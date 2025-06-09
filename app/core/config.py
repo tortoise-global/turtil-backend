@@ -30,6 +30,20 @@ class Settings(BaseSettings):
     RATE_LIMIT_CALLS: int = 100
     RATE_LIMIT_PERIOD: int = 60
     
+    # OTP Configuration
+    OTP_SECRET: str = "123456"
+    OTP_EXPIRY_MINUTES: int = 5
+    
+    # AWS Configuration (for S3 only)
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_REGION: str = "us-east-1"
+    S3_BUCKET_NAME: Optional[str] = None
+    
+    # Email Configuration
+    EMAIL_SERVICE_URL: Optional[str] = None
+    EMAIL_API_KEY: Optional[str] = None
+    
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         

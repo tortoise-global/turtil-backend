@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta
-from typing import Optional, Union
+from typing import Optional, Union, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
+import uuid
+import time
 from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -38,3 +40,18 @@ def verify_token(token: str) -> dict:
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+def generate_temp_password() -> str:
+    """Generate a temporary password."""
+    return f"temp_{uuid.uuid4().hex[:8]}"
+
+
+def generate_user_id() -> str:
+    """Generate a unique user ID."""
+    return f"user_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+
+
+def verify_otp(provided_otp: str) -> bool:
+    """Verify OTP against the environment variable."""
+    return provided_otp == settings.OTP_SECRET

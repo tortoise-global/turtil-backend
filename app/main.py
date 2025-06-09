@@ -7,12 +7,12 @@ import time
 from contextlib import asynccontextmanager
 
 from app.api.cms.routes import router as cms_router
-from app.api.health.routes import router as health_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.middleware import RateLimitMiddleware
 from app.db.database import engine, Base
+from app.models import models
 
 
 @asynccontextmanager
@@ -110,8 +110,9 @@ async def health_check():
     return {"status": "healthy", "timestamp": time.time()}
 
 
-app.include_router(health_router, prefix="/health", tags=["health"])
 app.include_router(cms_router, prefix="/cms", tags=["cms"])
+
+
 
 
 if __name__ == "__main__":

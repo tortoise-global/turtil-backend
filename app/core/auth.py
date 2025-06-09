@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.core.security import verify_token
 from app.db.database import get_db
-from app.models.cms.models import User
+from app.models.models import User
 
 security = HTTPBearer()
 
@@ -41,7 +41,7 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
 
 
 async def get_admin_user(current_user: User = Depends(get_current_active_user)) -> User:
-    if not current_user.is_admin:
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"
