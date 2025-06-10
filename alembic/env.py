@@ -8,9 +8,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.db.database import Base
-from app.models.cms.models import User, Institute
-from app.models.cms.programs import Program, Course
-from app.models.cms.placements import Company, PlacementDrive, PlacementApplication
+from app.models.cms.models import User, CollegeDegree, CollegePlacement, CollegeStudent
 from app.core.config import settings
 
 config = context.config
