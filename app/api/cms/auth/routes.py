@@ -6,11 +6,11 @@ from datetime import timedelta
 from app.core.auth import get_current_user
 from app.core.security import (
     verify_password, get_password_hash, create_access_token, 
-    generate_temp_password, generate_user_id, verify_otp
+    generate_temp_password, generate_user_id, verify_otp, send_mock_email_otp
 )
 from app.db.database import get_db
-from app.models.models import User
-from app.schemas.auth import (
+from app.models.cms.models import User
+from app.schemas.cms.auth import (
     SendEmailRequest, VerifyEmailRequest, LoginRequest, ChangePasswordRequest,
     Token, EmailResponse, VerifyResponse, UserCreate, UserUpdate, 
     UserResponse, UserCreateResponse, FetchUserResponse
@@ -25,9 +25,9 @@ async def send_email(request: SendEmailRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # In a real implementation, you would send an actual email here
-    # For now, we just return success since OTP is stored in env
-    return EmailResponse(message="OTP sent successfully", success=True)
+    # Use mock email service to get fixed OTP
+    otp = send_mock_email_otp(request.email)
+    return EmailResponse(message=f"Mock OTP sent successfully. OTP: {otp}", success=True)
 
 
 @router.post("/verify-email", response_model=VerifyResponse)

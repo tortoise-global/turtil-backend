@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
-from app.models.models import CollegePlacement
-from app.schemas.college_placements import CollegePlacementCreate, CollegePlacementUpdate, CollegePlacementResponse
+from app.models.cms.models import CollegePlacement
+from app.schemas.cms.college_placements import CollegePlacementCreate, CollegePlacementUpdate, CollegePlacementResponse
 
 router = APIRouter()
 

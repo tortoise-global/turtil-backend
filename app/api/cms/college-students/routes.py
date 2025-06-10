@@ -4,8 +4,8 @@ from typing import Optional, List
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
-from app.models.models import CollegeStudent
-from app.schemas.college_students import CollegeStudentCreate, CollegeStudentUpdate, CollegeStudentResponse, PaginatedResponse
+from app.models.cms.models import CollegeStudent
+from app.schemas.cms.college_students import CollegeStudentCreate, CollegeStudentUpdate, CollegeStudentResponse, PaginatedResponse
 
 router = APIRouter()
 

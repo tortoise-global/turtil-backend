@@ -12,7 +12,7 @@ from app.core.logging import setup_logging
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.middleware import RateLimitMiddleware
 from app.db.database import engine, Base
-from app.models import models
+from app.models.cms import models
 
 
 @asynccontextmanager

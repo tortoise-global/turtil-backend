@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
-from app.models.models import CollegeDegree
-from app.schemas.college_degree import DegreeCreate, DegreeUpdate, DegreeResponse
+from app.models.cms.models import CollegeDegree
+from app.schemas.cms.college_degree import DegreeCreate, DegreeUpdate, DegreeResponse
 
 router = APIRouter()
 

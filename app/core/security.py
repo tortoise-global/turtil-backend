@@ -52,6 +52,12 @@ def generate_user_id() -> str:
     return f"user_{int(time.time())}_{uuid.uuid4().hex[:8]}"
 
 
+def send_mock_email_otp(email: str) -> str:
+    """Mock email service that returns a fixed OTP."""
+    # Return fixed OTP for mocking
+    return settings.OTP_SECRET
+
+
 def verify_otp(provided_otp: str) -> bool:
-    """Verify OTP against the environment variable."""
+    """Verify OTP against the fixed mock OTP."""
     return provided_otp == settings.OTP_SECRET

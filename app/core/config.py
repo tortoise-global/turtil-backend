@@ -40,9 +40,6 @@ class Settings(BaseSettings):
     AWS_REGION: str = "us-east-1"
     S3_BUCKET_NAME: Optional[str] = None
     
-    # Email Configuration
-    EMAIL_SERVICE_URL: Optional[str] = None
-    EMAIL_API_KEY: Optional[str] = None
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
