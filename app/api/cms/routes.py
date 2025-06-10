@@ -9,7 +9,7 @@ from app.api.cms.image_upload.routes import router as image_upload_router
 router = APIRouter()
 
 # Include all routers with transformed paths: cms-[module] -> cms/[module]
-router.include_router(auth_router, prefix="/auth", tags=["cms-auth"])
-router.include_router(college_placements_router, prefix="/college-placements", tags=["cms-college-placements"])
-router.include_router(college_students_router, prefix="/college-students", tags=["cms-college-students"])
-router.include_router(image_upload_router, prefix="/image-upload", tags=["cms-image-upload"])
+router.include_router(auth_router, prefix="/auth", tags=["Auth"])
+router.include_router(college_placements_router, prefix="/college-placements", tags=["College Placements"])
+router.include_router(college_students_router, prefix="/college-students", tags=["College Students"])
+router.include_router(image_upload_router, prefix="/image-upload", tags=["Image Upload"])

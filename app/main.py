@@ -110,7 +110,7 @@ async def health_check():
     return {"status": "healthy", "timestamp": time.time()}
 
 
-app.include_router(cms_router, prefix="/cms", tags=["cms"])
+app.include_router(cms_router, prefix="/cms")
 
 
 
