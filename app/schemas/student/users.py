@@ -1,10 +1,10 @@
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import Optional, List, Dict, Any
-from uuid import UUID
 from datetime import date
-from enum import Enum
 from decimal import Decimal
+from enum import Enum
+from typing import Any, Dict, List, Optional
+from uuid import UUID
 
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class StudentUserRole(str, Enum):
@@ -16,7 +16,9 @@ class StudentUserBase(BaseModel):
     email: EmailStr = Field(..., description="Email address")
     full_name: str = Field(..., description="Full name")
     phone: Optional[str] = Field(None, description="Phone number")
-    role: Optional[StudentUserRole] = Field(StudentUserRole.STUDENT, description="User role")
+    role: Optional[StudentUserRole] = Field(
+        StudentUserRole.STUDENT, description="User role"
+    )
     student_id: str = Field(..., description="Student ID/enrollment number")
     roll_number: Optional[str] = Field(None, description="Roll number")
     admission_number: Optional[str] = Field(None, description="Admission number")
@@ -26,7 +28,9 @@ class StudentUserBase(BaseModel):
     batch_year: Optional[int] = Field(None, description="Batch year")
     current_semester: Optional[int] = Field(None, description="Current semester")
     admission_date: Optional[date] = Field(None, description="Admission date")
-    graduation_date: Optional[date] = Field(None, description="Expected graduation date")
+    graduation_date: Optional[date] = Field(
+        None, description="Expected graduation date"
+    )
     profile_image_url: Optional[str] = Field(None, description="Profile image URL")
     guardian_name: Optional[str] = Field(None, description="Guardian name")
     guardian_phone: Optional[str] = Field(None, description="Guardian phone")
@@ -36,7 +40,9 @@ class StudentUserBase(BaseModel):
     gender: Optional[str] = Field(None, description="Gender")
     address: Optional[str] = Field(None, description="Address")
     is_active: Optional[bool] = Field(True, description="User status")
-    email_verified: Optional[bool] = Field(False, description="Email verification status")
+    email_verified: Optional[bool] = Field(
+        False, description="Email verification status"
+    )
 
 
 class StudentUserCreate(StudentUserBase):
@@ -110,6 +116,7 @@ class StudentPasswordResetConfirm(BaseModel):
 
 # STUDENT ATTENDANCE SCHEMAS
 
+
 class StudentAttendanceBase(BaseModel):
     is_present: bool = Field(..., description="Attendance status")
     marked_at: Optional[int] = Field(None, description="Marked timestamp")
@@ -135,6 +142,7 @@ class StudentAttendanceResponse(StudentAttendanceBase):
 
 
 # STUDENT ASSIGNMENT SUBMISSION SCHEMAS
+
 
 class StudentAssignmentSubmissionBase(BaseModel):
     submission_text: Optional[str] = Field(None, description="Submission text")
@@ -165,6 +173,7 @@ class StudentAssignmentSubmissionResponse(StudentAssignmentSubmissionBase):
 
 
 # STUDENT RESULT SCHEMAS
+
 
 class StudentResultBase(BaseModel):
     marks_obtained: Optional[Decimal] = Field(None, description="Marks obtained")
@@ -200,6 +209,7 @@ class StudentResultResponse(StudentResultBase):
 
 # STUDENT PLACEMENT SCHEMAS
 
+
 class StudentPlacementStatus(str, Enum):
     APPLIED = "applied"
     SHORTLISTED = "shortlisted"
@@ -209,7 +219,9 @@ class StudentPlacementStatus(str, Enum):
 
 class StudentPlacementBase(BaseModel):
     application_date: Optional[date] = Field(None, description="Application date")
-    status: Optional[StudentPlacementStatus] = Field(StudentPlacementStatus.APPLIED, description="Application status")
+    status: Optional[StudentPlacementStatus] = Field(
+        StudentPlacementStatus.APPLIED, description="Application status"
+    )
     interview_date: Optional[date] = Field(None, description="Interview date")
     feedback: Optional[str] = Field(None, description="Feedback")
 
@@ -236,6 +248,7 @@ class StudentPlacementResponse(StudentPlacementBase):
 
 # STUDENT NOTIFICATION SCHEMAS
 
+
 class StudentNotificationBase(BaseModel):
     is_read: bool = Field(False, description="Read status")
     read_at: Optional[int] = Field(None, description="Read timestamp")
@@ -260,6 +273,7 @@ class StudentNotificationResponse(StudentNotificationBase):
 
 
 # STUDENT EVENT REGISTRATION SCHEMAS
+
 
 class StudentEventAttendanceStatus(str, Enum):
     REGISTERED = "registered"
@@ -295,6 +309,7 @@ class StudentEventRegistrationResponse(StudentEventRegistrationBase):
 
 # STUDENT TIMETABLE PREFERENCE SCHEMAS
 
+
 class StudentTimetablePreferenceBase(BaseModel):
     is_bookmarked: bool = Field(False, description="Bookmark status")
     notes: Optional[str] = Field(None, description="Personal notes")
@@ -321,12 +336,21 @@ class StudentTimetablePreferenceResponse(StudentTimetablePreferenceBase):
 
 # STUDENT DASHBOARD SCHEMAS
 
+
 class StudentDashboardBase(BaseModel):
-    total_attendance_percentage: Optional[Decimal] = Field(None, description="Overall attendance percentage")
-    pending_assignments: Optional[int] = Field(0, description="Number of pending assignments")
+    total_attendance_percentage: Optional[Decimal] = Field(
+        None, description="Overall attendance percentage"
+    )
+    pending_assignments: Optional[int] = Field(
+        0, description="Number of pending assignments"
+    )
     upcoming_events: Optional[int] = Field(0, description="Number of upcoming events")
-    unread_notifications: Optional[int] = Field(0, description="Number of unread notifications")
-    current_semester_gpa: Optional[Decimal] = Field(None, description="Current semester GPA")
+    unread_notifications: Optional[int] = Field(
+        0, description="Number of unread notifications"
+    )
+    current_semester_gpa: Optional[Decimal] = Field(
+        None, description="Current semester GPA"
+    )
 
 
 class StudentDashboardCreate(StudentDashboardBase):
@@ -343,8 +367,10 @@ class StudentDashboardResponse(StudentDashboardBase):
 
 # COMPLEX RESPONSE MODELS
 
+
 class StudentAttendanceSummary(BaseModel):
     """Student attendance summary"""
+
     student_id: UUID
     subject_wise_attendance: Dict[str, Dict[str, Any]] = Field(
         ..., description="Subject-wise attendance data"
@@ -357,6 +383,7 @@ class StudentAttendanceSummary(BaseModel):
 
 class StudentAcademicProfile(BaseModel):
     """Complete student academic profile"""
+
     student: StudentUserResponse
     current_semester_subjects: List[Dict[str, Any]] = []
     attendance_summary: StudentAttendanceSummary
@@ -369,6 +396,7 @@ class StudentAcademicProfile(BaseModel):
 
 class StudentResultCard(BaseModel):
     """Student result card for a semester"""
+
     student_id: UUID
     examination_id: UUID
     semester: int
@@ -385,21 +413,26 @@ class StudentResultCard(BaseModel):
 
 class StudentTimetableView(BaseModel):
     """Student's weekly timetable view"""
+
     student_id: UUID
     semester: int
     academic_year: int
     schedule: Dict[str, List[Dict[str, Any]]] = Field(
         ..., description="Weekly schedule organized by day"
     )
-    bookmarked_slots: List[UUID] = Field(..., description="Bookmarked timetable slot UUIDs")
+    bookmarked_slots: List[UUID] = Field(
+        ..., description="Bookmarked timetable slot UUIDs"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
 
 # ANALYTICS AND STATISTICS SCHEMAS
 
+
 class StudentPerformanceAnalytics(BaseModel):
     """Student performance analytics"""
+
     student_id: UUID
     semester_wise_performance: Dict[int, Dict[str, Any]] = Field(
         ..., description="Performance data by semester"
@@ -416,6 +449,7 @@ class StudentPerformanceAnalytics(BaseModel):
 
 class StudentPlacementProfile(BaseModel):
     """Student placement profile"""
+
     student_id: UUID
     cgpa: Optional[Decimal] = None
     skills: List[str] = []
@@ -430,18 +464,23 @@ class StudentPlacementProfile(BaseModel):
 
 # MOBILE APP SPECIFIC SCHEMAS
 
+
 class MobileStudentProfile(BaseModel):
     """Optimized student profile for mobile app"""
+
     basic_info: Dict[str, Any] = Field(..., description="Basic student information")
     academic_summary: Dict[str, Any] = Field(..., description="Academic summary")
     quick_stats: Dict[str, Any] = Field(..., description="Quick statistics")
-    recent_activities: List[Dict[str, Any]] = Field(..., description="Recent activities")
+    recent_activities: List[Dict[str, Any]] = Field(
+        ..., description="Recent activities"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class MobileNotificationPayload(BaseModel):
     """Mobile push notification payload"""
+
     title: str = Field(..., description="Notification title")
     body: str = Field(..., description="Notification body")
     data: Dict[str, Any] = Field(..., description="Additional data")

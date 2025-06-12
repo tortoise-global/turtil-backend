@@ -1,5 +1,6 @@
+from typing import List, Optional
+
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
 
 
 class SendEmailRequest(BaseModel):
@@ -40,11 +41,12 @@ class VerifyResponse(BaseModel):
     verified: bool
 
 
-from app.schemas.cms.users import CMSUserCreate, CMSUserUpdate, CMSUserResponse
+from app.schemas.cms.users import CMSUserCreate, CMSUserResponse, CMSUserUpdate
 
 CMSUserCreate = CMSUserCreate
-CMSUserUpdate = CMSUserUpdate  
+CMSUserUpdate = CMSUserUpdate
 CMSUserResponse = CMSUserResponse
+
 
 class CMSUserCreateResponse(BaseModel):
     message: str

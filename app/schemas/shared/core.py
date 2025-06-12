@@ -1,9 +1,9 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
-from uuid import UUID
 from datetime import date
 from decimal import Decimal
+from typing import List, Optional
+from uuid import UUID
 
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CollegeBase(BaseModel):
@@ -11,8 +11,12 @@ class CollegeBase(BaseModel):
     name: str = Field(..., description="Full college name")
     short_name: str = Field(..., description="College abbreviation")
     logo_url: Optional[str] = Field(None, description="College logo URL")
-    affiliated_university_name: Optional[str] = Field(None, description="University name")
-    affiliated_university_short: Optional[str] = Field(None, description="University abbreviation")
+    affiliated_university_name: Optional[str] = Field(
+        None, description="University name"
+    )
+    affiliated_university_short: Optional[str] = Field(
+        None, description="University abbreviation"
+    )
     university_id: Optional[str] = Field(None, description="University identifier")
     address: Optional[str] = Field(None, description="College address")
     city: Optional[str] = Field(None, description="City")
@@ -193,6 +197,7 @@ class SubjectResponse(SubjectBase):
 
 # RESPONSE MODELS WITH NESTED DATA
 
+
 class CollegeWithLocations(CollegeResponse):
     locations: List[CollegeLocationResponse] = []
 
@@ -207,14 +212,16 @@ class BranchWithSubjects(BranchResponse):
 
 class AcademicStructure(BaseModel):
     """Complete academic structure for a college"""
+
     college: CollegeResponse
     departments: List[DepartmentWithBranches] = []
     degrees: List[DegreeResponse] = []
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 # UTILITY SCHEMAS
+
 
 class PaginatedResponse(BaseModel):
     total: int = Field(..., description="Total number of items")
@@ -235,13 +242,16 @@ class ErrorResponse(BaseModel):
 
 # ENUM SCHEMAS
 
+
 class UserRole(BaseModel):
     """Base user role schema"""
+
     role: str = Field(..., description="User role")
 
 
 class CMSUserRoles(BaseModel):
     """CMS specific user roles"""
+
     SUPER_ADMIN = "super_admin"
     DEPARTMENT_ADMIN = "department_admin"
     LECTURER = "lecturer"
@@ -250,11 +260,13 @@ class CMSUserRoles(BaseModel):
 
 class StudentUserRoles(BaseModel):
     """Student specific user roles"""
+
     STUDENT = "student"
 
 
 class NotificationTypes(BaseModel):
     """Notification types"""
+
     INFO = "info"
     WARNING = "warning"
     SUCCESS = "success"
@@ -263,6 +275,7 @@ class NotificationTypes(BaseModel):
 
 class EventTypes(BaseModel):
     """Event types"""
+
     ACADEMIC = "academic"
     CULTURAL = "cultural"
     SPORTS = "sports"

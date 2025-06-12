@@ -1,9 +1,9 @@
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import Optional, List
-from uuid import UUID
 from datetime import date
 from enum import Enum
+from typing import List, Optional
+from uuid import UUID
 
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class CMSUserRole(str, Enum):
@@ -23,7 +23,9 @@ class CMSUserBase(BaseModel):
     branch_id: Optional[UUID] = Field(None, description="Branch UUID")
     degree_id: Optional[UUID] = Field(None, description="Degree UUID")
     is_active: Optional[bool] = Field(True, description="User status")
-    email_verified: Optional[bool] = Field(False, description="Email verification status")
+    email_verified: Optional[bool] = Field(
+        False, description="Email verification status"
+    )
 
 
 class CMSUserCreate(CMSUserBase):
@@ -82,7 +84,6 @@ class CMSPasswordResetConfirm(BaseModel):
     new_password: str = Field(..., min_length=8, description="New password")
 
 
-
 class CMSSystemModuleBase(BaseModel):
     name: str = Field(..., description="Module name")
     display_name: str = Field(..., description="Display name")
@@ -108,7 +109,6 @@ class CMSSystemModuleResponse(CMSSystemModuleBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-
 class CMSCollegeModuleBase(BaseModel):
     is_enabled: bool = Field(True, description="Module enabled status")
 
@@ -129,7 +129,6 @@ class CMSCollegeModuleResponse(CMSCollegeModuleBase):
     configured_at: int
 
     model_config = ConfigDict(from_attributes=True)
-
 
 
 class CMSUserModulePermissionBase(BaseModel):
@@ -154,7 +153,6 @@ class CMSUserModulePermissionResponse(CMSUserModulePermissionBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-
 class CMSCollegeSettingBase(BaseModel):
     setting_key: str = Field(..., description="Setting key")
     setting_value: Optional[str] = Field(None, description="Setting value")
@@ -177,7 +175,6 @@ class CMSCollegeSettingResponse(CMSCollegeSettingBase):
     updated_at: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
-
 
 
 class CMSFacultySubjectAssignmentBase(BaseModel):
@@ -206,7 +203,6 @@ class CMSFacultySubjectAssignmentResponse(CMSFacultySubjectAssignmentBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-
 class CMSUserWithPermissions(CMSUserResponse):
     module_permissions: List[CMSUserModulePermissionResponse] = []
 
@@ -217,7 +213,6 @@ class CMSCollegeWithModules(BaseModel):
     settings: List[CMSCollegeSettingResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
-
 
 
 class CMSBulkUserCreate(BaseModel):
@@ -234,7 +229,6 @@ class CMSBulkPermissionUpdate(BaseModel):
     user_ids: List[UUID] = Field(..., description="List of user UUIDs")
     module_id: UUID = Field(..., description="Module UUID")
     has_access: bool = Field(..., description="Access permission")
-
 
 
 class CMSUserStatistics(BaseModel):

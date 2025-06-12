@@ -1,22 +1,36 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List
-from datetime import timedelta
 import logging
 import time
+from datetime import timedelta
+from typing import List
 
-from app.core.auth import get_current_user, get_principal_user, get_admin_user
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.core.auth import get_admin_user, get_current_user, get_principal_user
 from app.core.auth_manager import auth_manager
 from app.core.security import (
-    verify_password, get_password_hash, 
-    generate_temp_password, generate_user_id, verify_otp, send_mock_email_otp
+    generate_temp_password,
+    generate_user_id,
+    get_password_hash,
+    send_email_otp,
+    verify_otp,
+    verify_password,
 )
 from app.db.database import get_db
 from app.models.cms.models import CMSUser
 from app.schemas.cms.auth import (
-    SendEmailRequest, VerifyEmailRequest, LoginRequest, ChangePasswordRequest,
-    Token, EmailResponse, VerifyResponse, CMSUserCreate, CMSUserUpdate, 
-    CMSUserResponse, CMSUserCreateResponse, FetchCMSUserResponse
+    ChangePasswordRequest,
+    CMSUserCreate,
+    CMSUserCreateResponse,
+    CMSUserResponse,
+    CMSUserUpdate,
+    EmailResponse,
+    FetchCMSUserResponse,
+    LoginRequest,
+    SendEmailRequest,
+    Token,
+    VerifyEmailRequest,
+    VerifyResponse,
 )
 
 router = APIRouter()
@@ -27,22 +41,22 @@ logger = logging.getLogger(__name__)
 async def send_email(request: SendEmailRequest, db: Session = Depends(get_db)):
     """
     Send OTP to email for verification
-    
+
     **Request Body:**
     - email (string, required): Email address of the user
-    
+
     **Parameters:** None
-    
-    **Headers:** 
+
+    **Headers:**
     - Content-Type: application/json
-    
+
     **Example Request:**
     ```json
     {
         "email": "admin@rajivgandhi.edu"
     }
     ```
-    
+
     **Example Response:**
     ```json
     {
@@ -50,7 +64,7 @@ async def send_email(request: SendEmailRequest, db: Session = Depends(get_db)):
         "success": true
     }
     ```
-    
+
     **Status Codes:**
     - 200: OTP sent successfully
     - 404: CMSUser not found
@@ -59,26 +73,37 @@ async def send_email(request: SendEmailRequest, db: Session = Depends(get_db)):
     user = db.query(CMSUser).filter(CMSUser.email == request.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="CMSUser not found")
-    
-    # Use mock email service to get fixed OTP
-    otp = send_mock_email_otp(request.email)
-    return EmailResponse(message=f"Mock OTP sent successfully. OTP: {otp}", success=True)
+
+    # Send real OTP via email
+    try:
+        otp = send_email_otp(request.email, user.college.name if user.college else None)
+        return EmailResponse(
+            message="OTP sent successfully to your email address", success=True
+        )
+    except HTTPException:
+        # Re-raise HTTP exceptions (like email sending failures)
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error sending OTP to {request.email}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="Failed to send OTP. Please try again."
+        )
 
 
 @router.post("/verify-email", response_model=VerifyResponse)
 async def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db)):
     """
     Verify email using OTP
-    
+
     **Request Body:**
     - email (string, required): Email address to verify
     - otp (integer, required): 6-digit OTP received via email
-    
+
     **Parameters:** None
-    
+
     **Headers:**
     - Content-Type: application/json
-    
+
     **Example Request:**
     ```json
     {
@@ -86,7 +111,7 @@ async def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db
         "otp": 123456
     }
     ```
-    
+
     **Example Response:**
     ```json
     {
@@ -95,7 +120,7 @@ async def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db
         "verified": true
     }
     ```
-    
+
     **Status Codes:**
     - 200: Email verified successfully
     - 400: Invalid OTP
@@ -105,22 +130,24 @@ async def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db
     user = db.query(CMSUser).filter(CMSUser.email == request.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="CMSUser not found")
-    
-    if not verify_otp(str(request.otp)):
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-    
+
+    if not verify_otp(request.email, str(request.otp)):
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+
     # Mark email as verified
-    user.is_email_verified = True
+    user.email_verified = True
     db.commit()
-    
-    return VerifyResponse(message="Email verified successfully", success=True, verified=True)
+
+    return VerifyResponse(
+        message="Email verified successfully", success=True, verified=True
+    )
 
 
 @router.post("/signup", response_model=CMSUserCreateResponse)
 async def signup(user_data: CMSUserCreate, db: Session = Depends(get_db)):
     """
     Create a new CMS user account
-    
+
     **Request Body:**
     - email (string, required): CMSUser's email address
     - password (string, optional): CMSUser password (if not provided, temp password generated)
@@ -136,12 +163,12 @@ async def signup(user_data: CMSUserCreate, db: Session = Depends(get_db)):
     - affilliatedUnversity (array, optional): University affiliation details
     - address (array, optional): College address information
     - resultFormat (array, optional): Academic result format configuration
-    
+
     **Parameters:** None
-    
+
     **Headers:**
     - Content-Type: application/json
-    
+
     **Example Request:**
     ```json
     {
@@ -190,7 +217,7 @@ async def signup(user_data: CMSUserCreate, db: Session = Depends(get_db)):
         ]
     }
     ```
-    
+
     **Example Response:**
     ```json
     {
@@ -200,7 +227,7 @@ async def signup(user_data: CMSUserCreate, db: Session = Depends(get_db)):
         "temparyPassword": "Password set by user"
     }
     ```
-    
+
     **Status Codes:**
     - 200: CMSUser created successfully
     - 400: Email already registered
@@ -210,11 +237,11 @@ async def signup(user_data: CMSUserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(CMSUser).filter(CMSUser.email == user_data.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     # Generate user ID and temporary password
     user_id = generate_user_id()
     temp_password = generate_temp_password()
-    
+
     # Create new user
     db_user = CMSUser(
         id=user_id,
@@ -232,18 +259,20 @@ async def signup(user_data: CMSUserCreate, db: Session = Depends(get_db)):
         college_details=user_data.collegeDetails,
         affiliated_university=user_data.affilliatedUnversity,
         address=user_data.address,
-        result_format=user_data.resultFormat
+        result_format=user_data.resultFormat,
     )
-    
+
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    
+
     return CMSUserCreateResponse(
         message="CMSUser created successfully",
         cmsCMSUserId=user_id,
         userName=user_data.email,
-        temparyPassword=temp_password if not user_data.password else "Password set by user"
+        temparyPassword=temp_password
+        if not user_data.password
+        else "Password set by user",
     )
 
 
@@ -251,16 +280,16 @@ async def signup(user_data: CMSUserCreate, db: Session = Depends(get_db)):
 async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     """
     Login to CMS system
-    
+
     **Request Body:**
     - userName (string, required): CMSUsername or email address
     - Password (string, required): CMSUser password
-    
+
     **Parameters:** None
-    
+
     **Headers:**
     - Content-Type: application/json
-    
+
     **Example Request:**
     ```json
     {
@@ -268,7 +297,7 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         "Password": "SecurePass123!"
     }
     ```
-    
+
     **Example Response:**
     ```json
     {
@@ -278,13 +307,13 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         "role": "admin"
     }
     ```
-    
+
     **Status Codes:**
     - 200: Login successful
     - 400: Inactive user
     - 401: Incorrect username or password
     - 422: Validation error
-    
+
     **Token Usage:**
     Include the access_token in subsequent requests:
     ```
@@ -292,35 +321,37 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     ```
     """
     logger = logging.getLogger(__name__)
-    
+
     # Authenticate user with enhanced auth manager
-    user = auth_manager.authenticate_user(credentials.userName, credentials.Password, db)
-    
+    user = auth_manager.authenticate_user(
+        credentials.userName, credentials.Password, db
+    )
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Create enhanced access token with Redis caching
     user_data = {
         "user_id": str(user.id),
         "email": user.email,
         "role": user.role,
         "college_id": str(user.college_id),
-        "username": user.username
+        "username": user.username,
     }
-    
+
     token_response = auth_manager.create_access_token(user_data)
-    
+
     logger.info(f"User {user.username} logged in successfully")
-    
+
     return Token(
         access_token=token_response["access_token"],
         token_type=token_response["token_type"],
         cmsUserId=str(user.id),
-        role=user.role
+        role=user.role,
     )
 
 
@@ -328,22 +359,22 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
 async def change_password(
     request: ChangePasswordRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Change user password (requires authentication)
-    
+
     **Request Body:**
     - email (string, required): Email address of the user
     - oldPassword (string, required): Current password
     - newPassword (string, required): New password
-    
+
     **Parameters:** None
-    
+
     **Headers:**
     - Content-Type: application/json
     - Authorization: Bearer {access_token}
-    
+
     **Example Request:**
     ```json
     {
@@ -352,14 +383,14 @@ async def change_password(
         "newPassword": "NewSecurePass456!"
     }
     ```
-    
+
     **Example Response:**
     ```json
     {
         "message": "Password changed successfully"
     }
     ```
-    
+
     **Status Codes:**
     - 200: Password changed successfully
     - 400: Invalid current password
@@ -371,15 +402,15 @@ async def change_password(
     user = db.query(CMSUser).filter(CMSUser.email == request.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="CMSUser not found")
-    
+
     # Verify current password
     if not verify_password(request.oldPassword, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid current password")
-    
+
     # Update password
     user.hashed_password = get_password_hash(request.newPassword)
     db.commit()
-    
+
     return {"message": "Password changed successfully"}
 
 
@@ -387,7 +418,7 @@ async def change_password(
 async def get_user(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     user = db.query(CMSUser).filter(CMSUser.id == user_id).first()
     if not user:
@@ -400,15 +431,15 @@ async def update_user(
     user_id: str,
     user_data: CMSUserUpdate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     user = db.query(CMSUser).filter(CMSUser.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="CMSUser not found")
-    
+
     for field, value in user_data.model_dump(exclude_unset=True).items():
         setattr(user, field, value)
-    
+
     db.commit()
     db.refresh(user)
     return user
@@ -418,12 +449,12 @@ async def update_user(
 async def delete_user(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     user = db.query(CMSUser).filter(CMSUser.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="CMSUser not found")
-    
+
     db.delete(user)
     db.commit()
 
@@ -434,15 +465,14 @@ async def fetch_users(
     page: int = 1,
     page_size: int = 10,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     if page_size > 100:
         page_size = 100
-    
+
     offset = (page - 1) * page_size
     users = db.query(CMSUser).offset(offset).limit(page_size).all()
     return users
-
 
 
 @router.delete("/admin/{admin_id}")
@@ -450,40 +480,38 @@ async def revoke_admin_access(
     admin_id: str,
     reason: str = "admin_revoked",
     db: Session = Depends(get_db),
-    current_user: CMSUser = Depends(get_principal_user)
+    current_user: CMSUser = Depends(get_principal_user),
 ):
     # Verify admin user exists
     admin_user = db.query(CMSUser).filter(CMSUser.id == admin_id).first()
     if not admin_user:
         raise HTTPException(status_code=404, detail="Admin user not found")
-    
+
     # Only allow revoking admin roles
     if admin_user.role not in ["admin", "head", "staff"]:
         raise HTTPException(
-            status_code=400, 
-            detail="Can only revoke admin/head/staff access"
+            status_code=400, detail="Can only revoke admin/head/staff access"
         )
-    
+
     # Immediately revoke access using Redis blacklist
     success = auth_manager.revoke_user_access(admin_id, reason)
-    
+
     if not success:
         raise HTTPException(
-            status_code=500,
-            detail="Failed to revoke access - Redis unavailable"
+            status_code=500, detail="Failed to revoke access - Redis unavailable"
         )
-    
+
     # Optionally deactivate user in database
     admin_user.is_active = False
     db.commit()
-    
+
     logger.info(f"Principal {current_user.id} revoked access for admin {admin_id}")
-    
+
     return {
         "message": "Admin access revoked immediately",
         "user_id": admin_id,
         "revoked_at": int(time.time()),
-        "reason": reason
+        "reason": reason,
     }
 
 
@@ -491,42 +519,39 @@ async def revoke_admin_access(
 async def restore_admin_access(
     admin_id: str,
     db: Session = Depends(get_db),
-    current_user: CMSUser = Depends(get_principal_user)
+    current_user: CMSUser = Depends(get_principal_user),
 ):
     # Verify admin user exists
     admin_user = db.query(CMSUser).filter(CMSUser.id == admin_id).first()
     if not admin_user:
         raise HTTPException(status_code=404, detail="Admin user not found")
-    
+
     # Restore access using Redis
     success = auth_manager.restore_user_access(admin_id)
-    
+
     if not success:
         raise HTTPException(
-            status_code=500,
-            detail="Failed to restore access - Redis unavailable"
+            status_code=500, detail="Failed to restore access - Redis unavailable"
         )
-    
+
     # Reactivate user in database
     admin_user.is_active = True
     db.commit()
-    
+
     logger.info(f"Principal {current_user.id} restored access for admin {admin_id}")
-    
+
     return {
         "message": "Admin access restored",
         "user_id": admin_id,
-        "restored_at": int(time.time())
+        "restored_at": int(time.time()),
     }
 
 
 @router.get("/auth/status")
-async def get_auth_status(
-    current_user: CMSUser = Depends(get_current_user)
-):
+async def get_auth_status(current_user: CMSUser = Depends(get_current_user)):
     # Get detailed authentication status
     auth_status = auth_manager.get_authentication_status(str(current_user.id))
-    
+
     return {
         "user_id": str(current_user.id),
         "username": current_user.username,
@@ -536,37 +561,29 @@ async def get_auth_status(
         "is_active": current_user.is_active,
         "last_login": current_user.last_login,
         "token_valid": True,
-        **auth_status
+        **auth_status,
     }
 
 
 @router.post("/logout")
-async def logout(
-    token: str = None,
-    current_user: CMSUser = Depends(get_current_user)
-):
+async def logout(token: str = None, current_user: CMSUser = Depends(get_current_user)):
     # Get token from authorization header if not provided
     if not token:
         # This would need to be extracted from the request context
         # For now, we'll just invalidate the user cache
         pass
-    
+
     # Invalidate user cache
     auth_manager.redis.invalidate_user_cache(str(current_user.id))
-    
+
     logger.info(f"User {current_user.username} logged out")
-    
-    return {
-        "message": "Logged out successfully",
-        "user_id": str(current_user.id)
-    }
+
+    return {"message": "Logged out successfully", "user_id": str(current_user.id)}
 
 
 @router.get("/cache/stats")
-async def get_cache_stats(
-    current_user: CMSUser = Depends(get_principal_user)
-):
+async def get_cache_stats(current_user: CMSUser = Depends(get_principal_user)):
     cache_stats = auth_manager.redis.get_cache_stats()
     cache_stats["cache_available"] = auth_manager.redis.is_available()
-    
+
     return cache_stats

@@ -1,32 +1,43 @@
-from sqlalchemy import Column, String, Boolean, JSON, BigInteger, Integer, Text, Date, Time, DECIMAL, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, ENUM
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.db.database import Base
 import uuid
 
-from app.models.cms.models import (
-    College, Department, Branch, Degree, Subject, CMSUser
+from sqlalchemy import (
+    DECIMAL,
+    JSON,
+    BigInteger,
+    Boolean,
+    Column,
+    Date,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Time,
 )
+from sqlalchemy.dialects.postgresql import ENUM, UUID
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
+from app.db.database import Base
+from app.models.cms.models import Branch, CMSUser, College, Degree, Department, Subject
 
-student_user_role = ENUM(
-    'student',
-    name='student_user_role',
-    create_type=False
-)
+student_user_role = ENUM("student", name="student_user_role", create_type=False)
+
 
 class StudentUser(Base):
     __tablename__ = "student_users"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
+    college_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("colleges.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     username = Column(String(100), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
     phone = Column(String(20))
-    role = Column(student_user_role, default='student')
+    role = Column(student_user_role, default="student")
     student_id = Column(String(50), unique=True, nullable=False)
     roll_number = Column(String(50))
     admission_number = Column(String(50))
@@ -48,10 +59,18 @@ class StudentUser(Base):
     is_active = Column(Boolean, default=True)
     email_verified = Column(Boolean, default=False)
     last_login = Column(BigInteger)
-    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
-    updated_at = Column(BigInteger, nullable=True, onupdate=func.extract('epoch', func.now()).cast(Integer))
+    created_at = Column(
+        BigInteger,
+        nullable=False,
+        default=func.extract("epoch", func.now()).cast(Integer),
+    )
+    updated_at = Column(
+        BigInteger,
+        nullable=True,
+        onupdate=func.extract("epoch", func.now()).cast(Integer),
+    )
 
     college = relationship("College")
     department = relationship("Department")
-    branch = relationship("Branch") 
+    branch = relationship("Branch")
     degree = relationship("Degree")
