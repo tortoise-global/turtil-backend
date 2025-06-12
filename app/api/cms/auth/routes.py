@@ -5,7 +5,7 @@ from datetime import timedelta
 import logging
 import time
 
-from app.core.auth import get_current_user, get_super_admin_user, get_admin_user
+from app.core.auth import get_current_user, get_principal_user, get_admin_user
 from app.core.auth_manager import auth_manager
 from app.core.security import (
     verify_password, get_password_hash, 
@@ -450,7 +450,7 @@ async def revoke_admin_access(
     admin_id: str,
     reason: str = "admin_revoked",
     db: Session = Depends(get_db),
-    current_user: CMSUser = Depends(get_super_admin_user)
+    current_user: CMSUser = Depends(get_principal_user)
 ):
     # Verify admin user exists
     admin_user = db.query(CMSUser).filter(CMSUser.id == admin_id).first()
@@ -458,10 +458,10 @@ async def revoke_admin_access(
         raise HTTPException(status_code=404, detail="Admin user not found")
     
     # Only allow revoking admin roles
-    if admin_user.role not in ["department_admin", "lecturer", "staff_admin"]:
+    if admin_user.role not in ["admin", "head", "staff"]:
         raise HTTPException(
             status_code=400, 
-            detail="Can only revoke admin/lecturer access"
+            detail="Can only revoke admin/head/staff access"
         )
     
     # Immediately revoke access using Redis blacklist
@@ -477,7 +477,7 @@ async def revoke_admin_access(
     admin_user.is_active = False
     db.commit()
     
-    logger.info(f"Super admin {current_user.id} revoked access for admin {admin_id}")
+    logger.info(f"Principal {current_user.id} revoked access for admin {admin_id}")
     
     return {
         "message": "Admin access revoked immediately",
@@ -491,7 +491,7 @@ async def revoke_admin_access(
 async def restore_admin_access(
     admin_id: str,
     db: Session = Depends(get_db),
-    current_user: CMSUser = Depends(get_super_admin_user)
+    current_user: CMSUser = Depends(get_principal_user)
 ):
     # Verify admin user exists
     admin_user = db.query(CMSUser).filter(CMSUser.id == admin_id).first()
@@ -511,7 +511,7 @@ async def restore_admin_access(
     admin_user.is_active = True
     db.commit()
     
-    logger.info(f"Super admin {current_user.id} restored access for admin {admin_id}")
+    logger.info(f"Principal {current_user.id} restored access for admin {admin_id}")
     
     return {
         "message": "Admin access restored",
@@ -564,7 +564,7 @@ async def logout(
 
 @router.get("/cache/stats")
 async def get_cache_stats(
-    current_user: CMSUser = Depends(get_super_admin_user)
+    current_user: CMSUser = Depends(get_principal_user)
 ):
     cache_stats = auth_manager.redis.get_cache_stats()
     cache_stats["cache_available"] = auth_manager.redis.is_available()

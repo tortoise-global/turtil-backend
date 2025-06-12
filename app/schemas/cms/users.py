@@ -7,10 +7,10 @@ from enum import Enum
 
 
 class CMSUserRole(str, Enum):
-    SUPER_ADMIN = "super_admin"
-    DEPARTMENT_ADMIN = "department_admin"
-    LECTURER = "lecturer"
-    STAFF_ADMIN = "staff_admin"
+    PRINCIPAL = "principal"
+    ADMIN = "admin"
+    HEAD = "head"
+    STAFF = "staff"
 
 
 class CMSUserBase(BaseModel):

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, JSON, BigInteger, Integer, Text, Date, Time, DECIMAL, ForeignKey
+from sqlalchemy import Column, String, Boolean, JSON, BigInteger, Integer, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, ENUM
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -6,7 +6,7 @@ from app.db.database import Base
 import uuid
 
 
-
+# Core models needed for user management and authentication
 class College(Base):
     __tablename__ = "colleges"
     
@@ -15,43 +15,20 @@ class College(Base):
     name = Column(String(255), nullable=False)
     short_name = Column(String(10), nullable=False)
     logo_url = Column(Text)
-    affiliated_university_name = Column(String(255))
-    affiliated_university_short = Column(String(50))
-    university_id = Column(String(50))
     address = Column(Text)
     city = Column(String(100))
-    district = Column(String(100))
     state = Column(String(100))
-    pincode = Column(String(10))
-    latitude = Column(DECIMAL(10, 8))
-    longitude = Column(DECIMAL(11, 8))
-    total_locations = Column(Integer, default=1)
     is_active = Column(Boolean, default=True)
+    # Setting to control college visibility for student signup
+    allow_student_signup = Column(Boolean, default=False)
     created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
     updated_at = Column(BigInteger, nullable=True, onupdate=func.extract('epoch', func.now()).cast(Integer))
 
     cms_users = relationship("CMSUser", back_populates="college")
     departments = relationship("Department", back_populates="college")
     degrees = relationship("Degree", back_populates="college")
-
-
-class CollegeLocation(Base):
-    __tablename__ = "college_locations"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
-    location_name = Column(String(100), nullable=False)
-    address = Column(Text)
-    city = Column(String(100))
-    district = Column(String(100))
-    state = Column(String(100))
-    pincode = Column(String(10))
-    latitude = Column(DECIMAL(10, 8))
-    longitude = Column(DECIMAL(11, 8))
-    is_main_campus = Column(Boolean, default=False)
-    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
-
-    college = relationship("College")
+    college_modules = relationship("CMSCollegeModule", back_populates="college")
+    college_settings = relationship("CMSCollegeSetting", back_populates="college")
 
 
 class Degree(Base):
@@ -97,37 +74,19 @@ class Branch(Base):
 
     department = relationship("Department", back_populates="branches")
     degree = relationship("Degree", back_populates="branches")
-    subjects = relationship("Subject", back_populates="branch")
     cms_users = relationship("CMSUser", back_populates="branch")
 
 
-class Subject(Base):
-    __tablename__ = "subjects"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"), nullable=True)
-    subject_code = Column(String(20), nullable=False)
-    subject_name = Column(String(255), nullable=False)
-    semester = Column(Integer)
-    credits = Column(Integer, default=0)
-    is_core = Column(Boolean, default=True)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
-
-    college = relationship("College")
-    branch = relationship("Branch", back_populates="subjects")
-
-
-
+# User roles enum
 cms_user_role = ENUM(
-    'super_admin',
-    'department_admin', 
-    'lecturer',
-    'staff_admin',
+    'principal',
+    'admin', 
+    'head',
+    'staff',
     name='cms_user_role',
     create_type=False
 )
+
 
 class CMSUser(Base):
     __tablename__ = "cms_users"
@@ -143,6 +102,10 @@ class CMSUser(Base):
     department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"))
     branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"))
     degree_id = Column(UUID(as_uuid=True), ForeignKey("degrees.id"))
+    # Hierarchy management fields
+    created_by = Column(UUID(as_uuid=True), ForeignKey("cms_users.id"))
+    managed_departments = Column(JSON, default=list)  # For cross-department access
+    teaching_subjects = Column(JSON, default=list)    # Subject IDs for cross-department teaching
     is_active = Column(Boolean, default=True)
     email_verified = Column(Boolean, default=False)
     last_login = Column(BigInteger)
@@ -153,8 +116,11 @@ class CMSUser(Base):
     department = relationship("Department", back_populates="cms_users")
     branch = relationship("Branch", back_populates="cms_users")
     degree = relationship("Degree")
+    creator = relationship("CMSUser", remote_side=[id], back_populates="created_users")
+    created_users = relationship("CMSUser", back_populates="creator")
 
 
+# Module management for role-based access control
 class CMSSystemModule(Base):
     __tablename__ = "cms_system_modules"
     
@@ -167,6 +133,7 @@ class CMSSystemModule(Base):
 
     college_modules = relationship("CMSCollegeModule", back_populates="module")
     user_permissions = relationship("CMSUserModulePermission", back_populates="module")
+    role_access = relationship("CMSRoleModuleAccess", back_populates="module")
 
 
 class CMSCollegeModule(Base):
@@ -178,8 +145,23 @@ class CMSCollegeModule(Base):
     is_enabled = Column(Boolean, default=True)
     configured_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
 
-    college = relationship("College")
+    college = relationship("College", back_populates="college_modules")
     module = relationship("CMSSystemModule", back_populates="college_modules")
+
+
+# Enhanced permission actions enum
+cms_permission_action = ENUM(
+    'read', 'write', 'delete', 'manage', 'export', 'import',
+    name='cms_permission_action',
+    create_type=False
+)
+
+# Access scope enum for department-level permissions
+cms_access_scope = ENUM(
+    'all', 'college', 'department', 'branch', 'self',
+    name='cms_access_scope', 
+    create_type=False
+)
 
 
 class CMSUserModulePermission(Base):
@@ -189,10 +171,34 @@ class CMSUserModulePermission(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("cms_users.id", ondelete="CASCADE"), nullable=False)
     module_id = Column(UUID(as_uuid=True), ForeignKey("cms_system_modules.id", ondelete="CASCADE"), nullable=False)
     has_access = Column(Boolean, default=False)
+    # Action-level permissions
+    allowed_actions = Column(JSON, default=list)  # List of allowed actions ['read', 'write', etc.]
+    # Scope-based access control
+    access_scope = Column(cms_access_scope, default='self')
+    # Department/branch restrictions
+    restricted_departments = Column(JSON, default=list)  # List of department UUIDs
+    restricted_branches = Column(JSON, default=list)     # List of branch UUIDs
     granted_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
+    updated_at = Column(BigInteger, nullable=True, onupdate=func.extract('epoch', func.now()).cast(Integer))
 
     user = relationship("CMSUser")
     module = relationship("CMSSystemModule", back_populates="user_permissions")
+
+
+class CMSRoleModuleAccess(Base):
+    """Defines default module access patterns for each role"""
+    __tablename__ = "cms_role_module_access"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    role = Column(cms_user_role, nullable=False)
+    module_id = Column(UUID(as_uuid=True), ForeignKey("cms_system_modules.id", ondelete="CASCADE"), nullable=False)
+    default_access = Column(Boolean, default=False)
+    default_actions = Column(JSON, default=list)  # Default actions for this role-module combination
+    default_scope = Column(cms_access_scope, default='self')
+    is_visible_in_role_creation = Column(Boolean, default=True)  # Whether shown when creating sub-accounts
+    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
+
+    module = relationship("CMSSystemModule", back_populates="role_access")
 
 
 class CMSCollegeSetting(Base):
@@ -206,235 +212,94 @@ class CMSCollegeSetting(Base):
     created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
     updated_at = Column(BigInteger, nullable=True, onupdate=func.extract('epoch', func.now()).cast(Integer))
 
-    college = relationship("College")
+    college = relationship("College", back_populates="college_settings")
 
 
-class CMSFacultySubjectAssignment(Base):
-    __tablename__ = "cms_faculty_subject_assignments"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("cms_users.id", ondelete="CASCADE"), nullable=False)
-    subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
-    academic_year = Column(Integer)
-    semester = Column(Integer)
-    assigned_date = Column(Date, default=func.current_date())
-    is_active = Column(Boolean, default=True)
-
-    user = relationship("CMSUser")
-    subject = relationship("Subject")
-
-
-cms_day_of_week = ENUM(
-    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-    name='cms_day_of_week',
-    create_type=False
-)
-
-class CMSTimetableSlot(Base):
-    __tablename__ = "cms_timetable_slots"
+# Academic Structure Models
+class Batch(Base):
+    __tablename__ = "batches"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"))
-    subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.id"))
-    faculty_id = Column(UUID(as_uuid=True), ForeignKey("cms_users.id"))
-    semester = Column(Integer)
-    day_of_week = Column(cms_day_of_week)
-    start_time = Column(Time, nullable=False)
-    end_time = Column(Time, nullable=False)
-    room_number = Column(String(50))
-    academic_year = Column(Integer)
+    department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id", ondelete="CASCADE"), nullable=False)
+    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id", ondelete="CASCADE"), nullable=False)
+    degree_id = Column(UUID(as_uuid=True), ForeignKey("degrees.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(100), nullable=False)  # 2024-CSE, 2023-IT
+    year = Column(Integer, nullable=False)      # Academic year
+    semester = Column(Integer, nullable=False)  # Current semester
+    start_date = Column(BigInteger)
+    end_date = Column(BigInteger)
     is_active = Column(Boolean, default=True)
-    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
-
-    college = relationship("College")
-    branch = relationship("Branch")
-    subject = relationship("Subject")
-    faculty = relationship("CMSUser")
-
-
-class CMSAttendanceSession(Base):
-    __tablename__ = "cms_attendance_sessions"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
-    subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
-    faculty_id = Column(UUID(as_uuid=True), ForeignKey("cms_users.id", ondelete="CASCADE"), nullable=False)
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"))
-    semester = Column(Integer)
-    session_date = Column(Date, nullable=False)
-    session_time = Column(Time)
-    session_type = Column(String(50), default='regular')
-    total_classes = Column(Integer, default=1)
-    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
-
-    college = relationship("College")
-    subject = relationship("Subject")
-    faculty = relationship("CMSUser")
-    branch = relationship("Branch")
-
-
-cms_assignment_status = ENUM(
-    'draft', 'published', 'closed',
-    name='cms_assignment_status',
-    create_type=False
-)
-
-class CMSAssignment(Base):
-    __tablename__ = "cms_assignments"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
-    subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
-    faculty_id = Column(UUID(as_uuid=True), ForeignKey("cms_users.id", ondelete="CASCADE"), nullable=False)
-    title = Column(String(255), nullable=False)
-    description = Column(Text)
-    assignment_type = Column(String(50), default='homework')
-    due_date = Column(BigInteger)
-    max_marks = Column(Integer, default=0)
-    status = Column(cms_assignment_status, default='draft')
-    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
-    updated_at = Column(BigInteger, nullable=True, onupdate=func.extract('epoch', func.now()).cast(Integer))
-
-    college = relationship("College")
-    subject = relationship("Subject")
-    faculty = relationship("CMSUser")
-
-
-class CMSExamination(Base):
-    __tablename__ = "cms_examinations"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
-    exam_name = Column(String(255), nullable=False)
-    exam_type = Column(String(50))  # mid_term, final, assignment
-    academic_year = Column(Integer)
-    semester = Column(Integer)
-    start_date = Column(Date)
-    end_date = Column(Date)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
-
-    college = relationship("College")
-
-
-cms_event_type = ENUM(
-    'academic', 'cultural', 'sports', 'placement', 'seminar', 'workshop',
-    name='cms_event_type',
-    create_type=False
-)
-
-class CMSEvent(Base):
-    __tablename__ = "cms_events"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
-    title = Column(String(255), nullable=False)
-    description = Column(Text)
-    event_type = Column(cms_event_type)
-    start_datetime = Column(BigInteger)
-    end_datetime = Column(BigInteger)
-    location = Column(String(255))
-    organizer_id = Column(UUID(as_uuid=True), ForeignKey("cms_users.id"))
-    max_participants = Column(Integer)
-    registration_required = Column(Boolean, default=False)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
-
-    college = relationship("College")
-    organizer = relationship("CMSUser")
-
-
-class CMSCompany(Base):
-    __tablename__ = "cms_companies"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), nullable=False)
-    description = Column(Text)
-    website = Column(String(255))
-    industry = Column(String(100))
-    location = Column(String(255))
-    is_active = Column(Boolean, default=True)
-    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
-
-
-class CMSPlacementDrive(Base):
-    __tablename__ = "cms_placement_drives"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
-    company_id = Column(UUID(as_uuid=True), ForeignKey("cms_companies.id", ondelete="CASCADE"), nullable=False)
-    position_title = Column(String(255), nullable=False)
-    job_description = Column(Text)
-    eligibility_criteria = Column(Text)
-    package_offered = Column(String(100))
-    drive_date = Column(Date)
-    application_deadline = Column(Date)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
-
-    college = relationship("College")
-    company = relationship("CMSCompany")
-
-
-cms_notification_type = ENUM(
-    'info', 'warning', 'success', 'error',
-    name='cms_notification_type',
-    create_type=False
-)
-
-cms_notification_target = ENUM(
-    'all', 'students', 'faculty', 'department', 'branch',
-    name='cms_notification_target',
-    create_type=False
-)
-
-class CMSNotification(Base):
-    __tablename__ = "cms_notifications"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
-    title = Column(String(255), nullable=False)
-    message = Column(Text, nullable=False)
-    notification_type = Column(cms_notification_type, default='info')
-    target_audience = Column(cms_notification_target, default='all')
-    department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"))
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"))
-    created_by = Column(UUID(as_uuid=True), ForeignKey("cms_users.id"))
-    is_active = Column(Boolean, default=True)
-    expires_at = Column(BigInteger)
     created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
 
     college = relationship("College")
     department = relationship("Department")
     branch = relationship("Branch")
-    creator = relationship("CMSUser")
+    degree = relationship("Degree")
+    sections = relationship("Section", back_populates="batch")
 
 
-cms_document_status = ENUM(
-    'pending', 'processing', 'ready', 'delivered', 'rejected',
-    name='cms_document_status',
-    create_type=False
-)
+class Section(Base):
+    __tablename__ = "sections"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    batch_id = Column(UUID(as_uuid=True), ForeignKey("batches.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(10), nullable=False)  # A, B, C
+    capacity = Column(Integer, default=60)
+    current_strength = Column(Integer, default=0)
+    class_teacher_id = Column(UUID(as_uuid=True), ForeignKey("cms_users.id"))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
 
-class CMSDocumentRequest(Base):
-    __tablename__ = "cms_document_requests"
+    batch = relationship("Batch", back_populates="sections")
+    class_teacher = relationship("CMSUser")
+    timetable_entries = relationship("Timetable", back_populates="section")
+
+
+class Subject(Base):
+    __tablename__ = "subjects"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
-    student_id = Column(UUID(as_uuid=True), nullable=False)  # References student app
-    document_type = Column(String(100), nullable=False)
-    purpose = Column(String(255))
-    status = Column(cms_document_status, default='pending')
-    requested_date = Column(Date, default=func.current_date())
-    expected_delivery = Column(Date)
-    processed_by = Column(UUID(as_uuid=True), ForeignKey("cms_users.id"))
-    remarks = Column(Text)
+    department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    code = Column(String(20), nullable=False)  # CS101, IT201
+    credits = Column(Integer, default=3)
+    semester = Column(Integer, nullable=False)
+    subject_type = Column(String(20), default='theory')  # theory, lab, project
+    description = Column(Text)
+    is_active = Column(Boolean, default=True)
     created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
-    updated_at = Column(BigInteger, nullable=True, onupdate=func.extract('epoch', func.now()).cast(Integer))
 
     college = relationship("College")
-    processor = relationship("CMSUser")
+    department = relationship("Department")
+    timetable_entries = relationship("Timetable", back_populates="subject")
 
 
+# Enum for timetable days
+timetable_day = ENUM(
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
+    name='timetable_day',
+    create_type=False
+)
 
+
+class Timetable(Base):
+    __tablename__ = "timetables"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
+    section_id = Column(UUID(as_uuid=True), ForeignKey("sections.id", ondelete="CASCADE"), nullable=False)
+    subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    teacher_id = Column(UUID(as_uuid=True), ForeignKey("cms_users.id", ondelete="CASCADE"), nullable=False)
+    day_of_week = Column(timetable_day, nullable=False)
+    start_time = Column(String(10), nullable=False)  # 09:00
+    end_time = Column(String(10), nullable=False)    # 10:00
+    room_number = Column(String(50))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(BigInteger, nullable=False, default=func.extract('epoch', func.now()).cast(Integer))
+
+    college = relationship("College")
+    section = relationship("Section", back_populates="timetable_entries")
+    subject = relationship("Subject", back_populates="timetable_entries")
+    teacher = relationship("CMSUser")

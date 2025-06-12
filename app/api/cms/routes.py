@@ -1,15 +1,15 @@
 from fastapi import APIRouter
 
-# Import all sub-routers with transformed paths
+# Import all CMS routers
 from app.api.cms.auth.routes import router as auth_router
-from app.api.cms.college_placements.routes import router as college_placements_router
-from app.api.cms.college_students.routes import router as college_students_router
-from app.api.cms.image_upload.routes import router as image_upload_router
+from app.api.cms.permissions.routes import router as permissions_router
+from app.api.cms.academic.routes import router as academic_router
+from app.api.cms.hierarchy.routes import router as hierarchy_router
 
 router = APIRouter()
 
-# Include all routers with transformed paths: cms-[module] -> cms/[module]
-router.include_router(auth_router, prefix="/auth", tags=["Auth"])
-router.include_router(college_placements_router, prefix="/college-placements", tags=["College Placements"])
-router.include_router(college_students_router, prefix="/college-students", tags=["College Students"])
-router.include_router(image_upload_router, prefix="/image-upload", tags=["Image Upload"])
+# Include all CMS routes
+router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+router.include_router(permissions_router, prefix="/permissions", tags=["Permissions"])
+router.include_router(academic_router, prefix="/academic", tags=["Academic Structure"])
+router.include_router(hierarchy_router, prefix="/hierarchy", tags=["User Hierarchy"])

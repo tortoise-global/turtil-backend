@@ -1,454 +1,204 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from uuid import UUID
-from datetime import date, time
 from enum import Enum
-from decimal import Decimal
 
 
-# CMS TIMETABLE SCHEMAS
-
-class CMSDayOfWeek(str, Enum):
+# Enums
+class TimetableDay(str, Enum):
     MONDAY = "monday"
     TUESDAY = "tuesday"
     WEDNESDAY = "wednesday"
     THURSDAY = "thursday"
     FRIDAY = "friday"
     SATURDAY = "saturday"
-    SUNDAY = "sunday"
 
 
-class CMSTimetableSlotBase(BaseModel):
-    semester: Optional[int] = Field(None, description="Semester number")
-    day_of_week: CMSDayOfWeek = Field(..., description="Day of the week")
-    start_time: time = Field(..., description="Start time")
-    end_time: time = Field(..., description="End time")
-    room_number: Optional[str] = Field(None, description="Room number")
-    academic_year: Optional[int] = Field(None, description="Academic year")
-    is_active: Optional[bool] = Field(True, description="Slot status")
+class SubjectType(str, Enum):
+    THEORY = "theory"
+    LAB = "lab"
+    PROJECT = "project"
 
 
-class CMSTimetableSlotCreate(CMSTimetableSlotBase):
-    college_id: UUID = Field(..., description="College UUID")
-    branch_id: Optional[UUID] = Field(None, description="Branch UUID")
-    subject_id: Optional[UUID] = Field(None, description="Subject UUID")
-    faculty_id: Optional[UUID] = Field(None, description="Faculty UUID")
+# Batch Schemas
+class BatchBase(BaseModel):
+    name: str = Field(..., description="Batch name (e.g., 2024-CSE)")
+    year: int = Field(..., description="Academic year")
+    semester: int = Field(..., description="Current semester")
+    start_date: Optional[int] = Field(None, description="Start date timestamp")
+    end_date: Optional[int] = Field(None, description="End date timestamp")
+    is_active: Optional[bool] = Field(True, description="Batch status")
 
 
-class CMSTimetableSlotUpdate(BaseModel):
-    branch_id: Optional[UUID] = None
-    subject_id: Optional[UUID] = None
-    faculty_id: Optional[UUID] = None
-    semester: Optional[int] = None
-    day_of_week: Optional[CMSDayOfWeek] = None
-    start_time: Optional[time] = None
-    end_time: Optional[time] = None
-    room_number: Optional[str] = None
-    academic_year: Optional[int] = None
-    is_active: Optional[bool] = None
+class BatchCreate(BatchBase):
+    department_id: UUID = Field(..., description="Department UUID")
+    branch_id: UUID = Field(..., description="Branch UUID")
+    degree_id: UUID = Field(..., description="Degree UUID")
 
 
-class CMSTimetableSlotResponse(CMSTimetableSlotBase):
-    id: UUID
-    college_id: UUID
-    branch_id: Optional[UUID] = None
-    subject_id: Optional[UUID] = None
-    faculty_id: Optional[UUID] = None
-    created_at: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# CMS ATTENDANCE SCHEMAS
-
-class CMSAttendanceSessionBase(BaseModel):
-    semester: Optional[int] = Field(None, description="Semester number")
-    session_date: date = Field(..., description="Session date")
-    session_time: Optional[time] = Field(None, description="Session time")
-    session_type: Optional[str] = Field("regular", description="Session type")
-    total_classes: Optional[int] = Field(1, description="Total classes in session")
-
-
-class CMSAttendanceSessionCreate(CMSAttendanceSessionBase):
-    college_id: UUID = Field(..., description="College UUID")
-    subject_id: UUID = Field(..., description="Subject UUID")
-    faculty_id: UUID = Field(..., description="Faculty UUID")
-    branch_id: Optional[UUID] = Field(None, description="Branch UUID")
-
-
-class CMSAttendanceSessionUpdate(BaseModel):
-    branch_id: Optional[UUID] = None
-    semester: Optional[int] = None
-    session_date: Optional[date] = None
-    session_time: Optional[time] = None
-    session_type: Optional[str] = None
-    total_classes: Optional[int] = None
-
-
-class CMSAttendanceSessionResponse(CMSAttendanceSessionBase):
-    id: UUID
-    college_id: UUID
-    subject_id: UUID
-    faculty_id: UUID
-    branch_id: Optional[UUID] = None
-    created_at: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# CMS ASSIGNMENT SCHEMAS
-
-class CMSAssignmentStatus(str, Enum):
-    DRAFT = "draft"
-    PUBLISHED = "published"
-    CLOSED = "closed"
-
-
-class CMSAssignmentBase(BaseModel):
-    title: str = Field(..., description="Assignment title")
-    description: Optional[str] = Field(None, description="Assignment description")
-    assignment_type: Optional[str] = Field("homework", description="Assignment type")
-    due_date: Optional[int] = Field(None, description="Due date as timestamp")
-    max_marks: Optional[int] = Field(0, description="Maximum marks")
-    status: Optional[CMSAssignmentStatus] = Field(CMSAssignmentStatus.DRAFT, description="Assignment status")
-
-
-class CMSAssignmentCreate(CMSAssignmentBase):
-    college_id: UUID = Field(..., description="College UUID")
-    subject_id: UUID = Field(..., description="Subject UUID")
-    faculty_id: UUID = Field(..., description="Faculty UUID")
-
-
-class CMSAssignmentUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    assignment_type: Optional[str] = None
-    due_date: Optional[int] = None
-    max_marks: Optional[int] = None
-    status: Optional[CMSAssignmentStatus] = None
-
-
-class CMSAssignmentResponse(CMSAssignmentBase):
-    id: UUID
-    college_id: UUID
-    subject_id: UUID
-    faculty_id: UUID
-    created_at: int
-    updated_at: Optional[int] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# CMS EXAMINATION SCHEMAS
-
-class CMSExaminationBase(BaseModel):
-    exam_name: str = Field(..., description="Examination name")
-    exam_type: Optional[str] = Field(None, description="Examination type")
-    academic_year: Optional[int] = Field(None, description="Academic year")
-    semester: Optional[int] = Field(None, description="Semester")
-    start_date: Optional[date] = Field(None, description="Start date")
-    end_date: Optional[date] = Field(None, description="End date")
-    is_active: Optional[bool] = Field(True, description="Examination status")
-
-
-class CMSExaminationCreate(CMSExaminationBase):
-    college_id: UUID = Field(..., description="College UUID")
-
-
-class CMSExaminationUpdate(BaseModel):
-    exam_name: Optional[str] = None
-    exam_type: Optional[str] = None
-    academic_year: Optional[int] = None
-    semester: Optional[int] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    is_active: Optional[bool] = None
-
-
-class CMSExaminationResponse(CMSExaminationBase):
-    id: UUID
-    college_id: UUID
-    created_at: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# CMS EVENT SCHEMAS
-
-class CMSEventType(str, Enum):
-    ACADEMIC = "academic"
-    CULTURAL = "cultural"
-    SPORTS = "sports"
-    PLACEMENT = "placement"
-    SEMINAR = "seminar"
-    WORKSHOP = "workshop"
-
-
-class CMSEventBase(BaseModel):
-    title: str = Field(..., description="Event title")
-    description: Optional[str] = Field(None, description="Event description")
-    event_type: Optional[CMSEventType] = Field(None, description="Event type")
-    start_datetime: Optional[int] = Field(None, description="Start datetime as timestamp")
-    end_datetime: Optional[int] = Field(None, description="End datetime as timestamp")
-    location: Optional[str] = Field(None, description="Event location")
-    max_participants: Optional[int] = Field(None, description="Maximum participants")
-    registration_required: Optional[bool] = Field(False, description="Registration required")
-    is_active: Optional[bool] = Field(True, description="Event status")
-
-
-class CMSEventCreate(CMSEventBase):
-    college_id: UUID = Field(..., description="College UUID")
-    organizer_id: Optional[UUID] = Field(None, description="Organizer UUID")
-
-
-class CMSEventUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    event_type: Optional[CMSEventType] = None
-    start_datetime: Optional[int] = None
-    end_datetime: Optional[int] = None
-    location: Optional[str] = None
-    organizer_id: Optional[UUID] = None
-    max_participants: Optional[int] = None
-    registration_required: Optional[bool] = None
-    is_active: Optional[bool] = None
-
-
-class CMSEventResponse(CMSEventBase):
-    id: UUID
-    college_id: UUID
-    organizer_id: Optional[UUID] = None
-    created_at: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# CMS PLACEMENT SCHEMAS
-
-class CMSCompanyBase(BaseModel):
-    name: str = Field(..., description="Company name")
-    description: Optional[str] = Field(None, description="Company description")
-    website: Optional[str] = Field(None, description="Company website")
-    industry: Optional[str] = Field(None, description="Industry")
-    location: Optional[str] = Field(None, description="Company location")
-    is_active: Optional[bool] = Field(True, description="Company status")
-
-
-class CMSCompanyCreate(CMSCompanyBase):
-    pass
-
-
-class CMSCompanyUpdate(BaseModel):
+class BatchUpdate(BaseModel):
     name: Optional[str] = None
-    description: Optional[str] = None
-    website: Optional[str] = None
-    industry: Optional[str] = None
-    location: Optional[str] = None
+    semester: Optional[int] = None
+    start_date: Optional[int] = None
+    end_date: Optional[int] = None
     is_active: Optional[bool] = None
 
 
-class CMSCompanyResponse(CMSCompanyBase):
-    id: UUID
-    created_at: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class CMSPlacementDriveBase(BaseModel):
-    position_title: str = Field(..., description="Position title")
-    job_description: Optional[str] = Field(None, description="Job description")
-    eligibility_criteria: Optional[str] = Field(None, description="Eligibility criteria")
-    package_offered: Optional[str] = Field(None, description="Package offered")
-    drive_date: Optional[date] = Field(None, description="Drive date")
-    application_deadline: Optional[date] = Field(None, description="Application deadline")
-    is_active: Optional[bool] = Field(True, description="Drive status")
-
-
-class CMSPlacementDriveCreate(CMSPlacementDriveBase):
-    college_id: UUID = Field(..., description="College UUID")
-    company_id: UUID = Field(..., description="Company UUID")
-
-
-class CMSPlacementDriveUpdate(BaseModel):
-    company_id: Optional[UUID] = None
-    position_title: Optional[str] = None
-    job_description: Optional[str] = None
-    eligibility_criteria: Optional[str] = None
-    package_offered: Optional[str] = None
-    drive_date: Optional[date] = None
-    application_deadline: Optional[date] = None
-    is_active: Optional[bool] = None
-
-
-class CMSPlacementDriveResponse(CMSPlacementDriveBase):
+class BatchResponse(BatchBase):
     id: UUID
     college_id: UUID
-    company_id: UUID
-    created_at: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# CMS NOTIFICATION SCHEMAS
-
-class CMSNotificationType(str, Enum):
-    INFO = "info"
-    WARNING = "warning"
-    SUCCESS = "success"
-    ERROR = "error"
-
-
-class CMSNotificationTarget(str, Enum):
-    ALL = "all"
-    STUDENTS = "students"
-    FACULTY = "faculty"
-    DEPARTMENT = "department"
-    BRANCH = "branch"
-
-
-class CMSNotificationBase(BaseModel):
-    title: str = Field(..., description="Notification title")
-    message: str = Field(..., description="Notification message")
-    notification_type: Optional[CMSNotificationType] = Field(CMSNotificationType.INFO, description="Notification type")
-    target_audience: Optional[CMSNotificationTarget] = Field(CMSNotificationTarget.ALL, description="Target audience")
-    department_id: Optional[UUID] = Field(None, description="Department UUID for targeted notifications")
-    branch_id: Optional[UUID] = Field(None, description="Branch UUID for targeted notifications")
-    is_active: Optional[bool] = Field(True, description="Notification status")
-    expires_at: Optional[int] = Field(None, description="Expiration timestamp")
-
-
-class CMSNotificationCreate(CMSNotificationBase):
-    college_id: UUID = Field(..., description="College UUID")
-    created_by: UUID = Field(..., description="Creator UUID")
-
-
-class CMSNotificationUpdate(BaseModel):
-    title: Optional[str] = None
-    message: Optional[str] = None
-    notification_type: Optional[CMSNotificationType] = None
-    target_audience: Optional[CMSNotificationTarget] = None
-    department_id: Optional[UUID] = None
-    branch_id: Optional[UUID] = None
-    is_active: Optional[bool] = None
-    expires_at: Optional[int] = None
-
-
-class CMSNotificationResponse(CMSNotificationBase):
-    id: UUID
-    college_id: UUID
-    created_by: UUID
-    created_at: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# CMS DOCUMENT REQUEST SCHEMAS
-
-class CMSDocumentStatus(str, Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    READY = "ready"
-    DELIVERED = "delivered"
-    REJECTED = "rejected"
-
-
-class CMSDocumentRequestBase(BaseModel):
-    document_type: str = Field(..., description="Document type")
-    purpose: Optional[str] = Field(None, description="Purpose of request")
-    status: Optional[CMSDocumentStatus] = Field(CMSDocumentStatus.PENDING, description="Request status")
-    requested_date: Optional[date] = Field(None, description="Request date")
-    expected_delivery: Optional[date] = Field(None, description="Expected delivery date")
-    remarks: Optional[str] = Field(None, description="Remarks")
-
-
-class CMSDocumentRequestCreate(CMSDocumentRequestBase):
-    college_id: UUID = Field(..., description="College UUID")
-    student_id: UUID = Field(..., description="Student UUID")
-
-
-class CMSDocumentRequestUpdate(BaseModel):
-    status: Optional[CMSDocumentStatus] = None
-    expected_delivery: Optional[date] = None
-    processed_by: Optional[UUID] = None
-    remarks: Optional[str] = None
-
-
-class CMSDocumentRequestResponse(CMSDocumentRequestBase):
-    id: UUID
-    college_id: UUID
-    student_id: UUID
-    processed_by: Optional[UUID] = None
-    created_at: int
-    updated_at: Optional[int] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# COMPLEX RESPONSE MODELS
-
-class TimetableWeekView(BaseModel):
-    """Weekly timetable view"""
+    department_id: UUID
     branch_id: UUID
-    semester: int
-    academic_year: int
-    schedule: Dict[str, List[CMSTimetableSlotResponse]] = Field(
-        ..., description="Schedule organized by day of week"
-    )
+    degree_id: UUID
+    created_at: int
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class AttendanceReport(BaseModel):
-    """Attendance report"""
+# Section Schemas
+class SectionBase(BaseModel):
+    name: str = Field(..., description="Section name (A, B, C)")
+    capacity: Optional[int] = Field(60, description="Section capacity")
+    current_strength: Optional[int] = Field(0, description="Current student count")
+    class_teacher_id: Optional[UUID] = Field(None, description="Class teacher UUID")
+    is_active: Optional[bool] = Field(True, description="Section status")
+
+
+class SectionCreate(SectionBase):
+    batch_id: UUID = Field(..., description="Batch UUID")
+
+
+class SectionUpdate(BaseModel):
+    name: Optional[str] = None
+    capacity: Optional[int] = None
+    current_strength: Optional[int] = None
+    class_teacher_id: Optional[UUID] = None
+    is_active: Optional[bool] = None
+
+
+class SectionResponse(SectionBase):
+    id: UUID
+    batch_id: UUID
+    created_at: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Subject Schemas
+class SubjectBase(BaseModel):
+    name: str = Field(..., description="Subject name")
+    code: str = Field(..., description="Subject code (CS101, IT201)")
+    credits: Optional[int] = Field(3, description="Credit hours")
+    semester: int = Field(..., description="Semester number")
+    subject_type: Optional[SubjectType] = Field(SubjectType.THEORY, description="Subject type")
+    description: Optional[str] = Field(None, description="Subject description")
+    is_active: Optional[bool] = Field(True, description="Subject status")
+
+
+class SubjectCreate(SubjectBase):
+    department_id: UUID = Field(..., description="Department UUID")
+
+
+class SubjectUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    credits: Optional[int] = None
+    semester: Optional[int] = None
+    subject_type: Optional[SubjectType] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class SubjectResponse(SubjectBase):
+    id: UUID
+    college_id: UUID
+    department_id: UUID
+    created_at: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Timetable Schemas
+class TimetableBase(BaseModel):
+    day_of_week: TimetableDay = Field(..., description="Day of the week")
+    start_time: str = Field(..., description="Start time (HH:MM)")
+    end_time: str = Field(..., description="End time (HH:MM)")
+    room_number: Optional[str] = Field(None, description="Room number")
+    is_active: Optional[bool] = Field(True, description="Timetable entry status")
+
+
+class TimetableCreate(TimetableBase):
+    section_id: UUID = Field(..., description="Section UUID")
+    subject_id: UUID = Field(..., description="Subject UUID")
+    teacher_id: UUID = Field(..., description="Teacher UUID")
+
+
+class TimetableUpdate(BaseModel):
+    day_of_week: Optional[TimetableDay] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    room_number: Optional[str] = None
+    teacher_id: Optional[UUID] = None
+    is_active: Optional[bool] = None
+
+
+class TimetableResponse(TimetableBase):
+    id: UUID
+    college_id: UUID
+    section_id: UUID
     subject_id: UUID
-    total_sessions: int
-    students_present: Dict[str, int] = Field(..., description="Student attendance count")
-    attendance_percentage: Dict[str, float] = Field(..., description="Student attendance percentage")
+    teacher_id: UUID
+    created_at: int
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class AssignmentSubmissionSummary(BaseModel):
-    """Assignment submission summary"""
-    assignment_id: UUID
-    total_students: int
-    submitted: int
-    pending: int
-    submission_rate: float
-    average_marks: Optional[float] = None
+# Cross-Department Teaching Schemas
+class CrossDepartmentAssignment(BaseModel):
+    teacher_id: UUID = Field(..., description="Teacher UUID")
+    department_id: UUID = Field(..., description="Additional department UUID")
+    subject_ids: List[UUID] = Field(..., description="List of subject UUIDs")
+
+
+class TeacherAssignmentResponse(BaseModel):
+    teacher_id: UUID
+    primary_department_id: Optional[UUID]
+    managed_departments: List[str]
+    teaching_subjects: List[dict]
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlacementStatistics(BaseModel):
-    """Placement statistics"""
-    total_drives: int
-    active_drives: int
-    total_applications: int
-    total_selections: int
-    placement_rate: float
-    companies_participated: int
+# Academic Hierarchy Schemas
+class AcademicHierarchy(BaseModel):
+    college_id: UUID
+    departments: List[dict]
+    total_batches: int
+    total_sections: int
+    total_subjects: int
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# BULK OPERATION SCHEMAS
-
-class BulkTimetableCreate(BaseModel):
-    slots: List[CMSTimetableSlotCreate] = Field(..., description="List of timetable slots")
-    academic_year: int = Field(..., description="Academic year")
-    semester: int = Field(..., description="Semester")
+# Bulk Operations
+class BulkBatchCreate(BaseModel):
+    batches: List[BatchCreate] = Field(..., description="List of batches to create")
 
 
-class BulkAttendanceRecord(BaseModel):
-    session_id: UUID = Field(..., description="Session UUID")
-    student_attendances: List[Dict[str, Any]] = Field(
-        ..., description="List of student attendance records"
-    )
+class BulkSectionCreate(BaseModel):
+    sections: List[SectionCreate] = Field(..., description="List of sections to create")
 
 
-class BulkNotificationSend(BaseModel):
-    notification_id: UUID = Field(..., description="Notification UUID")
-    target_users: List[UUID] = Field(..., description="Target user UUIDs")
-    send_email: Optional[bool] = Field(False, description="Send email notification")
-    send_sms: Optional[bool] = Field(False, description="Send SMS notification")
+class BulkSubjectCreate(BaseModel):
+    subjects: List[SubjectCreate] = Field(..., description="List of subjects to create")
+
+
+# Academic Statistics
+class AcademicStatistics(BaseModel):
+    total_batches: int
+    total_sections: int
+    total_subjects: int
+    active_timetable_entries: int
+    teachers_with_cross_dept_assignments: int
+
+    model_config = ConfigDict(from_attributes=True)
