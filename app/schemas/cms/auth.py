@@ -40,70 +40,18 @@ class VerifyResponse(BaseModel):
     verified: bool
 
 
-class UserCreate(BaseModel):
-    email: str
-    password: Optional[str] = None
-    fullName: Optional[str] = None
-    phone: Optional[str] = None
-    collegeName: Optional[str] = None
-    role: Optional[str] = None
-    status: Optional[str] = None
-    parentId: Optional[str] = None
-    modelAccess: Optional[List] = []
-    logo: Optional[List] = []
-    collegeDetails: Optional[List] = []
-    affilliatedUnversity: Optional[List] = []
-    address: Optional[List] = []
-    resultFormat: Optional[List] = []
+from app.schemas.cms.users import CMSUserCreate, CMSUserUpdate, CMSUserResponse
 
+CMSUserCreate = CMSUserCreate
+CMSUserUpdate = CMSUserUpdate  
+CMSUserResponse = CMSUserResponse
 
-class UserUpdate(BaseModel):
-    email: Optional[str] = None
-    fullName: Optional[str] = None
-    phone: Optional[str] = None
-    collegeName: Optional[str] = None
-    role: Optional[str] = None
-    status: Optional[str] = None
-    parentId: Optional[str] = None
-    modelAccess: Optional[List] = []
-    logo: Optional[List] = []
-    collegeDetails: Optional[List] = []
-    affilliatedUnversity: Optional[List] = []
-    address: Optional[List] = []
-    resultFormat: Optional[List] = []
-
-
-class UserResponse(BaseModel):
-    id: str
-    email: str
-    username: Optional[str] = None
-    is_email_verified: bool = False
-    is_active: bool = True
-    fullName: Optional[str] = None
-    phone: Optional[str] = None
-    collegeName: Optional[str] = None
-    role: Optional[str] = None
-    status: Optional[str] = None
-    parentId: Optional[str] = None
-    modelAccess: Optional[List] = []
-    logo: Optional[List] = []
-    collegeDetails: Optional[List] = []
-    affilliatedUnversity: Optional[List] = []
-    address: Optional[List] = []
-    resultFormat: Optional[List] = []
-    created_at: int
-    updated_at: Optional[int] = None
-
-    class Config:
-        from_attributes = True
-
-
-class UserCreateResponse(BaseModel):
+class CMSUserCreateResponse(BaseModel):
     message: str
     cmsUserId: str
     userName: str
     temparyPassword: str
 
 
-class FetchUserResponse(UserResponse):
+class FetchCMSUserResponse(CMSUserResponse):
     pass

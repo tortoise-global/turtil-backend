@@ -8,7 +8,9 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.db.database import Base
-from app.models.cms.models import User, CollegeDegree, CollegePlacement, CollegeStudent
+# Import all new normalized models for proper migration
+from app.models.cms.models import *
+from app.models.student.models import *
 from app.core.config import settings
 
 config = context.config

@@ -4,7 +4,7 @@ from typing import Optional, List
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
-from app.models.cms.models import CollegeStudent
+from app.models.student.models import StudentUser
 from app.schemas.cms.college_students import CollegeStudentCreate, CollegeStudentUpdate, CollegeStudentResponse, PaginatedResponse
 
 router = APIRouter()
@@ -16,6 +16,75 @@ async def create_student(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
+    """
+    Create a new college student record
+    
+    **Request Body:**
+    - id (string, required): Unique identifier for the student record
+    - college_id (string, required): Unique identifier for the college
+    - college_short_name (string, required): Short name/abbreviation of college
+    - college_name (string, required): Full name of the college
+    - student_id (string, required): Student's enrollment/roll number
+    - student_name (string, required): Full name of the student
+    - email (string, required): Student's email address
+    - phone (string, required): Student's phone number with country code
+    - degree (string, required): Degree program (e.g., "B.Tech", "M.Tech")
+    - batch (string, required): Academic batch year
+    - branch (string, required): Academic branch/specialization
+    - section (string, required): Section within the branch
+    - gender (string, required): Student's gender
+    
+    **Parameters:** None
+    
+    **Headers:**
+    - Content-Type: application/json
+    - Authorization: Bearer {access_token}
+    
+    **Example Request:**
+    ```json
+    {
+        "id": "std_rajesh_2024_cse_001",
+        "college_id": "clg_rajivgandhi_001",
+        "college_short_name": "RGIT",
+        "college_name": "Rajiv Gandhi Institute of Technology",
+        "student_id": "24CSE001",
+        "student_name": "Rajesh Kumar",
+        "email": "rajesh.kumar@student.rgit.edu",
+        "phone": "+91-9876543210",
+        "degree": "B.Tech",
+        "batch": "2024",
+        "branch": "Computer Science Engineering",
+        "section": "A",
+        "gender": "Male"
+    }
+    ```
+    
+    **Example Response:**
+    ```json
+    {
+        "id": "std_rajesh_2024_cse_001",
+        "college_id": "clg_rajivgandhi_001",
+        "college_short_name": "RGIT",
+        "college_name": "Rajiv Gandhi Institute of Technology",
+        "student_id": "24CSE001",
+        "student_name": "Rajesh Kumar",
+        "email": "rajesh.kumar@student.rgit.edu",
+        "phone": "+91-9876543210",
+        "degree": "B.Tech",
+        "batch": "2024",
+        "branch": "Computer Science Engineering",
+        "section": "A",
+        "gender": "Male",
+        "created_at": 1704153600,
+        "updated_at": null
+    }
+    ```
+    
+    **Status Codes:**
+    - 200: Student record created successfully
+    - 401: Unauthorized (invalid token)
+    - 422: Validation error (duplicate ID, invalid data)
+    """
     db_student = CollegeStudent(**student_data.model_dump())
     db.add(db_student)
     db.commit()
@@ -41,6 +110,70 @@ async def get_students(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
+    """
+    Get paginated list of college students with filtering
+    
+    **Request Body:** None
+    
+    **Path Parameters:** None
+    
+    **Query Parameters (all optional):**
+    - college_id (string): Filter by college ID
+    - college_short_name (string): Filter by college short name
+    - student_id (string): Filter by student ID
+    - student_name (string): Filter by student name (partial match)
+    - email (string): Filter by exact email address
+    - phone (string): Filter by exact phone number
+    - degree (string): Filter by degree program
+    - batch (string): Filter by academic batch
+    - branch (string): Filter by academic branch
+    - section (string): Filter by section
+    - gender (string): Filter by gender
+    - page (integer): Page number (default: 1, minimum: 1)
+    - page_size (integer): Items per page (default: 10, min: 1, max: 100)
+    
+    **Headers:**
+    - Authorization: Bearer {access_token}
+    
+    **Example URLs:**
+    - GET /college-students?page=1&page_size=10
+    - GET /college-students?college_id=clg_rajivgandhi_001&batch=2024
+    - GET /college-students?branch=Computer%20Science%20Engineering&section=A
+    - GET /college-students?student_name=rajesh&gender=Male
+    
+    **Example Response:**
+    ```json
+    {
+        "total": 150,
+        "page": 1,
+        "per_page": 10,
+        "items": [
+            {
+                "id": "std_rajesh_2024_cse_001",
+                "college_id": "clg_rajivgandhi_001",
+                "college_short_name": "RGIT",
+                "college_name": "Rajiv Gandhi Institute of Technology",
+                "student_id": "24CSE001",
+                "student_name": "Rajesh Kumar",
+                "email": "rajesh.kumar@student.rgit.edu",
+                "phone": "+91-9876543210",
+                "degree": "B.Tech",
+                "batch": "2024",
+                "branch": "Computer Science Engineering",
+                "section": "A",
+                "gender": "Male",
+                "created_at": 1704153600,
+                "updated_at": null
+            }
+        ]
+    }
+    ```
+    
+    **Status Codes:**
+    - 200: Students retrieved successfully
+    - 401: Unauthorized (invalid token)
+    - 422: Validation error (invalid query parameters)
+    """
     query = db.query(CollegeStudent)
     
     if college_id:
@@ -84,6 +217,47 @@ async def get_student(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
+    """
+    Get a specific student by ID
+    
+    **Request Body:** None
+    
+    **Path Parameters:**
+    - student_id (string, required): Unique ID of the student record
+    
+    **Query Parameters:** None
+    
+    **Headers:**
+    - Authorization: Bearer {access_token}
+    
+    **Example URL:** GET /college-students/std_rajesh_2024_cse_001
+    
+    **Example Response:**
+    ```json
+    {
+        "id": "std_rajesh_2024_cse_001",
+        "college_id": "clg_rajivgandhi_001",
+        "college_short_name": "RGIT",
+        "college_name": "Rajiv Gandhi Institute of Technology",
+        "student_id": "24CSE001",
+        "student_name": "Rajesh Kumar",
+        "email": "rajesh.kumar@student.rgit.edu",
+        "phone": "+91-9876543210",
+        "degree": "B.Tech",
+        "batch": "2024",
+        "branch": "Computer Science Engineering",
+        "section": "A",
+        "gender": "Male",
+        "created_at": 1704153600,
+        "updated_at": null
+    }
+    ```
+    
+    **Status Codes:**
+    - 200: Student retrieved successfully
+    - 401: Unauthorized (invalid token)
+    - 404: Student not found
+    """
     student = db.query(CollegeStudent).filter(CollegeStudent.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
@@ -97,6 +271,70 @@ async def update_student(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
+    """
+    Update a student record
+    
+    **Request Body (partial update allowed):**
+    - college_id (string, optional): Unique identifier for the college
+    - college_short_name (string, optional): Short name/abbreviation of college
+    - college_name (string, optional): Full name of the college
+    - student_id (string, optional): Student's enrollment/roll number
+    - student_name (string, optional): Full name of the student
+    - email (string, optional): Student's email address
+    - phone (string, optional): Student's phone number with country code
+    - degree (string, optional): Degree program
+    - batch (string, optional): Academic batch year
+    - branch (string, optional): Academic branch/specialization
+    - section (string, optional): Section within the branch
+    - gender (string, optional): Student's gender
+    
+    **Path Parameters:**
+    - student_id (string, required): Unique ID of the student record to update
+    
+    **Query Parameters:** None
+    
+    **Headers:**
+    - Content-Type: application/json
+    - Authorization: Bearer {access_token}
+    
+    **Example URL:** PUT /college-students/std_rajesh_2024_cse_001
+    
+    **Example Request (partial update):**
+    ```json
+    {
+        "phone": "+91-9876543211",
+        "email": "rajesh.new@student.rgit.edu",
+        "section": "B"
+    }
+    ```
+    
+    **Example Response:**
+    ```json
+    {
+        "id": "std_rajesh_2024_cse_001",
+        "college_id": "clg_rajivgandhi_001",
+        "college_short_name": "RGIT",
+        "college_name": "Rajiv Gandhi Institute of Technology",
+        "student_id": "24CSE001",
+        "student_name": "Rajesh Kumar",
+        "email": "rajesh.new@student.rgit.edu",
+        "phone": "+91-9876543211",
+        "degree": "B.Tech",
+        "batch": "2024",
+        "branch": "Computer Science Engineering",
+        "section": "B",
+        "gender": "Male",
+        "created_at": 1704153600,
+        "updated_at": 1704240000
+    }
+    ```
+    
+    **Status Codes:**
+    - 200: Student updated successfully
+    - 401: Unauthorized (invalid token)
+    - 404: Student not found
+    - 422: Validation error
+    """
     student = db.query(CollegeStudent).filter(CollegeStudent.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
@@ -130,6 +368,59 @@ async def search_students(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
+    """
+    Search students by name or student ID
+    
+    **Request Body:** None
+    
+    **Path Parameters:** None
+    
+    **Query Parameters:**
+    - query (string, optional): Search term for student name or student ID (partial match)
+    - college_id (string, optional): Filter results by college ID
+    
+    **Headers:**
+    - Authorization: Bearer {access_token}
+    
+    **Example URLs:**
+    - GET /search-students?query=rajesh
+    - GET /search-students?query=24CSE001&college_id=clg_rajivgandhi_001
+    - GET /search-students?college_id=clg_rajivgandhi_001
+    
+    **Example Response:**
+    ```json
+    [
+        {
+            "id": "std_rajesh_2024_cse_001",
+            "college_id": "clg_rajivgandhi_001",
+            "college_short_name": "RGIT",
+            "college_name": "Rajiv Gandhi Institute of Technology",
+            "student_id": "24CSE001",
+            "student_name": "Rajesh Kumar",
+            "email": "rajesh.kumar@student.rgit.edu",
+            "phone": "+91-9876543210",
+            "degree": "B.Tech",
+            "batch": "2024",
+            "branch": "Computer Science Engineering",
+            "section": "A",
+            "gender": "Male",
+            "created_at": 1704153600,
+            "updated_at": null
+        }
+    ]
+    ```
+    
+    **Status Codes:**
+    - 200: Search completed successfully
+    - 401: Unauthorized (invalid token)
+    - 422: Validation error
+    
+    **Search Logic:**
+    - If query is provided: searches in student_id and student_name fields
+    - If college_id is provided: filters results by college
+    - If both provided: applies both filters
+    - If neither provided: returns all students for the college
+    """
     db_query = db.query(CollegeStudent)
     
     if college_id:

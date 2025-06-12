@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     AWS_REGION: str = "us-east-1"
     S3_BUCKET_NAME: Optional[str] = None
     
+    # Upstash Redis Configuration
+    UPSTASH_REDIS_URL: Optional[str] = None
+    UPSTASH_REDIS_TOKEN: Optional[str] = None
+    REDIS_USER_CACHE_TTL: int = 300  # 5 minutes
+    REDIS_BLACKLIST_TTL: int = 86400  # 24 hours
+    
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

@@ -1,60 +1,26 @@
 from pydantic import BaseModel
 from typing import Optional, List
-
-
+from uuid import UUID
+from app.schemas.student.users import StudentUserCreate, StudentUserUpdate, StudentUserResponse
 class CollegeStudentCreate(BaseModel):
-    collegeId: str
-    collegeShortName: str
-    collegeName: str
-    studentId: str
-    studentName: str
+    college_id: UUID
+    student_id: str
+    full_name: str
     email: str
-    phone: str
-    degree: str
-    batch: str
-    branch: str
-    section: str
-    gender: str
-
-
-class CollegeStudentUpdate(BaseModel):
-    collegeId: Optional[str] = None
-    collegeShortName: Optional[str] = None
-    collegeName: Optional[str] = None
-    studentId: Optional[str] = None
-    studentName: Optional[str] = None
-    email: Optional[str] = None
     phone: Optional[str] = None
-    degree: Optional[str] = None
-    batch: Optional[str] = None
-    branch: Optional[str] = None
-    section: Optional[str] = None
+    batch_year: Optional[int] = None
+    branch_id: Optional[UUID] = None
+    department_id: Optional[UUID] = None
+    degree_id: Optional[UUID] = None
     gender: Optional[str] = None
+    username: str
+    password: str
 
-
-class CollegeStudentResponse(BaseModel):
-    id: str
-    collegeId: str
-    collegeShortName: str
-    collegeName: str
-    studentId: str
-    studentName: str
-    email: str
-    phone: str
-    degree: str
-    batch: str
-    branch: str
-    section: str
-    gender: str
-    createdAt: int
-    updatedAt: Optional[int] = None
-
-    class Config:
-        from_attributes = True
-
+CollegeStudentUpdate = StudentUserUpdate
+CollegeStudentResponse = StudentUserResponse
 
 class PaginatedResponse(BaseModel):
     total: int
     page: int
     per_page: int
-    items: List[CollegeStudentResponse]
+    items: List[StudentUserResponse]
