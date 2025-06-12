@@ -56,11 +56,21 @@ async def get_current_active_user(current_user: CMSUser = Depends(get_current_us
 
 
 async def get_admin_user(current_user: CMSUser = Depends(get_current_active_user)) -> CMSUser:
-    if current_user.role not in ["department_admin", "super_admin"]:
+    if current_user.role not in ["admin", "principal"]:
         logger.warning(f"Insufficient permissions for user: {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"
+        )
+    return current_user
+
+
+async def get_principal_user(current_user: CMSUser = Depends(get_current_active_user)) -> CMSUser:
+    if current_user.role != "principal":
+        logger.warning(f"Principal access denied for user: {current_user.id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Principal access required"
         )
     return current_user
 
@@ -76,7 +86,7 @@ async def get_super_admin_user(current_user: CMSUser = Depends(get_current_activ
 
 
 async def get_lecturer_user(current_user: CMSUser = Depends(get_current_active_user)) -> CMSUser:
-    if current_user.role not in ["lecturer", "department_admin", "super_admin"]:
+    if current_user.role not in ["staff", "head", "admin", "principal"]:
         logger.warning(f"Lecturer access denied for user: {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
