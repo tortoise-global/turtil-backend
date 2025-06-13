@@ -250,11 +250,10 @@ variable "ec2_user_data" {
           image: $ECR_URI/dev-cms-api-repo:latest
           ports:
             - "8000:8000"
-          environment:
-            - PYTHONUNBUFFERED=1
+          env_file:
+            - .env
           command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
           restart: always
-
           networks:
             - default
 
@@ -264,8 +263,10 @@ variable "ec2_user_data" {
 
       EOF
 
-
-      # Start the app
+      # Wait for .env file to be created by GitHub Actions
+      echo "Waiting for .env file from deployment..."
+      
+      # Start the app (will be restarted when .env is deployed)
       docker-compose -f /home/ubuntu/docker-compose.yml up -d
     EOT
   }
