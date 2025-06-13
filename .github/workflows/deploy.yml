@@ -146,12 +146,12 @@ jobs:
             --strategy Rolling \
             --preferences "MinHealthyPercentage=100,InstanceWarmup=300"
 
-      # Copy .env file to server instances
+      # Deploy .env to running server instances
       - name: Deploy .env to server instances
         if: github.ref_name == 'main' || github.ref_name == 'dev'
         working-directory: ./terraform-files
         run: |
-          # Get ASG instance IPs
+          # Get ASG instance IDs
           ASG_NAME=$(terraform output -raw asg_name)
           INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
             --auto-scaling-group-names "$ASG_NAME" \
@@ -159,7 +159,7 @@ jobs:
             --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`].InstanceId' \
             --output text)
           
-# Set environment values based on branch
+          # Set environment values based on branch
           if [ "${{ github.ref_name }}" == "main" ]; then
             ENV_VALUE="production"
             DEBUG_VALUE="false"
@@ -168,7 +168,7 @@ jobs:
             DEBUG_VALUE="true"
           fi
           
-          # Create .env content as parameter for launch template
+          # Create .env content
           ENV_CONTENT="DATABASE_URL=${{ secrets.DATABASE_URL }}
           SECRET_KEY=${{ secrets.SECRET_KEY }}
           ALGORITHM=HS256
@@ -195,38 +195,25 @@ jobs:
           GMAIL_EMAIL=${{ secrets.GMAIL_EMAIL }}
           GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}"
           
-          # Update launch template with new environment variables
-          LAUNCH_TEMPLATE_ID=$(terraform output -raw launch_template_id)
-          
-          # Get current launch template data
-          CURRENT_USER_DATA=$(aws ec2 describe-launch-template-versions \
-            --launch-template-id "$LAUNCH_TEMPLATE_ID" \
-            --versions '$Latest' \
-            --region ${{ secrets.AWS_REGION }} \
-            --query 'LaunchTemplateVersions[0].LaunchTemplateData.UserData' \
-            --output text | base64 -d)
-          
-          # Create new user data with environment variables
-          NEW_USER_DATA=$(cat <<EOF | base64 -w 0
-          #!/bin/bash
-          $CURRENT_USER_DATA
-          
-          # Create .env file
-          cd /app
-          cat > .env << 'ENVEOF'
-          $ENV_CONTENT
-          ENVEOF
-          
-          # Restart docker-compose services
-          docker-compose down
-          docker-compose up -d
-          EOF
-          )
-          
-          # Create new launch template version
-          aws ec2 create-launch-template-version \
-            --launch-template-id "$LAUNCH_TEMPLATE_ID" \
-            --region ${{ secrets.AWS_REGION }} \
-            --launch-template-data "{\"UserData\":\"$NEW_USER_DATA\"}"
-          
-          echo "Updated launch template with new environment variables"
+          # Deploy to each running instance
+          for INSTANCE_ID in $INSTANCE_IDS; do
+            echo "Deploying to instance: $INSTANCE_ID"
+            
+            # Create .env file on server
+            aws ssm send-command \
+              --instance-ids "$INSTANCE_ID" \
+              --region ${{ secrets.AWS_REGION }} \
+              --document-name "AWS-RunShellScript" \
+              --parameters "commands=[
+                'cd /home/ubuntu',
+                'cat > .env << \"ENVEOF\"',
+                '$ENV_CONTENT',
+                'ENVEOF',
+                'sudo chown ubuntu:ubuntu .env',
+                'chmod 600 .env',
+                'docker-compose down || true',
+                'docker-compose up -d'
+              ]"
+            
+            echo "Deployed .env to $INSTANCE_ID"
+          done
