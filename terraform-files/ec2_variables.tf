@@ -257,8 +257,8 @@ variable "ec2_user_data" {
       ENVIRONMENT=development
       DEBUG=true
       LOG_LEVEL=INFO
-      CORS_ORIGINS=["http://localhost:3000","http://localhost:8080"]
-      ALLOWED_HOSTS=["localhost","127.0.0.1","0.0.0.0"]
+      CORS_ORIGINS=["*","http://localhost:3000","http://localhost:8080"]
+      ALLOWED_HOSTS=["*","localhost","127.0.0.1","0.0.0.0"]
       RATE_LIMIT_CALLS=100
       RATE_LIMIT_PERIOD=60
       OTP_SECRET=123456
@@ -298,7 +298,7 @@ variable "ec2_user_data" {
           ports:
             - "8000:8000"
           env_file:
-            - .env
+            - /home/ubuntu/.env
           command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
           restart: always
           networks:
