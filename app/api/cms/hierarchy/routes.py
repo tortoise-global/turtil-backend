@@ -62,14 +62,14 @@ async def create_hierarchical_user(
     ```json
     {
         "email": "rajesh.kumar@college.edu.in",
-        "full_name": "Dr. Rajesh Kumar Sharma",
+        "fullName": "Dr. Rajesh Kumar Sharma",
         "phone": "+91-9876543210",
         "role": "head",
-        "department_id": "dept-123e4567-e89b-12d3-a456-426614174000",
-        "branch_id": "branch-123e4567-e89b-12d3-a456-426614174001",
-        "degree_id": "degree-123e4567-e89b-12d3-a456-426614174002",
-        "managed_departments": ["dept-cse", "dept-it"],
-        "teaching_subjects": ["subject-algorithms", "subject-data-structures"]
+        "departmentId": "dept-123e4567-e89b-12d3-a456-426614174000",
+        "branchId": "branch-123e4567-e89b-12d3-a456-426614174001",
+        "degreeId": "degree-123e4567-e89b-12d3-a456-426614174002",
+        "managedDepartments": ["dept-cse", "dept-it"],
+        "teachingSubjects": ["subject-algorithms", "subject-data-structures"]
     }
     ```
 
@@ -79,14 +79,14 @@ async def create_hierarchical_user(
     ```json
     {
         "email": "principal@vit.edu.in",
-        "full_name": "Dr. Pradeep Kumar Sinha",
+        "fullName": "Dr. Pradeep Kumar Sinha",
         "phone": "+91-9876543210",
         "role": "principal",
-        "department_id": null,
-        "branch_id": null,
-        "degree_id": null,
-        "managed_departments": [],
-        "teaching_subjects": []
+        "departmentId": null,
+        "branchId": null,
+        "degreeId": null,
+        "managedDepartments": [],
+        "teachingSubjects": []
     }
     ```
 
@@ -94,14 +94,14 @@ async def create_hierarchical_user(
     ```json
     {
         "email": "admin@iit.delhi.ac.in",
-        "full_name": "श्री अरविंद गुप्ता (Shri Arvind Gupta)",
+        "fullName": "श्री अरविंद गुप्ता (Shri Arvind Gupta)",
         "phone": "+91-9876543210",
         "role": "admin",
-        "department_id": null,
-        "branch_id": null,
-        "degree_id": null,
-        "managed_departments": ["dept-all"],
-        "teaching_subjects": []
+        "departmentId": null,
+        "branchId": null,
+        "degreeId": null,
+        "managedDepartments": ["dept-all"],
+        "teachingSubjects": []
     }
     ```
 
@@ -109,14 +109,14 @@ async def create_hierarchical_user(
     ```json
     {
         "email": "hod.cse@nit.ac.in",
-        "full_name": "Prof. (Dr.) Sunita Sharma",
+        "fullName": "Prof. (Dr.) Sunita Sharma",
         "phone": "+91-9876543210",
         "role": "head",
-        "department_id": "dept-computer-science",
-        "branch_id": "branch-cse",
-        "degree_id": "degree-btech",
-        "managed_departments": ["dept-computer-science"],
-        "teaching_subjects": ["subject-software-engineering", "subject-dbms"]
+        "departmentId": "dept-computer-science",
+        "branchId": "branch-cse",
+        "degreeId": "degree-btech",
+        "managedDepartments": ["dept-computer-science"],
+        "teachingSubjects": ["subject-software-engineering", "subject-dbms"]
     }
     ```
 
@@ -124,14 +124,14 @@ async def create_hierarchical_user(
     ```json
     {
         "email": "hod.medicine@aiims.edu.in",
-        "full_name": "डॉ. प्रिया देवी शर्मा (Dr. Priya Devi Sharma)",
+        "fullName": "डॉ. प्रिया देवी शर्मा (Dr. Priya Devi Sharma)",
         "phone": "+91-9876543210",
         "role": "head",
-        "department_id": "dept-general-medicine",
-        "branch_id": "branch-medicine",
-        "degree_id": "degree-mbbs",
-        "managed_departments": ["dept-general-medicine"],
-        "teaching_subjects": ["subject-pathology", "subject-internal-medicine"]
+        "departmentId": "dept-general-medicine",
+        "branchId": "branch-medicine",
+        "degreeId": "degree-mbbs",
+        "managedDepartments": ["dept-general-medicine"],
+        "teachingSubjects": ["subject-pathology", "subject-internal-medicine"]
     }
     ```
 
@@ -139,14 +139,14 @@ async def create_hierarchical_user(
     ```json
     {
         "email": "rajesh.kumar@college.edu.in",
-        "full_name": "Mr. Rajesh Kumar Yadav",
+        "fullName": "Mr. Rajesh Kumar Yadav",
         "phone": "+91-9876543210",
         "role": "staff",
-        "department_id": "dept-mechanical-engineering",
-        "branch_id": "branch-mechanical",
-        "degree_id": "degree-btech",
-        "managed_departments": [],
-        "teaching_subjects": ["subject-thermodynamics", "subject-fluid-mechanics"]
+        "departmentId": "dept-mechanical-engineering",
+        "branchId": "branch-mechanical",
+        "degreeId": "degree-btech",
+        "managedDepartments": [],
+        "teachingSubjects": ["subject-thermodynamics", "subject-fluid-mechanics"]
     }
     ```
 
@@ -154,14 +154,14 @@ async def create_hierarchical_user(
     ```json
     {
         "email": "kavita.singh@du.ac.in",
-        "full_name": "श्रीमती कविता सिंह (Smt. Kavita Singh)",
+        "fullName": "श्रीमती कविता सिंह (Smt. Kavita Singh)",
         "phone": "+91-9876543210",
         "role": "staff",
-        "department_id": "dept-hindi-literature",
-        "branch_id": "branch-hindi",
-        "degree_id": "degree-ba",
-        "managed_departments": [],
-        "teaching_subjects": ["subject-hindi-sahitya", "subject-kavya-shastra"]
+        "departmentId": "dept-hindi-literature",
+        "branchId": "branch-hindi",
+        "degreeId": "degree-ba",
+        "managedDepartments": [],
+        "teachingSubjects": ["subject-hindi-sahitya", "subject-kavya-shastra"]
     }
     ```
 
@@ -169,14 +169,14 @@ async def create_hierarchical_user(
     ```json
     {
         "email": "mathematics.prof@college.edu.in",
-        "full_name": "Prof. Suresh Chandra Gupta",
+        "fullName": "Prof. Suresh Chandra Gupta",
         "phone": "+91-9876543210",
         "role": "staff",
-        "department_id": "dept-mathematics",
-        "branch_id": "branch-pure-mathematics",
-        "degree_id": "degree-msc",
-        "managed_departments": ["dept-mathematics", "dept-computer-science", "dept-physics"],
-        "teaching_subjects": [
+        "departmentId": "dept-mathematics",
+        "branchId": "branch-pure-mathematics",
+        "degreeId": "degree-msc",
+        "managedDepartments": ["dept-mathematics", "dept-computer-science", "dept-physics"],
+        "teachingSubjects": [
             "subject-calculus",
             "subject-discrete-mathematics",
             "subject-statistics",
@@ -189,14 +189,14 @@ async def create_hierarchical_user(
     ```json
     {
         "email": "guest.faculty@industry.com",
-        "full_name": "CA Meera Patel (Chartered Accountant)",
+        "fullName": "CA Meera Patel (Chartered Accountant)",
         "phone": "+91-9876543210",
         "role": "staff",
-        "department_id": "dept-commerce",
-        "branch_id": "branch-accounting",
-        "degree_id": "degree-bcom",
-        "managed_departments": ["dept-commerce", "dept-management"],
-        "teaching_subjects": [
+        "departmentId": "dept-commerce",
+        "branchId": "branch-accounting",
+        "degreeId": "degree-bcom",
+        "managedDepartments": ["dept-commerce", "dept-management"],
+        "teachingSubjects": [
             "subject-financial-accounting",
             "subject-cost-accounting",
             "subject-taxation",
@@ -350,7 +350,7 @@ async def transfer_authority(
     ## Request Payload Example:
     ```json
     {
-        "target_user_id": "admin-123e4567-e89b-12d3-a456-426614174000"
+        "targetUserId": "admin-123e4567-e89b-12d3-a456-426614174000"
     }
     ```
 
@@ -359,28 +359,28 @@ async def transfer_authority(
     ### Principal Retirement Transfer:
     ```json
     {
-        "target_user_id": "admin-dr-sunita-sharma",
+        "targetUserId": "admin-dr-sunita-sharma",
         "reason": "Principal retirement - authority transfer to Senior Administrator",
-        "effective_date": "2024-07-01"
+        "effectiveDate": "2024-07-01"
     }
     ```
 
     ### Emergency Authority Transfer:
     ```json
     {
-        "target_user_id": "admin-prof-rajesh-kumar",
+        "targetUserId": "admin-prof-rajesh-kumar",
         "reason": "Medical leave - temporary authority transfer",
         "temporary": true,
-        "duration_months": 6
+        "durationMonths": 6
     }
     ```
 
     ### Promotion-based Transfer:
     ```json
     {
-        "target_user_id": "admin-dr-priya-singh",
+        "targetUserId": "admin-dr-priya-singh",
         "reason": "Promotion to Principal position",
-        "ceremony_date": "2024-08-15",
+        "ceremonyDate": "2024-08-15",
         "announcement": true
     }
     ```
@@ -389,9 +389,9 @@ async def transfer_authority(
     ```json
     {
         "message": "Authority transferred successfully",
-        "former_principal": "user-dr-pradeep-sinha",
-        "new_principal": "user-dr-sunita-sharma",
-        "transferred_at": 1706764200
+        "formerPrincipal": "user-dr-pradeep-sinha",
+        "newPrincipal": "user-dr-sunita-sharma",
+        "transferredAt": 1706764200
     }
     ```
     """
@@ -440,8 +440,8 @@ async def delegate_department_management(
     ## Request Payload Example:
     ```json
     {
-        "department_id": "dept-123e4567-e89b-12d3-a456-426614174000",
-        "head_user_id": "head-123e4567-e89b-12d3-a456-426614174001"
+        "departmentId": "dept-123e4567-e89b-12d3-a456-426614174000",
+        "headUserId": "head-123e4567-e89b-12d3-a456-426614174001"
     }
     ```
 
@@ -450,14 +450,14 @@ async def delegate_department_management(
     ### Computer Science Department Delegation:
     ```json
     {
-        "department_id": "dept-computer-science",
-        "head_user_id": "head-dr-rajesh-kumar",
-        "effective_from": "2024-07-01",
-        "delegation_scope": [
-            "faculty_management",
-            "curriculum_updates",
-            "student_affairs",
-            "budget_approval_upto_50000"
+        "departmentId": "dept-computer-science",
+        "headUserId": "head-dr-rajesh-kumar",
+        "effectiveFrom": "2024-07-01",
+        "delegationScope": [
+            "facultyManagement",
+            "curriculumUpdates",
+            "studentAffairs",
+            "budgetApprovalUpto50000"
         ]
     }
     ```
@@ -465,14 +465,14 @@ async def delegate_department_management(
     ### Medical Department Delegation:
     ```json
     {
-        "department_id": "dept-general-medicine",
-        "head_user_id": "head-dr-priya-sharma",
-        "effective_from": "2024-08-01",
-        "delegation_scope": [
-            "clinical_operations",
-            "resident_supervision",
-            "equipment_procurement",
-            "patient_care_protocols"
+        "departmentId": "dept-general-medicine",
+        "headUserId": "head-dr-priya-sharma",
+        "effectiveFrom": "2024-08-01",
+        "delegationScope": [
+            "clinicalOperations",
+            "residentSupervision",
+            "equipmentProcurement",
+            "patientCareProtocols"
         ]
     }
     ```
@@ -480,14 +480,14 @@ async def delegate_department_management(
     ### Commerce Department Delegation:
     ```json
     {
-        "department_id": "dept-commerce",
-        "head_user_id": "head-prof-suresh-gupta",
-        "effective_from": "2024-06-15",
-        "delegation_scope": [
-            "industry_partnerships",
-            "placement_coordination",
-            "guest_faculty_management",
-            "seminar_organization"
+        "departmentId": "dept-commerce",
+        "headUserId": "head-prof-suresh-gupta",
+        "effectiveFrom": "2024-06-15",
+        "delegationScope": [
+            "industryPartnerships",
+            "placementCoordination",
+            "guestFacultyManagement",
+            "seminarOrganization"
         ]
     }
     ```
@@ -495,15 +495,15 @@ async def delegate_department_management(
     ### Multi-Department Delegation:
     ```json
     {
-        "department_id": "dept-humanities",
-        "head_user_id": "head-prof-kavita-singh",
-        "sub_departments": [
+        "departmentId": "dept-humanities",
+        "headUserId": "head-prof-kavita-singh",
+        "subDepartments": [
             "dept-hindi-literature",
             "dept-english-literature",
             "dept-philosophy",
             "dept-history"
         ],
-        "effective_from": "2024-07-15"
+        "effectiveFrom": "2024-07-15"
     }
     ```
 
@@ -511,8 +511,8 @@ async def delegate_department_management(
     ```json
     {
         "message": "Department management delegated successfully",
-        "department_id": "dept-computer-science",
-        "head_user_id": "head-dr-rajesh-kumar"
+        "departmentId": "dept-computer-science",
+        "headUserId": "head-dr-rajesh-kumar"
     }
     ```
     """
@@ -554,8 +554,8 @@ async def grant_module_permission(
     ## Request Payload Example:
     ```json
     {
-        "user_id": "staff-123e4567-e89b-12d3-a456-426614174000",
-        "module_name": "student_management",
+        "userId": "staff-123e4567-e89b-12d3-a456-426614174000",
+        "moduleName": "studentManagement",
         "actions": ["read", "write", "delete"]
     }
     ```
@@ -565,72 +565,72 @@ async def grant_module_permission(
     ### Grant Attendance Management Permission:
     ```json
     {
-        "user_id": "staff-prof-anita-singh",
-        "module_name": "attendance_management",
+        "userId": "staff-prof-anita-singh",
+        "moduleName": "attendanceManagement",
         "actions": ["read", "write"],
         "scope": {
             "sections": ["btech-cse-a", "btech-cse-b"],
             "subjects": ["subject-data-structures", "subject-algorithms"]
         },
-        "valid_until": "2024-12-31"
+        "validUntil": "2024-12-31"
     }
     ```
 
     ### Grant Grade Management Permission:
     ```json
     {
-        "user_id": "staff-dr-rajesh-kumar",
-        "module_name": "grade_management",
+        "userId": "staff-dr-rajesh-kumar",
+        "moduleName": "gradeManagement",
         "actions": ["read", "write", "approve"],
         "scope": {
             "semesters": ["2024-spring", "2024-fall"],
             "departments": ["dept-computer-science"]
         },
-        "delegation_allowed": true
+        "delegationAllowed": true
     }
     ```
 
     ### Grant Library Management Permission:
     ```json
     {
-        "user_id": "staff-librarian-meera-patel",
-        "module_name": "library_management",
-        "actions": ["read", "write", "delete", "issue_books", "collect_fines"],
+        "userId": "staff-librarian-meera-patel",
+        "moduleName": "libraryManagement",
+        "actions": ["read", "write", "delete", "issueBooks", "collectFines"],
         "scope": {
             "sections": ["all"],
-            "book_categories": ["computer-science", "mathematics", "physics"]
+            "bookCategories": ["computer-science", "mathematics", "physics"]
         },
-        "special_permissions": ["bulk_operations", "report_generation"]
+        "specialPermissions": ["bulkOperations", "reportGeneration"]
     }
     ```
 
     ### Grant Hostel Management Permission:
     ```json
     {
-        "user_id": "staff-warden-suresh-gupta",
-        "module_name": "hostel_management",
-        "actions": ["read", "write", "delete", "room_allocation"],
+        "userId": "staff-warden-suresh-gupta",
+        "moduleName": "hostelManagement",
+        "actions": ["read", "write", "delete", "roomAllocation"],
         "scope": {
             "hostels": ["boys-hostel-1", "boys-hostel-2"],
             "facilities": ["mess", "sports", "medical"]
         },
-        "emergency_access": true
+        "emergencyAccess": true
     }
     ```
 
     ### Grant Examination Management Permission:
     ```json
     {
-        "user_id": "staff-exam-controller",
-        "module_name": "examination_management",
-        "actions": ["read", "write", "delete", "schedule_exams", "publish_results"],
+        "userId": "staff-exam-controller",
+        "moduleName": "examinationManagement",
+        "actions": ["read", "write", "delete", "scheduleExams", "publishResults"],
         "scope": {
-            "exam_types": ["internal", "external", "practical"],
+            "examTypes": ["internal", "external", "practical"],
             "departments": ["dept-computer-science", "dept-electronics"]
         },
-        "time_restrictions": {
-            "exam_period_only": true,
-            "working_hours": "09:00-18:00"
+        "timeRestrictions": {
+            "examPeriodOnly": true,
+            "workingHours": "09:00-18:00"
         }
     }
     ```
@@ -638,14 +638,14 @@ async def grant_module_permission(
     ### Grant Placement Cell Permission:
     ```json
     {
-        "user_id": "staff-placement-officer",
-        "module_name": "placement_management",
-        "actions": ["read", "write", "schedule_interviews", "send_notifications"],
+        "userId": "staff-placement-officer",
+        "moduleName": "placementManagement",
+        "actions": ["read", "write", "scheduleInterviews", "sendNotifications"],
         "scope": {
-            "student_years": ["final-year", "pre-final"],
+            "studentYears": ["final-year", "pre-final"],
             "companies": ["tier-1", "tier-2", "startups"]
         },
-        "company_interaction": true
+        "companyInteraction": true
     }
     ```
 
@@ -653,8 +653,8 @@ async def grant_module_permission(
     ```json
     {
         "message": "Module permission granted successfully",
-        "user_id": "staff-prof-anita-singh",
-        "module": "attendance_management",
+        "userId": "staff-prof-anita-singh",
+        "module": "attendanceManagement",
         "actions": ["read", "write"]
     }
     ```

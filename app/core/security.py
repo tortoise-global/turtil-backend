@@ -1,9 +1,18 @@
+"""Security utilities for authentication and password management.
+
+This module provides functions for:
+- Password hashing and verification
+- JWT token creation and verification  
+- OTP generation and validation
+- User ID and temporary password generation
+"""
+
 import random
 import string
 import time
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Union
+from typing import Optional
 
 from fastapi import HTTPException, status
 from jose import JWTError, jwt
@@ -16,19 +25,45 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a plain password against its hash.
+    
+    Args:
+        plain_password (str): The plain text password to verify
+        hashed_password (str): The hashed password to verify against
+        
+    Returns:
+        bool: True if password matches, False otherwise
+    """
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
+    """Generate password hash from plain text password.
+    
+    Args:
+        password (str): Plain text password to hash
+        
+    Returns:
+        str: Hashed password
+    """
     return pwd_context.hash(password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """Create a JWT access token.
+    
+    Args:
+        data (dict): Data to encode in the token
+        expires_delta (Optional[timedelta]): Custom expiration time
+        
+    Returns:
+        str: Encoded JWT token
+    """
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now().astimezone() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(
+        expire = datetime.now().astimezone() + timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
 
@@ -40,6 +75,17 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def verify_token(token: str) -> dict:
+    """Verify and decode a JWT token.
+    
+    Args:
+        token (str): JWT token to verify
+        
+    Returns:
+        dict: Decoded token payload
+        
+    Raises:
+        HTTPException: If token is invalid or expired
+    """
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
@@ -112,13 +158,14 @@ def send_email_otp(email: str, college_name: Optional[str] = None) -> str:
     return otp
 
 
-def verify_otp(email: str, provided_otp: str) -> bool:
+def verify_otp(email: str, provided_otp: str, consume: bool = True) -> bool:
     """
     Verify OTP against stored value.
 
     Args:
         email (str): Email address
         provided_otp (str): OTP provided by user
+        consume (bool): Whether to delete OTP after verification (default: True)
 
     Returns:
         bool: True if OTP is valid, False otherwise
@@ -137,8 +184,8 @@ def verify_otp(email: str, provided_otp: str) -> bool:
 
             # Check if OTP matches
             if stored_otp == provided_otp:
-                # Delete OTP after successful verification
-                if redis_client.redis:
+                # Delete OTP after successful verification only if consume=True
+                if consume and redis_client.redis:
                     redis_client.redis.delete(otp_key)
                 return True
     except Exception:

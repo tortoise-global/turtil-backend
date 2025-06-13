@@ -1,3 +1,11 @@
+"""Custom middleware for request processing.
+
+This module provides middleware for:
+- Rate limiting by client IP
+- Input sanitization for security
+- Request validation and filtering
+"""
+
 import html
 import time
 from typing import Dict
@@ -8,6 +16,10 @@ from starlette.responses import Response
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Rate limiting middleware to prevent abuse.
+    
+    Limits the number of requests per IP address within a time period.
+    """
     def __init__(self, app, calls: int = 100, period: int = 60):
         super().__init__(app)
         self.calls = calls
