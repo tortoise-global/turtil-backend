@@ -179,10 +179,6 @@ variable "ec2_user_data" {
       # Install Docker from official repository
       sudo apt-get update -y
       sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-      
-      # Ensure SSM agent is running (pre-installed on Ubuntu AMI)
-      sudo systemctl enable amazon-ssm-agent
-      sudo systemctl start amazon-ssm-agent
       curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
       sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
       sudo apt-get update -y
@@ -247,15 +243,39 @@ variable "ec2_user_data" {
 
       docker pull $ECR_URI/dev-cms-api-repo:latest
 
-      # Generate docker-compose.yml
+      # Generate docker-compose.yml with environment variables
       cat <<EOF > /home/ubuntu/docker-compose.yml
       services:
         web:
           image: $ECR_URI/dev-cms-api-repo:latest
           ports:
             - "8000:8000"
-          env_file:
-            - .env
+          environment:
+            - DATABASE_URL=${var.app_database_url}
+            - SECRET_KEY=${var.app_secret_key}
+            - ALGORITHM=HS256
+            - ACCESS_TOKEN_EXPIRE_MINUTES=30
+            - PROJECT_NAME=Turtil Backend
+            - VERSION=1.0.0
+            - ENVIRONMENT=${terraform.workspace == "main" ? "production" : "development"}
+            - DEBUG=${terraform.workspace == "main" ? "false" : "true"}
+            - LOG_LEVEL=INFO
+            - CORS_ORIGINS=["*", "http://localhost:3000", "http://localhost:8080"]
+            - ALLOWED_HOSTS=["*", "localhost", "127.0.0.1", "0.0.0.0"]
+            - RATE_LIMIT_CALLS=100
+            - RATE_LIMIT_PERIOD=60
+            - OTP_SECRET=123456
+            - OTP_EXPIRY_MINUTES=5
+            - AWS_ACCESS_KEY_ID=${var.app_aws_access_key_id}
+            - AWS_SECRET_ACCESS_KEY=${var.app_aws_secret_access_key}
+            - AWS_REGION=ap-south-1
+            - S3_BUCKET_NAME=${var.app_s3_bucket_name}
+            - UPSTASH_REDIS_URL=${var.app_upstash_redis_url}
+            - UPSTASH_REDIS_TOKEN=${var.app_upstash_redis_token}
+            - REDIS_USER_CACHE_TTL=300
+            - REDIS_BLACKLIST_TTL=86400
+            - GMAIL_EMAIL=${var.app_gmail_email}
+            - GMAIL_APP_PASSWORD=${var.app_gmail_app_password}
           command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
           restart: always
           networks:
@@ -267,10 +287,7 @@ variable "ec2_user_data" {
 
       EOF
 
-      # Wait for .env file to be created by GitHub Actions
-      echo "Waiting for .env file from deployment..."
-      
-      # Start the app (will be restarted when .env is deployed)
+      # Start the app with environment variables
       docker-compose -f /home/ubuntu/docker-compose.yml up -d
     EOT
   }
@@ -320,4 +337,59 @@ variable "asg_target_cpu_utilization" {
     "prod" = 70
   }
 }
+
+# Environment variables passed from GitHub Actions
+variable "app_database_url" {
+  description = "Database URL"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_secret_key" {
+  description = "Secret key"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_aws_access_key_id" {
+  description = "AWS Access Key ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_aws_secret_access_key" {
+  description = "AWS Secret Access Key"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_s3_bucket_name" {
+  description = "S3 bucket name"
+  type        = string
+}
+
+variable "app_upstash_redis_url" {
+  description = "Upstash Redis URL"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_upstash_redis_token" {
+  description = "Upstash Redis Token"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_gmail_email" {
+  description = "Gmail email"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_gmail_app_password" {
+  description = "Gmail app password"
+  type        = string
+  sensitive   = true
+}
+
 
