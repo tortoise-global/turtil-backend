@@ -267,3 +267,70 @@ variable "app_gmail_app_password" {
   type        = string
   sensitive   = true
 }
+
+variable "app_algorithm" {
+  description = "JWT algorithm"
+  type        = string
+  default     = "HS256"
+}
+
+variable "app_access_token_expire_minutes" {
+  description = "Access token expiration time in minutes"
+  type        = string
+  default     = "30"
+}
+
+variable "app_project_name" {
+  description = "Project name"
+  type        = string
+  default     = "Turtil Backend"
+}
+
+variable "app_version" {
+  description = "Application version"
+  type        = string
+  default     = "1.0.0"
+}
+
+variable "app_log_level" {
+  description = "Application log level"
+  type        = string
+  default     = "INFO"
+}
+
+variable "app_rate_limit_calls" {
+  description = "Rate limit calls per period"
+  type        = string
+  default     = "100"
+}
+
+variable "app_rate_limit_period" {
+  description = "Rate limit period in seconds"
+  type        = string
+  default     = "60"
+}
+
+variable "app_otp_secret" {
+  description = "OTP secret key"
+  type        = string
+  sensitive   = true
+  default     = "123456"
+}
+
+variable "app_otp_expiry_minutes" {
+  description = "OTP expiration time in minutes"
+  type        = string
+  default     = "5"
+}
+
+variable "app_redis_user_cache_ttl" {
+  description = "Redis user cache TTL in seconds"
+  type        = string
+  default     = "300"
+}
+
+variable "app_redis_blacklist_ttl" {
+  description = "Redis blacklist TTL in seconds"
+  type        = string
+  default     = "86400"
+}
