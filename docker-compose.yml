@@ -1,40 +1,8 @@
-# version: "3.8"
-
-# services:
-#   web:
-#     build: .
-#     ports:
-#       - "8000:8000"
-#     environment:
-#       - DATABASE_URL=${DATABASE_URL}
-#       - SECRET_KEY=${SECRET_KEY}
-#       - ALGORITHM=${ALGORITHM}
-#       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
-#       - ENVIRONMENT=${ENVIRONMENT}
-#       - LOG_LEVEL=${LOG_LEVEL}
-#     restart: unless-stopped
-#     healthcheck:
-#       test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
-#       interval: 30s
-#       timeout: 10s
-#       retries: 3
-#       start_period: 40s
-#     networks:
-#       - turtil_network
-
-# networks:
-#   turtil_network:
-#     driver: bridge
-
-
-
+version: "3.8"
 
 services:
   web:
-    # image: 033464272864.dkr.ecr.ap-south-1.amazonaws.com/docker-crud:latest
-    # image: 033464272864.dkr.ecr.ap-south-1.amazonaws.com/dev-fast-api-repo:latest
-    image:  033464272864.dkr.ecr.ap-south-1.amazonaws.com/dev-cms-api-repo:latest
-
+    build: .
     ports:
       - "8000:8000"
     environment:
@@ -42,8 +10,27 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - ALGORITHM=${ALGORITHM}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      - PROJECT_NAME=${PROJECT_NAME}
+      - VERSION=${VERSION}
       - ENVIRONMENT=${ENVIRONMENT}
+      - DEBUG=${DEBUG}
       - LOG_LEVEL=${LOG_LEVEL}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - RATE_LIMIT_CALLS=${RATE_LIMIT_CALLS}
+      - RATE_LIMIT_PERIOD=${RATE_LIMIT_PERIOD}
+      - OTP_SECRET=${OTP_SECRET}
+      - OTP_EXPIRY_MINUTES=${OTP_EXPIRY_MINUTES}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - UPSTASH_REDIS_URL=${UPSTASH_REDIS_URL}
+      - UPSTASH_REDIS_TOKEN=${UPSTASH_REDIS_TOKEN}
+      - REDIS_USER_CACHE_TTL=${REDIS_USER_CACHE_TTL}
+      - REDIS_BLACKLIST_TTL=${REDIS_BLACKLIST_TTL}
+      - GMAIL_EMAIL=${GMAIL_EMAIL}
+      - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
@@ -52,9 +39,8 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - default
-    
+      - turtil_network
 
 networks:
-  default:
+  turtil_network:
     driver: bridge

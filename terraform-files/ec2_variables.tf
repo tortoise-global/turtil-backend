@@ -236,6 +236,49 @@ variable "ec2_user_data" {
       }
       EOF
 
+      # Install jq for JSON parsing
+      sudo apt-get install -y jq
+
+      # Fetch all parameters from SSM
+      SECRETS=$(aws ssm get-parameters-by-path \
+      --path "/dev/" \
+      --region ap-south-1 \
+      --with-decryption \
+      --query "Parameters[*].{Name:Name,Value:Value}")
+
+      # Create .env file
+      cat << EOF > /home/ubuntu/.env
+      DATABASE_URL=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/DATABASE_URL").Value')
+      SECRET_KEY=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/SECRET_KEY").Value')
+      ALGORITHM=HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES=30
+      PROJECT_NAME=Turtil Backend
+      VERSION=1.0.0
+      ENVIRONMENT=development
+      DEBUG=true
+      LOG_LEVEL=INFO
+      CORS_ORIGINS=["http://localhost:3000","http://localhost:8080"]
+      ALLOWED_HOSTS=["localhost","127.0.0.1","0.0.0.0"]
+      RATE_LIMIT_CALLS=100
+      RATE_LIMIT_PERIOD=60
+      OTP_SECRET=123456
+      OTP_EXPIRY_MINUTES=5
+      AWS_ACCESS_KEY_ID=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/AWS_ACCESS_KEY_ID").Value')
+      AWS_SECRET_ACCESS_KEY=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/AWS_SECRET_ACCESS_KEY").Value')
+      AWS_REGION=ap-south-1
+      S3_BUCKET_NAME=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/S3_BUCKET_NAME").Value')
+      UPSTASH_REDIS_URL=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/UPSTASH_REDIS_URL").Value')
+      UPSTASH_REDIS_TOKEN=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/UPSTASH_REDIS_TOKEN").Value')
+      REDIS_USER_CACHE_TTL=300
+      REDIS_BLACKLIST_TTL=86400
+      GMAIL_EMAIL=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/GMAIL_EMAIL").Value')
+      GMAIL_APP_PASSWORD=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/GMAIL_APP_PASSWORD").Value')
+      EOF
+
+      # Set permissions
+      chown ubuntu:ubuntu /home/ubuntu/.env
+      chmod 600 /home/ubuntu/.env
+
       # Test Nginx configuration and reload
       sudo nginx -t
       sudo systemctl reload nginx

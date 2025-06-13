@@ -1,4 +1,225 @@
-name: CI/CD Pipeline with Docker Deployment
+# name: CI/CD Pipeline with Docker Deployment
+
+# on:
+#   push:
+#     branches:
+#       - main
+#       - dev
+#   pull_request:
+#     branches:
+#       - main
+#       - dev
+
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+#     environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+
+#     steps:
+#       # Checkout code
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       # Create .env file from environment secrets
+#       - name: Create .env file
+#         run: |
+#           cat > .env << EOF
+#           DATABASE_URL=${{ secrets.DATABASE_URL }}
+#           SECRET_KEY=${{ secrets.SECRET_KEY }}
+#           ALGORITHM=HS256
+#           ACCESS_TOKEN_EXPIRE_MINUTES=30
+#           PROJECT_NAME=Turtil Backend
+#           VERSION=1.0.0
+#           ENVIRONMENT=${{ github.ref_name == 'main' && 'production' || 'development' }}
+#           DEBUG=${{ github.ref_name == 'main' && 'false' || 'true' }}
+#           LOG_LEVEL=INFO
+#           CORS_ORIGINS=["http://localhost:3000", "http://localhost:8080"]
+#           ALLOWED_HOSTS=["localhost", "127.0.0.1", "0.0.0.0"]
+#           RATE_LIMIT_CALLS=100
+#           RATE_LIMIT_PERIOD=60
+#           OTP_SECRET=123456
+#           OTP_EXPIRY_MINUTES=5
+#           AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+#           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           AWS_REGION=${{ secrets.AWS_REGION }}
+#           S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+#           UPSTASH_REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }}
+#           UPSTASH_REDIS_TOKEN=${{ secrets.UPSTASH_REDIS_TOKEN }}
+#           REDIS_USER_CACHE_TTL=300
+#           REDIS_BLACKLIST_TTL=86400
+#           GMAIL_EMAIL=${{ secrets.GMAIL_EMAIL }}
+#           GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
+#           EOF
+
+#       # Set up Terraform
+#       - name: Setup Terraform
+#         uses: hashicorp/setup-terraform@v3
+#         with:
+#           terraform_version: 1.5.0
+
+#       - name: Terraform Init
+#         working-directory: ./terraform-files
+#         run: terraform init
+#         env:
+#           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           AWS_REGION: ${{ secrets.AWS_REGION }}
+
+#       - name: Select Terraform Workspace
+#         working-directory: ./terraform-files
+#         run: |
+#           terraform workspace select dev || terraform workspace new dev
+#         env:
+#           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           AWS_REGION: ${{ secrets.AWS_REGION }}
+
+#       - name: Terraform Plan
+#         working-directory: ./terraform-files
+#         run: terraform plan -out=tfplan
+#         env:
+#           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           AWS_REGION: ${{ secrets.AWS_REGION }}
+
+#       - name: Terraform Apply
+#         if: github.event_name == 'push'
+#         working-directory: ./terraform-files
+#         run: terraform apply -auto-approve tfplan
+#         env:
+#           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           AWS_REGION: ${{ secrets.AWS_REGION }}
+
+#       # Docker build and deploy
+#       - name: Set up QEMU
+#         uses: docker/setup-qemu-action@v3
+
+#       - name: Configure AWS credentials
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: ${{ secrets.AWS_REGION }}
+
+#       - name: Login to ECR
+#         run: |
+#           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+#             | docker login --username AWS --password-stdin 033464272864.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+#       - name: Build Docker Image
+#         run: |
+#           docker build --platform linux/arm64 -t dev-cms-api-repo .
+
+#       - name: Tag Docker Image
+#         run: |
+#           docker tag dev-cms-api-repo:latest 033464272864.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/dev-cms-api-repo:latest
+
+#       - name: Push Docker Image to ECR
+#         run: |
+#           docker push 033464272864.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/dev-cms-api-repo:latest
+
+#       # Zero-downtime ASG refresh
+#       - name: Refresh ASG Instances
+#         if: github.ref_name == 'main' || github.ref_name == 'dev'
+#         working-directory: ./terraform-files
+#         run: |
+#           ASG_NAME=$(terraform output -raw asg_name)
+
+#           while true; do
+#             STATUS=$(aws autoscaling describe-instance-refreshes \
+#               --auto-scaling-group-name "$ASG_NAME" \
+#               --region ${{ secrets.AWS_REGION }} \
+#               --query 'InstanceRefreshes[?Status==`InProgress`].Status' \
+#               --output text)
+#             if [ -z "$STATUS" ]; then
+#               echo "No instance refresh in progress. Proceeding..."
+#               break
+#             fi
+#             echo "Instance refresh in progress. Waiting..."
+#             sleep 50
+#           done
+
+#           aws autoscaling start-instance-refresh \
+#             --auto-scaling-group-name "$ASG_NAME" \
+#             --region ${{ secrets.AWS_REGION }} \
+#             --strategy Rolling \
+#             --preferences "MinHealthyPercentage=100,InstanceWarmup=300"
+
+#       # # Deploy .env to running server instances
+#       # - name: Deploy .env to server instances
+#       #   if: github.ref_name == 'main' || github.ref_name == 'dev'
+#       #   working-directory: ./terraform-files
+#       #   run: |
+#       #     # Get ASG instance IDs
+#       #     ASG_NAME=$(terraform output -raw asg_name)
+#       #     INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
+#       #       --auto-scaling-group-names "$ASG_NAME" \
+#       #       --region ${{ secrets.AWS_REGION }} \
+#       #       --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`].InstanceId' \
+#       #       --output text)
+          
+#       #     # Set environment values based on branch
+#       #     if [ "${{ github.ref_name }}" == "main" ]; then
+#       #       ENV_VALUE="production"
+#       #       DEBUG_VALUE="false"
+#       #     else
+#       #       ENV_VALUE="development"
+#       #       DEBUG_VALUE="true"
+#       #     fi
+          
+#       #     # Create .env content
+#       #     ENV_CONTENT="DATABASE_URL=${{ secrets.DATABASE_URL }}
+#       #     SECRET_KEY=${{ secrets.SECRET_KEY }}
+#       #     ALGORITHM=HS256
+#       #     ACCESS_TOKEN_EXPIRE_MINUTES=30
+#       #     PROJECT_NAME=Turtil Backend
+#       #     VERSION=1.0.0
+#       #     ENVIRONMENT=$ENV_VALUE
+#       #     DEBUG=$DEBUG_VALUE
+#       #     LOG_LEVEL=INFO
+#       #     CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+#       #     ALLOWED_HOSTS=${{ secrets.ALLOWED_HOSTS }}
+#       #     RATE_LIMIT_CALLS=100
+#       #     RATE_LIMIT_PERIOD=60
+#       #     OTP_SECRET=123456
+#       #     OTP_EXPIRY_MINUTES=5
+#       #     AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+#       #     AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#       #     AWS_REGION=${{ secrets.AWS_REGION }}
+#       #     S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+#       #     UPSTASH_REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }}
+#       #     UPSTASH_REDIS_TOKEN=${{ secrets.UPSTASH_REDIS_TOKEN }}
+#       #     REDIS_USER_CACHE_TTL=300
+#       #     REDIS_BLACKLIST_TTL=86400
+#       #     GMAIL_EMAIL=${{ secrets.GMAIL_EMAIL }}
+#       #     GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}"
+          
+#       #     # Deploy to each running instance
+#       #     for INSTANCE_ID in $INSTANCE_IDS; do
+#       #       echo "Deploying to instance: $INSTANCE_ID"
+            
+#       #       # Create .env file on server
+#       #       aws ssm send-command \
+#       #         --instance-ids "$INSTANCE_ID" \
+#       #         --region ${{ secrets.AWS_REGION }} \
+#       #         --document-name "AWS-RunShellScript" \
+#       #         --parameters "commands=[
+#       #           'cd /home/ubuntu',
+#       #           'cat > .env << \"ENVEOF\"',
+#       #           '$ENV_CONTENT',
+#       #           'ENVEOF',
+#       #           'sudo chown ubuntu:ubuntu .env',
+#       #           'chmod 600 .env',
+#       #           'docker-compose down || true',
+#       #           'docker-compose up -d'
+#       #         ]"
+            
+#       #       echo "Deployed .env to $INSTANCE_ID"
+#       #     done
+
+
+name: CI/CD Pipeline with Docker Deployment and SSM Parameters
 
 on:
   push:
@@ -19,6 +240,87 @@ jobs:
       # Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
+
+      # Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Store parameters in AWS SSM Parameter Store
+      - name: Store Parameters in SSM
+        run: |
+          # Define environment prefix
+          ENV_PREFIX="/dev"
+          if [ "${{ github.ref_name }}" == "main" ]; then
+            ENV_PREFIX="/prod"
+          fi
+
+          # Store parameters with appropriate type
+          aws ssm put-parameter \
+            --name "$ENV_PREFIX/DATABASE_URL" \
+            --value "${{ secrets.DATABASE_URL }}" \
+            --type SecureString \
+            --overwrite \
+            --region ${{ secrets.AWS_REGION }}
+
+          aws ssm put-parameter \
+            --name "$ENV_PREFIX/SECRET_KEY" \
+            --value "${{ secrets.SECRET_KEY }}" \
+            --type SecureString \
+            --overwrite \
+            --region ${{ secrets.AWS_REGION }}
+
+          aws ssm put-parameter \
+            --name "$ENV_PREFIX/AWS_ACCESS_KEY_ID" \
+            --value "${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            --type SecureString \
+            --overwrite \
+            --region ${{ secrets.AWS_REGION }}
+
+          aws ssm put-parameter \
+            --name "$ENV_PREFIX/AWS_SECRET_ACCESS_KEY" \
+            --value "${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            --type SecureString \
+            --overwrite \
+            --region ${{ secrets.AWS_REGION }}
+
+          aws ssm put-parameter \
+            --name "$ENV_PREFIX/S3_BUCKET_NAME" \
+            --value "${{ secrets.S3_BUCKET_NAME }}" \
+            --type String \
+            --overwrite \
+            --region ${{ secrets.AWS_REGION }}
+
+          aws ssm put-parameter \
+            --name "$ENV_PREFIX/UPSTASH_REDIS_URL" \
+            --value "${{ secrets.UPSTASH_REDIS_URL }}" \
+            --type SecureString \
+            --overwrite \
+            --region ${{ secrets.AWS_REGION }}
+
+          aws ssm put-parameter \
+            --name "$ENV_PREFIX/UPSTASH_REDIS_TOKEN" \
+            --value "${{ secrets.UPSTASH_REDIS_TOKEN }}" \
+            --type SecureString \
+            --overwrite \
+            --region ${{ secrets.AWS_REGION }}
+
+          aws ssm put-parameter \
+            --name "$ENV_PREFIX/GMAIL_EMAIL" \
+            --value "${{ secrets.GMAIL_EMAIL }}" \
+            --type String \
+            --overwrite \
+            --region ${{ secrets.AWS_REGION }}
+
+          aws ssm put-parameter \
+            --name "$ENV_PREFIX/GMAIL_APP_PASSWORD" \
+            --value "${{ secrets.GMAIL_APP_PASSWORD }}" \
+            --type SecureString \
+            --overwrite \
+            --region ${{ secrets.AWS_REGION }}
 
       # Create .env file from environment secrets
       - name: Create .env file
@@ -95,13 +397,6 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
       - name: Login to ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
@@ -146,74 +441,74 @@ jobs:
             --strategy Rolling \
             --preferences "MinHealthyPercentage=100,InstanceWarmup=300"
 
-      # Deploy .env to running server instances
-      - name: Deploy .env to server instances
-        if: github.ref_name == 'main' || github.ref_name == 'dev'
-        working-directory: ./terraform-files
-        run: |
-          # Get ASG instance IDs
-          ASG_NAME=$(terraform output -raw asg_name)
-          INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
-            --auto-scaling-group-names "$ASG_NAME" \
-            --region ${{ secrets.AWS_REGION }} \
-            --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`].InstanceId' \
-            --output text)
+      # # Deploy .env to running server instances
+      # - name: Deploy .env to server instances
+      #   if: github.ref_name == 'main' || github.ref_name == 'dev'
+      #   working-directory: ./terraform-files
+      #   run: |
+      #     # Get ASG instance IDs
+      #     ASG_NAME=$(terraform output -raw asg_name)
+      #     INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
+      #       --auto-scaling-group-names "$ASG_NAME" \
+      #       --region ${{ secrets.AWS_REGION }} \
+      #       --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`].InstanceId' \
+      #       --output text)
           
-          # Set environment values based on branch
-          if [ "${{ github.ref_name }}" == "main" ]; then
-            ENV_VALUE="production"
-            DEBUG_VALUE="false"
-          else
-            ENV_VALUE="development"
-            DEBUG_VALUE="true"
-          fi
+      #     # Set environment values based on branch
+      #     if [ "${{ github.ref_name }}" == "main" ]; then
+      #       ENV_VALUE="production"
+      #       DEBUG_VALUE="false"
+      #     else
+      #       ENV_VALUE="development"
+      #       DEBUG_VALUE="true"
+      #     fi
           
-          # Create .env content
-          ENV_CONTENT="DATABASE_URL=${{ secrets.DATABASE_URL }}
-          SECRET_KEY=${{ secrets.SECRET_KEY }}
-          ALGORITHM=HS256
-          ACCESS_TOKEN_EXPIRE_MINUTES=30
-          PROJECT_NAME=Turtil Backend
-          VERSION=1.0.0
-          ENVIRONMENT=$ENV_VALUE
-          DEBUG=$DEBUG_VALUE
-          LOG_LEVEL=INFO
-          CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
-          ALLOWED_HOSTS=${{ secrets.ALLOWED_HOSTS }}
-          RATE_LIMIT_CALLS=100
-          RATE_LIMIT_PERIOD=60
-          OTP_SECRET=123456
-          OTP_EXPIRY_MINUTES=5
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION=${{ secrets.AWS_REGION }}
-          S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
-          UPSTASH_REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }}
-          UPSTASH_REDIS_TOKEN=${{ secrets.UPSTASH_REDIS_TOKEN }}
-          REDIS_USER_CACHE_TTL=300
-          REDIS_BLACKLIST_TTL=86400
-          GMAIL_EMAIL=${{ secrets.GMAIL_EMAIL }}
-          GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}"
+      #     # Create .env content
+      #     ENV_CONTENT="DATABASE_URL=${{ secrets.DATABASE_URL }}
+      #     SECRET_KEY=${{ secrets.SECRET_KEY }}
+      #     ALGORITHM=HS256
+      #     ACCESS_TOKEN_EXPIRE_MINUTES=30
+      #     PROJECT_NAME=Turtil Backend
+      #     VERSION=1.0.0
+      #     ENVIRONMENT=$ENV_VALUE
+      #     DEBUG=$DEBUG_VALUE
+      #     LOG_LEVEL=INFO
+      #     CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+      #     ALLOWED_HOSTS=${{ secrets.ALLOWED_HOSTS }}
+      #     RATE_LIMIT_CALLS=100
+      #     RATE_LIMIT_PERIOD=60
+      #     OTP_SECRET=123456
+      #     OTP_EXPIRY_MINUTES=5
+      #     AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     AWS_REGION=${{ secrets.AWS_REGION }}
+      #     S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+      #     UPSTASH_REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }}
+      #     UPSTASH_REDIS_TOKEN=${{ secrets.UPSTASH_REDIS_TOKEN }}
+      #     REDIS_USER_CACHE_TTL=300
+      #     REDIS_BLACKLIST_TTL=86400
+      #     GMAIL_EMAIL=${{ secrets.GMAIL_EMAIL }}
+      #     GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}"
           
-          # Deploy to each running instance
-          for INSTANCE_ID in $INSTANCE_IDS; do
-            echo "Deploying to instance: $INSTANCE_ID"
+      #     # Deploy to each running instance
+      #     for INSTANCE_ID in $INSTANCE_IDS; do
+      #       echo "Deploying to instance: $INSTANCE_ID"
             
-            # Create .env file on server
-            aws ssm send-command \
-              --instance-ids "$INSTANCE_ID" \
-              --region ${{ secrets.AWS_REGION }} \
-              --document-name "AWS-RunShellScript" \
-              --parameters "commands=[
-                'cd /home/ubuntu',
-                'cat > .env << \"ENVEOF\"',
-                '$ENV_CONTENT',
-                'ENVEOF',
-                'sudo chown ubuntu:ubuntu .env',
-                'chmod 600 .env',
-                'docker-compose down || true',
-                'docker-compose up -d'
-              ]"
+      #       # Create .env file on server
+      #       aws ssm send-command \
+      #         --instance-ids "$INSTANCE_ID" \
+      #         --region ${{ secrets.AWS_REGION }} \
+      #         --document-name "AWS-RunShellScript" \
+      #         --parameters "commands=[
+      #           'cd /home/ubuntu',
+      #           'cat > .env << \"ENVEOF\"',
+      #           '$ENV_CONTENT',
+      #           'ENVEOF',
+      #           'sudo chown ubuntu:ubuntu .env',
+      #           'chmod 600 .env',
+      #           'docker-compose down || true',
+      #           'docker-compose up -d'
+      #         ]"
             
-            echo "Deployed .env to $INSTANCE_ID"
-          done
+      #       echo "Deployed .env to $INSTANCE_ID"
+      #     done
