@@ -1,27 +1,57 @@
-version: "3.8"
+# version: "3.8"
+
+# services:
+#   web:
+#     build: .
+#     ports:
+#       - "8000:8000"
+#     environment:
+#       - DATABASE_URL=${DATABASE_URL}
+#       - SECRET_KEY=${SECRET_KEY}
+#       - ALGORITHM=${ALGORITHM}
+#       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+#       - ENVIRONMENT=${ENVIRONMENT}
+#       - LOG_LEVEL=${LOG_LEVEL}
+#     restart: unless-stopped
+#     healthcheck:
+#       test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+#       interval: 30s
+#       timeout: 10s
+#       retries: 3
+#       start_period: 40s
+#     networks:
+#       - turtil_network
+
+# networks:
+#   turtil_network:
+#     driver: bridge
+
+
+
 
 services:
   web:
-    build: .
+    # image: 033464272864.dkr.ecr.ap-south-1.amazonaws.com/docker-crud:latest
+    # image: 033464272864.dkr.ecr.ap-south-1.amazonaws.com/dev-fast-api-repo:latest
+    image:  033464272864.dkr.ecr.ap-south-1.amazonaws.com/dev-cms-api-repo:latest
+
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - SECRET_KEY=${SECRET_KEY}
-      - ALGORITHM=${ALGORITHM}
-      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
-      - ENVIRONMENT=${ENVIRONMENT}
-      - LOG_LEVEL=${LOG_LEVEL}
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      - PYTHONUNBUFFERED=1
+      - WORKERS=4
+      - LOG_LEVEL=info
+
+    # command: ["gunicorn", "-w", "${WORKERS:-4}", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--log-level", "${LOG_LEVEL:-info}", "app.main:app"]
+
+    # restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    restart: always
+
     networks:
-      - turtil_network
+      - default
+    
 
 networks:
-  turtil_network:
+  default:
     driver: bridge
