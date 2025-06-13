@@ -328,27 +328,27 @@ jobs:
           cat > .env << EOF
           DATABASE_URL=${{ secrets.DATABASE_URL }}
           SECRET_KEY=${{ secrets.SECRET_KEY }}
-          ALGORITHM=HS256
-          ACCESS_TOKEN_EXPIRE_MINUTES=30
-          PROJECT_NAME=Turtil Backend
-          VERSION=1.0.0
+          ALGORITHM=${{ secrets.ALGORITHM }}
+          ACCESS_TOKEN_EXPIRE_MINUTES=${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          PROJECT_NAME=${{ secrets.PROJECT_NAME }}
+          VERSION=${{ secrets.VERSION }}
           ENVIRONMENT=${{ github.ref_name == 'main' && 'production' || 'development' }}
           DEBUG=${{ github.ref_name == 'main' && 'false' || 'true' }}
-          LOG_LEVEL=INFO
+          LOG_LEVEL=${{ secrets.LOG_LEVEL }}
           CORS_ORIGINS=["http://localhost:3000", "http://localhost:8080"]
           ALLOWED_HOSTS=["localhost", "127.0.0.1", "0.0.0.0"]
-          RATE_LIMIT_CALLS=100
-          RATE_LIMIT_PERIOD=60
-          OTP_SECRET=123456
-          OTP_EXPIRY_MINUTES=5
+          RATE_LIMIT_CALLS=${{ secrets.RATE_LIMIT_CALLS }}
+          RATE_LIMIT_PERIOD=${{ secrets.RATE_LIMIT_PERIOD }}
+          OTP_SECRET=${{ secrets.OTP_SECRET }}
+          OTP_EXPIRY_MINUTES=${{ secrets.OTP_EXPIRY_MINUTES }}
           AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION=${{ secrets.AWS_REGION }}
           S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
           UPSTASH_REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }}
           UPSTASH_REDIS_TOKEN=${{ secrets.UPSTASH_REDIS_TOKEN }}
-          REDIS_USER_CACHE_TTL=300
-          REDIS_BLACKLIST_TTL=86400
+          REDIS_USER_CACHE_TTL=${{ secrets.REDIS_USER_CACHE_TTL }}
+          REDIS_BLACKLIST_TTL=${{ secrets.REDIS_BLACKLIST_TTL }}
           GMAIL_EMAIL=${{ secrets.GMAIL_EMAIL }}
           GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
           EOF
@@ -383,15 +383,26 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-          # TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
-          # TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
-          # TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          # TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          # TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
-          # TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
-          # TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
-          # TF_VAR_app_gmail_email: ${{ secrets.GMAIL_EMAIL }}
-          # TF_VAR_app_gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_app_algorithm: ${{ secrets.ALGORITHM }}
+          TF_VAR_app_access_token_expire_minutes: ${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
+          TF_VAR_app_version: ${{ secrets.VERSION }}
+          TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
+          TF_VAR_app_rate_limit_calls: ${{ secrets.RATE_LIMIT_CALLS }}
+          TF_VAR_app_rate_limit_period: ${{ secrets.RATE_LIMIT_PERIOD }}
+          TF_VAR_app_otp_secret: ${{ secrets.OTP_SECRET }}
+          TF_VAR_app_otp_expiry_minutes: ${{ secrets.OTP_EXPIRY_MINUTES }}
+          TF_VAR_app_redis_user_cache_ttl: ${{ secrets.REDIS_USER_CACHE_TTL }}
+          TF_VAR_app_redis_blacklist_ttl: ${{ secrets.REDIS_BLACKLIST_TTL }}
+          TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
+          TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
+          TF_VAR_app_gmail_email: ${{ secrets.GMAIL_EMAIL }}
+          TF_VAR_app_gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
 
       - name: Terraform Apply
         if: github.event_name == 'push'
@@ -401,15 +412,26 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-        #   TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
-        #   TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
-        #   TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        #   TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        #   TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
-        #   TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
-        #   TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
-        #   TF_VAR_app_gmail_email: ${{ secrets.GMAIL_EMAIL }}
-        #   TF_VAR_app_gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_app_algorithm: ${{ secrets.ALGORITHM }}
+          TF_VAR_app_access_token_expire_minutes: ${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
+          TF_VAR_app_version: ${{ secrets.VERSION }}
+          TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
+          TF_VAR_app_rate_limit_calls: ${{ secrets.RATE_LIMIT_CALLS }}
+          TF_VAR_app_rate_limit_period: ${{ secrets.RATE_LIMIT_PERIOD }}
+          TF_VAR_app_otp_secret: ${{ secrets.OTP_SECRET }}
+          TF_VAR_app_otp_expiry_minutes: ${{ secrets.OTP_EXPIRY_MINUTES }}
+          TF_VAR_app_redis_user_cache_ttl: ${{ secrets.REDIS_USER_CACHE_TTL }}
+          TF_VAR_app_redis_blacklist_ttl: ${{ secrets.REDIS_BLACKLIST_TTL }}
+          TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
+          TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
+          TF_VAR_app_gmail_email: ${{ secrets.GMAIL_EMAIL }}
+          TF_VAR_app_gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
 
       # Docker build and deploy
       - name: Set up QEMU

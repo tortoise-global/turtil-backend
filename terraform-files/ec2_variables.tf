@@ -364,56 +364,123 @@ variable "asg_target_cpu_utilization" {
   }
 }
 
-# # Environment variables passed from GitHub Actions
-# variable "app_database_url" {
-#   description = "Database URL"
-#   type        = string
-#   sensitive   = true
-# }
+# Environment variables passed from GitHub Actions
+variable "app_database_url" {
+  description = "Database URL"
+  type        = string
+  sensitive   = true
+}
 
-# variable "app_secret_key" {
-#   description = "Secret key"
-#   type        = string
-#   sensitive   = true
-# }
+variable "app_secret_key" {
+  description = "Secret key"
+  type        = string
+  sensitive   = true
+}
 
-# variable "app_aws_access_key_id" {
-#   description = "AWS Access Key ID"
-#   type        = string
-#   sensitive   = true
-# }
+variable "app_aws_access_key_id" {
+  description = "AWS Access Key ID"
+  type        = string
+  sensitive   = true
+}
 
-# variable "app_aws_secret_access_key" {
-#   description = "AWS Secret Access Key"
-#   type        = string
-#   sensitive   = true
-# }
+variable "app_aws_secret_access_key" {
+  description = "AWS Secret Access Key"
+  type        = string
+  sensitive   = true
+}
 
-# variable "app_s3_bucket_name" {
-#   description = "S3 bucket name"
-#   type        = string
-# }
+variable "app_s3_bucket_name" {
+  description = "S3 bucket name"
+  type        = string
+}
 
-# variable "app_upstash_redis_url" {
-#   description = "Upstash Redis URL"
-#   type        = string
-#   sensitive   = true
-# }
+variable "app_upstash_redis_url" {
+  description = "Upstash Redis URL"
+  type        = string
+  sensitive   = true
+}
 
-# variable "app_upstash_redis_token" {
-#   description = "Upstash Redis Token"
-#   type        = string
-#   sensitive   = true
-# }
+variable "app_upstash_redis_token" {
+  description = "Upstash Redis Token"
+  type        = string
+  sensitive   = true
+}
 
-# variable "app_gmail_email" {
-#   description = "Gmail email"
-#   type        = string
-#   sensitive   = true
-# }
+variable "app_gmail_email" {
+  description = "Gmail email"
+  type        = string
+  sensitive   = true
+}
 
-# variable "app_gmail_app_password" {
-#   description = "Gmail app password"
-#   type        = string
-#   sensitive   = true
-# }
+variable "app_gmail_app_password" {
+  description = "Gmail app password"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_algorithm" {
+  description = "JWT algorithm"
+  type        = string
+  default     = "HS256"
+}
+
+variable "app_access_token_expire_minutes" {
+  description = "Access token expiration time in minutes"
+  type        = string
+  default     = "30"
+}
+
+variable "app_project_name" {
+  description = "Project name"
+  type        = string
+  default     = "Turtil Backend"
+}
+
+variable "app_version" {
+  description = "Application version"
+  type        = string
+  default     = "1.0.0"
+}
+
+variable "app_log_level" {
+  description = "Application log level"
+  type        = string
+  default     = "INFO"
+}
+
+variable "app_rate_limit_calls" {
+  description = "Rate limit calls per period"
+  type        = string
+  default     = "100"
+}
+
+variable "app_rate_limit_period" {
+  description = "Rate limit period in seconds"
+  type        = string
+  default     = "60"
+}
+
+variable "app_otp_secret" {
+  description = "OTP secret key"
+  type        = string
+  sensitive   = true
+  default     = "123456"
+}
+
+variable "app_otp_expiry_minutes" {
+  description = "OTP expiration time in minutes"
+  type        = string
+  default     = "5"
+}
+
+variable "app_redis_user_cache_ttl" {
+  description = "Redis user cache TTL in seconds"
+  type        = string
+  default     = "300"
+}
+
+variable "app_redis_blacklist_ttl" {
+  description = "Redis blacklist TTL in seconds"
+  type        = string
+  default     = "86400"
+}

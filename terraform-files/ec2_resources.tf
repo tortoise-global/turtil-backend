@@ -95,7 +95,30 @@ resource "aws_launch_template" "cms_fast_api" {
     }
   }
 
-  user_data = base64encode(var.ec2_user_data[terraform.workspace])
+  user_data = base64encode(templatefile("${path.module}/user_data.tpl", {
+    database_url                = var.app_database_url
+    secret_key                  = var.app_secret_key
+    algorithm                   = var.app_algorithm
+    access_token_expire_minutes = var.app_access_token_expire_minutes
+    project_name                = var.app_project_name
+    version                     = var.app_version
+    environment                 = terraform.workspace == "main" ? "production" : "development"
+    debug                       = terraform.workspace == "main" ? "false" : "true"
+    log_level                   = var.app_log_level
+    rate_limit_calls            = var.app_rate_limit_calls
+    rate_limit_period           = var.app_rate_limit_period
+    otp_secret                  = var.app_otp_secret
+    otp_expiry_minutes          = var.app_otp_expiry_minutes
+    aws_access_key_id           = var.app_aws_access_key_id
+    aws_secret_access_key       = var.app_aws_secret_access_key
+    s3_bucket_name              = var.app_s3_bucket_name
+    upstash_redis_url           = var.app_upstash_redis_url
+    upstash_redis_token         = var.app_upstash_redis_token
+    redis_user_cache_ttl        = var.app_redis_user_cache_ttl
+    redis_blacklist_ttl         = var.app_redis_blacklist_ttl
+    gmail_email                 = var.app_gmail_email
+    gmail_app_password          = var.app_gmail_app_password
+  }))
 
   tags = {
     Environment = lookup(var.ec2_env_tags, terraform.workspace)
