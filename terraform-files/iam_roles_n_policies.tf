@@ -45,6 +45,12 @@ resource "aws_iam_role_policy" "ecr_access" {
   })
 }
 
+# Attach AWS managed SSM policy for Systems Manager access
+resource "aws_iam_role_policy_attachment" "ssm_managed_instance_core" {
+  role       = aws_iam_role.ec2_ecr_access.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 # Create an instance profile for the role
 resource "aws_iam_instance_profile" "ec2_ecr_access" {
   name = "${terraform.workspace}-ec2-cms-ecr-access-profile"
