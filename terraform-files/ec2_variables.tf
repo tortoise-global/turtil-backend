@@ -249,20 +249,20 @@ variable "ec2_user_data" {
       # Create .env file
       cat << EOF > /home/ubuntu/.env
       DATABASE_URL=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/DATABASE_URL").Value')
-      SECRET_KEY=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/SECRET_KEY").Value')
-      ALGORITHM=HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES=30
-      PROJECT_NAME=Turtil Backend
-      VERSION=1.0.0
-      ENVIRONMENT=development
-      DEBUG=true
-      LOG_LEVEL=INFO
-      CORS_ORIGINS=["*","http://localhost:3000","http://localhost:8080"]
-      ALLOWED_HOSTS=["*","localhost","127.0.0.1","0.0.0.0"]
-      RATE_LIMIT_CALLS=100
-      RATE_LIMIT_PERIOD=60
-      OTP_SECRET=123456
-      OTP_EXPIRY_MINUTES=5
+      # SECRET_KEY=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/SECRET_KEY").Value')
+      # ALGORITHM=HS256
+      # ACCESS_TOKEN_EXPIRE_MINUTES=30
+      # PROJECT_NAME=Turtil Backend
+      # VERSION=1.0.0
+      # ENVIRONMENT=development
+      # DEBUG=true
+      # LOG_LEVEL=INFO
+      # CORS_ORIGINS=["*","http://localhost:3000","http://localhost:8080"]
+      # ALLOWED_HOSTS=["*","localhost","127.0.0.1","0.0.0.0"]
+      # RATE_LIMIT_CALLS=100
+      # RATE_LIMIT_PERIOD=60
+      # OTP_SECRET=123456
+      # OTP_EXPIRY_MINUTES=5
       AWS_ACCESS_KEY_ID=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/AWS_ACCESS_KEY_ID").Value')
       AWS_SECRET_ACCESS_KEY=$(echo "$SECRETS" | jq -r '.[] | select(.Name == "/dev/AWS_SECRET_ACCESS_KEY").Value')
       AWS_REGION=ap-south-1
@@ -364,56 +364,56 @@ variable "asg_target_cpu_utilization" {
   }
 }
 
-# Environment variables passed from GitHub Actions
-variable "app_database_url" {
-  description = "Database URL"
-  type        = string
-  sensitive   = true
-}
+# # Environment variables passed from GitHub Actions
+# variable "app_database_url" {
+#   description = "Database URL"
+#   type        = string
+#   sensitive   = true
+# }
 
-variable "app_secret_key" {
-  description = "Secret key"
-  type        = string
-  sensitive   = true
-}
+# variable "app_secret_key" {
+#   description = "Secret key"
+#   type        = string
+#   sensitive   = true
+# }
 
-variable "app_aws_access_key_id" {
-  description = "AWS Access Key ID"
-  type        = string
-  sensitive   = true
-}
+# variable "app_aws_access_key_id" {
+#   description = "AWS Access Key ID"
+#   type        = string
+#   sensitive   = true
+# }
 
-variable "app_aws_secret_access_key" {
-  description = "AWS Secret Access Key"
-  type        = string
-  sensitive   = true
-}
+# variable "app_aws_secret_access_key" {
+#   description = "AWS Secret Access Key"
+#   type        = string
+#   sensitive   = true
+# }
 
-variable "app_s3_bucket_name" {
-  description = "S3 bucket name"
-  type        = string
-}
+# variable "app_s3_bucket_name" {
+#   description = "S3 bucket name"
+#   type        = string
+# }
 
-variable "app_upstash_redis_url" {
-  description = "Upstash Redis URL"
-  type        = string
-  sensitive   = true
-}
+# variable "app_upstash_redis_url" {
+#   description = "Upstash Redis URL"
+#   type        = string
+#   sensitive   = true
+# }
 
-variable "app_upstash_redis_token" {
-  description = "Upstash Redis Token"
-  type        = string
-  sensitive   = true
-}
+# variable "app_upstash_redis_token" {
+#   description = "Upstash Redis Token"
+#   type        = string
+#   sensitive   = true
+# }
 
-variable "app_gmail_email" {
-  description = "Gmail email"
-  type        = string
-  sensitive   = true
-}
+# variable "app_gmail_email" {
+#   description = "Gmail email"
+#   type        = string
+#   sensitive   = true
+# }
 
-variable "app_gmail_app_password" {
-  description = "Gmail app password"
-  type        = string
-  sensitive   = true
-}
+# variable "app_gmail_app_password" {
+#   description = "Gmail app password"
+#   type        = string
+#   sensitive   = true
+# }

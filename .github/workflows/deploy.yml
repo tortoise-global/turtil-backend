@@ -383,15 +383,15 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-          TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
-          TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
-          TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
-          TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
-          TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
-          TF_VAR_app_gmail_email: ${{ secrets.GMAIL_EMAIL }}
-          TF_VAR_app_gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          # TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
+          # TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
+          # TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          # TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          # TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
+          # TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
+          # TF_VAR_app_gmail_email: ${{ secrets.GMAIL_EMAIL }}
+          # TF_VAR_app_gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
 
       - name: Terraform Apply
         if: github.event_name == 'push'
@@ -401,15 +401,15 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-          TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
-          TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
-          TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
-          TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
-          TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
-          TF_VAR_app_gmail_email: ${{ secrets.GMAIL_EMAIL }}
-          TF_VAR_app_gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
+        #   TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
+        #   TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
+        #   TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        #   TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        #   TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+        #   TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
+        #   TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
+        #   TF_VAR_app_gmail_email: ${{ secrets.GMAIL_EMAIL }}
+        #   TF_VAR_app_gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
 
       # Docker build and deploy
       - name: Set up QEMU
