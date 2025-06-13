@@ -364,3 +364,56 @@ variable "asg_target_cpu_utilization" {
   }
 }
 
+# Environment variables passed from GitHub Actions
+variable "app_database_url" {
+  description = "Database URL"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_secret_key" {
+  description = "Secret key"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_aws_access_key_id" {
+  description = "AWS Access Key ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_aws_secret_access_key" {
+  description = "AWS Secret Access Key"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_s3_bucket_name" {
+  description = "S3 bucket name"
+  type        = string
+}
+
+variable "app_upstash_redis_url" {
+  description = "Upstash Redis URL"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_upstash_redis_token" {
+  description = "Upstash Redis Token"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_gmail_email" {
+  description = "Gmail email"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_gmail_app_password" {
+  description = "Gmail app password"
+  type        = string
+  sensitive   = true
+}
