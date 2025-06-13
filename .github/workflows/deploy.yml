@@ -4,27 +4,59 @@ on:
   push:
     branches:
       - main
+      - dev
   pull_request:
     branches:
       - main
+      - dev
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'push' && 'production' || 'staging' }}
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
 
     steps:
-      # Checkout code (from first workflow)
+      # Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Set up Terraform (from first workflow)
+      # Create .env file from environment secrets
+      - name: Create .env file
+        run: |
+          cat > .env << EOF
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          SECRET_KEY=${{ secrets.SECRET_KEY }}
+          ALGORITHM=HS256
+          ACCESS_TOKEN_EXPIRE_MINUTES=30
+          PROJECT_NAME=Turtil Backend
+          VERSION=1.0.0
+          ENVIRONMENT=${{ github.ref_name == 'main' && 'production' || 'development' }}
+          DEBUG=${{ github.ref_name == 'main' && 'false' || 'true' }}
+          LOG_LEVEL=INFO
+          CORS_ORIGINS=["http://localhost:3000", "http://localhost:8080"]
+          ALLOWED_HOSTS=["localhost", "127.0.0.1", "0.0.0.0"]
+          RATE_LIMIT_CALLS=100
+          RATE_LIMIT_PERIOD=60
+          OTP_SECRET=123456
+          OTP_EXPIRY_MINUTES=5
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+          UPSTASH_REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }}
+          UPSTASH_REDIS_TOKEN=${{ secrets.UPSTASH_REDIS_TOKEN }}
+          REDIS_USER_CACHE_TTL=300
+          REDIS_BLACKLIST_TTL=86400
+          GMAIL_EMAIL=${{ secrets.GMAIL_EMAIL }}
+          GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
+          EOF
+
+      # Set up Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.0
 
-      # Initialize Terraform (from first workflow)
       - name: Terraform Init
         working-directory: ./terraform-files
         run: terraform init
@@ -33,22 +65,15 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      # Select Terraform Workspace (based on environment) (from first workflow)
       - name: Select Terraform Workspace
         working-directory: ./terraform-files
         run: |
-          # Map GitHub environment to Terraform workspace
-          if [ "${{ github.event_name }}" == "push" ]; then
-            terraform workspace select dev || terraform workspace new dev
-          else
-            terraform workspace select dev || terraform workspace new dev
-          fi
+          terraform workspace select dev || terraform workspace new dev
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      # Terraform Plan (from first workflow)
       - name: Terraform Plan
         working-directory: ./terraform-files
         run: terraform plan -out=tfplan
@@ -57,7 +82,6 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      # Terraform Apply (only on push to main) (from first workflow)
       - name: Terraform Apply
         if: github.event_name == 'push'
         working-directory: ./terraform-files
@@ -67,59 +91,41 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      # Enable ARM64 emulation (from second workflow)
+      # Docker build and deploy
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      # Configure AWS credentials (from second workflow)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      # Login to ECR using AWS CLI (replacing the previous ECR login step)
       - name: Login to ECR
         run: |
-          aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 033464272864.dkr.ecr.ap-south-1.amazonaws.com
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+            | docker login --username AWS --password-stdin 033464272864.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
-      # Build Docker image for ARM64
       - name: Build Docker Image
         run: |
           docker build --platform linux/arm64 -t dev-cms-api-repo .
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      # Tag Docker image
       - name: Tag Docker Image
         run: |
-          docker tag dev-cms-api-repo:latest 033464272864.dkr.ecr.ap-south-1.amazonaws.com/dev-cms-api-repo:latest
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          docker tag dev-cms-api-repo:latest 033464272864.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/dev-cms-api-repo:latest
 
-      # Push Docker image to ECR
       - name: Push Docker Image to ECR
         run: |
-          docker push 033464272864.dkr.ecr.ap-south-1.amazonaws.com/dev-cms-api-repo:latest
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          docker push 033464272864.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/dev-cms-api-repo:latest
 
-      # Refresh ASG with zero-downtime deployment
+      # Zero-downtime ASG refresh
       - name: Refresh ASG Instances
-        if: github.event_name == 'push'
+        if: github.ref_name == 'main' || github.ref_name == 'dev'
         working-directory: ./terraform-files
         run: |
-          # Get the ASG name from Terraform output
           ASG_NAME=$(terraform output -raw asg_name)
 
-          # Check if an instance refresh is already in progress and wait for it to complete
           while true; do
             STATUS=$(aws autoscaling describe-instance-refreshes \
               --auto-scaling-group-name "$ASG_NAME" \
@@ -127,20 +133,15 @@ jobs:
               --query 'InstanceRefreshes[?Status==`InProgress`].Status' \
               --output text)
             if [ -z "$STATUS" ]; then
-              echo "No instance refresh in progress. Proceeding with new refresh."
+              echo "No instance refresh in progress. Proceeding..."
               break
             fi
-            echo "Instance refresh in progress. Waiting for it to complete..."
+            echo "Instance refresh in progress. Waiting..."
             sleep 50
           done
 
-          # Start a new instance refresh to roll out the new image
           aws autoscaling start-instance-refresh \
             --auto-scaling-group-name "$ASG_NAME" \
             --region ${{ secrets.AWS_REGION }} \
             --strategy Rolling \
             --preferences "MinHealthyPercentage=100,InstanceWarmup=300"
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}

@@ -1,6 +1,6 @@
 # Turtil Backend
 
-Production-ready FastAPI backend for college management system with comprehensive CMS APIs, local authentication, and AWS S3 integration.
+backend for college management system with comprehensive CMS APIs, local authentication, and AWS S3 integration.
 
 ## Features
 
