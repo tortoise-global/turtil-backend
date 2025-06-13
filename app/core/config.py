@@ -1,3 +1,10 @@
+"""Application configuration settings.
+
+This module defines the settings class that manages all application configuration
+including database settings, security keys, CORS origins, rate limiting,
+and external service configurations.
+"""
+
 import json
 import os
 import secrets
@@ -7,6 +14,16 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    """Application settings configuration.
+    
+    Manages all configuration settings for the application including:
+    - Application metadata
+    - Security settings
+    - Database configuration
+    - CORS and security policies
+    - Rate limiting configuration
+    - External service settings (AWS, Redis, Gmail)
+    """
     # Application Settings
     PROJECT_NAME: str = "Turtil Backend"
     VERSION: str = "1.0.0"
@@ -52,6 +69,11 @@ class Settings(BaseSettings):
     GMAIL_APP_PASSWORD: Optional[str] = None
 
     def __init__(self, **kwargs):
+        """Initialize settings with environment variable parsing.
+        
+        Args:
+            **kwargs: Additional configuration parameters
+        """
         super().__init__(**kwargs)
 
         # Parse JSON strings from environment variables
@@ -70,6 +92,7 @@ class Settings(BaseSettings):
                 pass
 
     class Config:
+        """Pydantic settings configuration."""
         env_file = ".env"
         case_sensitive = True
 

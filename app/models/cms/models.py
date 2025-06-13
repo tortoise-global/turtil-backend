@@ -1,3 +1,14 @@
+"""CMS database models.
+
+This module contains SQLAlchemy ORM models for the College Management System including:
+- College and user management models
+- Academic structure models (departments, branches, degrees)
+- Course and subject models
+- Batch and section models
+- Permission and role management models
+- System module and configuration models
+"""
+
 import uuid
 
 from sqlalchemy import (
@@ -135,14 +146,14 @@ class CMSUser(Base):
     college_id = Column(
         UUID(as_uuid=True),
         ForeignKey("colleges.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
-    username = Column(String(100), unique=True, nullable=False)
+    username = Column(String(100), unique=True, nullable=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    full_name = Column(String(255), nullable=False)
+    full_name = Column(String(255), nullable=True)
     phone = Column(String(20))
-    role = Column(cms_user_role, nullable=False)
+    role = Column(cms_user_role, nullable=True)
     department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"))
     branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"))
     degree_id = Column(UUID(as_uuid=True), ForeignKey("degrees.id"))
@@ -154,6 +165,7 @@ class CMSUser(Base):
     )  # Subject IDs for cross-department teaching
     is_active = Column(Boolean, default=True)
     email_verified = Column(Boolean, default=False)
+    profile_completed = Column(Boolean, default=False)
     last_login = Column(BigInteger)
     created_at = Column(
         BigInteger,

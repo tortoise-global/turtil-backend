@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_admin_user, get_current_user, get_principal_user
 from app.core.auth_manager import auth_manager
 from app.core.security import (
-    generate_temp_password,
     generate_user_id,
     get_password_hash,
     send_email_otp,
@@ -20,260 +19,181 @@ from app.db.database import get_db
 from app.models.cms.models import CMSUser
 from app.schemas.cms.auth import (
     ChangePasswordRequest,
-    CMSUserCreate,
-    CMSUserCreateResponse,
     CMSUserResponse,
     CMSUserUpdate,
+    CompleteProfileRequest,
+    CompleteSignupRequest,
+    CompleteSignupResponse,
     EmailResponse,
     FetchCMSUserResponse,
     LoginRequest,
-    SendEmailRequest,
+    SendSignupOTPRequest,
     Token,
-    VerifyEmailRequest,
     VerifyResponse,
+    VerifySignupOTPRequest,
 )
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/send-email", response_model=EmailResponse)
-async def send_email(request: SendEmailRequest, db: Session = Depends(get_db)):
+@router.post("/send-signup-otp", response_model=EmailResponse)
+async def send_signup_otp(request: SendSignupOTPRequest, db: Session = Depends(get_db)):
     """
-    Send OTP to email for verification
-
+    Send OTP to email for new user signup (no existing user required)
+    
     **Request Body:**
-    - email (string, required): Email address of the user
-
-    **Parameters:** None
-
-    **Headers:**
-    - Content-Type: application/json
-
+    - email (string, required): Email address for signup
+    
     **Example Request:**
     ```json
     {
-        "email": "admin@rajivgandhi.edu"
+        "email": "newuser@example.com"
     }
     ```
-
+    
     **Example Response:**
     ```json
     {
-        "message": "Mock OTP sent successfully. OTP: 123456",
+        "message": "OTP sent successfully to your email address",
         "success": true
     }
     ```
-
+    
     **Status Codes:**
     - 200: OTP sent successfully
-    - 404: CMSUser not found
+    - 400: Email already registered
     - 422: Validation error
     """
-    user = db.query(CMSUser).filter(CMSUser.email == request.email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="CMSUser not found")
-
-    # Send real OTP via email
+    # Check if user already exists
+    existing_user = db.query(CMSUser).filter(CMSUser.email == request.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Send OTP for signup
     try:
-        otp = send_email_otp(request.email, user.college.name if user.college else None)
+        otp = send_email_otp(request.email)
         return EmailResponse(
             message="OTP sent successfully to your email address", success=True
         )
     except HTTPException:
-        # Re-raise HTTP exceptions (like email sending failures)
         raise
     except Exception as e:
-        logger.error(f"Unexpected error sending OTP to {request.email}: {str(e)}")
+        logger.error(f"Unexpected error sending signup OTP to {request.email}: {str(e)}")
         raise HTTPException(
             status_code=500, detail="Failed to send OTP. Please try again."
         )
 
 
-@router.post("/verify-email", response_model=VerifyResponse)
-async def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db)):
+@router.post("/verify-signup-otp", response_model=VerifyResponse)
+async def verify_signup_otp(request: VerifySignupOTPRequest):
     """
-    Verify email using OTP
-
+    Verify signup OTP (allows password setup if valid)
+    
     **Request Body:**
-    - email (string, required): Email address to verify
+    - email (string, required): Email address
     - otp (integer, required): 6-digit OTP received via email
-
-    **Parameters:** None
-
-    **Headers:**
-    - Content-Type: application/json
-
+    
     **Example Request:**
     ```json
     {
-        "email": "admin@rajivgandhi.edu",
+        "email": "newuser@example.com",
         "otp": 123456
     }
     ```
-
+    
     **Example Response:**
     ```json
     {
-        "message": "Email verified successfully",
+        "message": "OTP verified successfully. You can now set your password.",
         "success": true,
         "verified": true
     }
     ```
-
+    
     **Status Codes:**
-    - 200: Email verified successfully
-    - 400: Invalid OTP
-    - 404: CMSUser not found
+    - 200: OTP verified successfully
+    - 400: Invalid or expired OTP
     - 422: Validation error
     """
-    user = db.query(CMSUser).filter(CMSUser.email == request.email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="CMSUser not found")
-
-    if not verify_otp(request.email, str(request.otp)):
+    if not verify_otp(request.email, str(request.otp), consume=False):
         raise HTTPException(status_code=400, detail="Invalid or expired OTP")
-
-    # Mark email as verified
-    user.email_verified = True
-    db.commit()
-
+    
     return VerifyResponse(
-        message="Email verified successfully", success=True, verified=True
+        message="OTP verified successfully. You can now set your password.",
+        success=True,
+        verified=True
     )
 
 
-@router.post("/signup", response_model=CMSUserCreateResponse)
-async def signup(user_data: CMSUserCreate, db: Session = Depends(get_db)):
+@router.post("/complete-signup", response_model=CompleteSignupResponse)
+async def complete_signup(request: CompleteSignupRequest, db: Session = Depends(get_db)):
     """
-    Create a new CMS user account
-
+    Complete signup by setting password (creates minimal user record)
+    
     **Request Body:**
-    - email (string, required): CMSUser's email address
-    - password (string, optional): CMSUser password (if not provided, temp password generated)
-    - fullName (string, optional): Full name of the user
-    - phone (string, optional): Phone number with country code
-    - collegeName (string, optional): Name of the college
-    - role (string, optional): CMSUser role (default: "student")
-    - status (string, optional): Account status (default: "active")
-    - parentId (string, optional): Parent user ID for hierarchical access
-    - modelAccess (array, optional): List of accessible modules
-    - logo (array, optional): College logo information
-    - collegeDetails (array, optional): College details like establishment year
-    - affilliatedUnversity (array, optional): University affiliation details
-    - address (array, optional): College address information
-    - resultFormat (array, optional): Academic result format configuration
-
-    **Parameters:** None
-
-    **Headers:**
-    - Content-Type: application/json
-
+    - email (string, required): Email address
+    - otp (integer, required): 6-digit OTP for final verification
+    - password (string, required): User password
+    
     **Example Request:**
     ```json
     {
-        "email": "admin@rajivgandhi.edu",
-        "password": "SecurePass123!",
-        "fullName": "Dr. John Smith",
-        "phone": "+91-9876543210",
-        "collegeName": "Rajiv Gandhi Institute of Technology",
-        "role": "admin",
-        "status": "active",
-        "parentId": null,
-        "modelAccess": ["students", "placements", "reports"],
-        "logo": [
-            {
-                "url": "https://example.com/logo.png",
-                "alt": "College Logo"
-            }
-        ],
-        "collegeDetails": [
-            {
-                "established": "1998",
-                "type": "Engineering",
-                "accreditation": "NAAC A+"
-            }
-        ],
-        "affilliatedUnversity": [
-            {
-                "name": "Anna University",
-                "code": "AU001"
-            }
-        ],
-        "address": [
-            {
-                "street": "123 College Road",
-                "city": "Chennai",
-                "state": "Tamil Nadu",
-                "pincode": "600001",
-                "country": "India"
-            }
-        ],
-        "resultFormat": [
-            {
-                "type": "percentage",
-                "scale": "0-100"
-            }
-        ]
+        "email": "newuser@example.com",
+        "otp": 123456,
+        "password": "SecurePass123!"
     }
     ```
-
+    
     **Example Response:**
     ```json
     {
-        "message": "CMSUser created successfully",
-        "cmsCMSUserId": "usr_abc123xyz",
-        "userName": "admin@rajivgandhi.edu",
-        "temparyPassword": "Password set by user"
+        "message": "Signup completed successfully. Please login to complete your profile.",
+        "success": true,
+        "user_id": "usr_abc123xyz"
     }
     ```
-
+    
     **Status Codes:**
-    - 200: CMSUser created successfully
-    - 400: Email already registered
+    - 200: Signup completed successfully
+    - 400: Invalid OTP or email already registered
     - 422: Validation error
     """
-    # Check if user already exists
-    existing_user = db.query(CMSUser).filter(CMSUser.email == user_data.email).first()
+    # Verify OTP one final time
+    if not verify_otp(request.email, str(request.otp)):
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+    
+    # Check if user was created in the meantime
+    existing_user = db.query(CMSUser).filter(CMSUser.email == request.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-
-    # Generate user ID and temporary password
+    
+    # Create minimal user record
     user_id = generate_user_id()
-    temp_password = generate_temp_password()
-
-    # Create new user
     db_user = CMSUser(
         id=user_id,
-        email=user_data.email,
-        username=user_data.email,  # Use email as username initially
-        hashed_password=get_password_hash(user_data.password or temp_password),
-        full_name=user_data.fullName,
-        phone=user_data.phone,
-        college_name=user_data.collegeName,
-        role=user_data.role or "student",
-        status=user_data.status or "active",
-        parent_id=user_data.parentId,
-        model_access=user_data.modelAccess,
-        logo=user_data.logo,
-        college_details=user_data.collegeDetails,
-        affiliated_university=user_data.affilliatedUnversity,
-        address=user_data.address,
-        result_format=user_data.resultFormat,
+        email=request.email,
+        password_hash=get_password_hash(request.password),
+        email_verified=True,
+        profile_completed=False,
+        # All other fields remain null
     )
-
+    
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-
-    return CMSUserCreateResponse(
-        message="CMSUser created successfully",
-        cmsCMSUserId=user_id,
-        userName=user_data.email,
-        temparyPassword=temp_password
-        if not user_data.password
-        else "Password set by user",
+    
+    return CompleteSignupResponse(
+        message="Signup completed successfully. Please login to complete your profile.",
+        success=True,
+        user_id=str(user_id)
     )
+
+
+
+
+
+
 
 
 @router.post("/login", response_model=Token)
@@ -301,9 +221,9 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     **Example Response:**
     ```json
     {
-        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-        "token_type": "bearer",
-        "cmsCMSUserId": "usr_abc123xyz",
+        "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "tokenType": "bearer",
+        "cmsUserId": "usr_abc123xyz",
         "role": "admin"
     }
     ```
@@ -352,6 +272,7 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         token_type=token_response["token_type"],
         cmsUserId=str(user.id),
         role=user.role,
+        profile_completed=user.profile_completed or False,
     )
 
 
@@ -579,6 +500,84 @@ async def logout(token: str = None, current_user: CMSUser = Depends(get_current_
     logger.info(f"User {current_user.username} logged out")
 
     return {"message": "Logged out successfully", "user_id": str(current_user.id)}
+
+
+@router.post("/complete-profile")
+async def complete_profile(
+    profile_data: CompleteProfileRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Complete user profile after initial signup
+    
+    **Request Body:**
+    - full_name (string, required): Full name of the user
+    - phone (string, optional): Phone number
+    - college_id (string, required): College UUID
+    - role (string, optional): User role (default: "student")
+    - department_id (string, optional): Department UUID
+    - branch_id (string, optional): Branch UUID
+    - degree_id (string, optional): Degree UUID
+    
+    **Headers:**
+    - Authorization: Bearer {access_token}
+    
+    **Example Request:**
+    ```json
+    {
+        "full_name": "John Doe",
+        "phone": "+91-9876543210",
+        "college_id": "123e4567-e89b-12d3-a456-426614174000",
+        "role": "student",
+        "department_id": "123e4567-e89b-12d3-a456-426614174001",
+        "branch_id": "123e4567-e89b-12d3-a456-426614174002",
+        "degree_id": "123e4567-e89b-12d3-a456-426614174003"
+    }
+    ```
+    
+    **Example Response:**
+    ```json
+    {
+        "message": "Profile completed successfully",
+        "profile_completed": true
+    }
+    ```
+    
+    **Status Codes:**
+    - 200: Profile completed successfully
+    - 400: Profile already completed
+    - 401: Unauthorized
+    - 404: User not found
+    - 422: Validation error
+    """
+    # Get user from database
+    user = db.query(CMSUser).filter(CMSUser.id == current_user["user_id"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if profile is already completed
+    if user.profile_completed:
+        raise HTTPException(status_code=400, detail="Profile already completed")
+    
+    # Update user profile
+    user.full_name = profile_data.full_name
+    user.phone = profile_data.phone
+    user.college_id = profile_data.college_id
+    user.role = profile_data.role
+    user.department_id = profile_data.department_id
+    user.branch_id = profile_data.branch_id
+    user.degree_id = profile_data.degree_id
+    user.username = user.email  # Set username to email
+    user.profile_completed = True
+    
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "message": "Profile completed successfully",
+        "profile_completed": True
+    }
 
 
 @router.get("/cache/stats")

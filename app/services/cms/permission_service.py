@@ -1,3 +1,13 @@
+"""Permission service for role-based access control.
+
+This module provides comprehensive permission management for the CMS including:
+- Role hierarchy and inheritance
+- Module-based permissions
+- Department and branch access control
+- Default permission assignment
+- Permission checking and validation
+"""
+
 import logging
 from typing import Any, Dict, List, Optional, Set
 from uuid import UUID

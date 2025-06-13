@@ -1,41 +1,51 @@
+"""Authentication and user management schemas.
+
+This module contains Pydantic models for authentication including:
+- Login and token models
+- Email verification models
+- Password management models
+- User creation and response models
+"""
+
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
-class SendEmailRequest(BaseModel):
-    email: EmailStr
-
-
-class VerifyEmailRequest(BaseModel):
-    email: EmailStr
-    otp: int
 
 
 class LoginRequest(BaseModel):
+    """Request model for user login."""
     userName: str
     Password: str
 
 
 class ChangePasswordRequest(BaseModel):
+    """Request model for changing user password."""
     email: str
     oldPassword: str
     newPassword: str
 
 
 class Token(BaseModel):
-    access_token: str
-    token_type: str
+    """JWT token response model."""
+    access_token: str = Field(..., alias="accessToken")
+    token_type: str = Field(..., alias="tokenType")
     cmsUserId: str
-    role: str
+    role: Optional[str] = None
+    profile_completed: bool = False
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class EmailResponse(BaseModel):
+    """Response model for email operations."""
     message: str
     success: bool
 
 
 class VerifyResponse(BaseModel):
+    """Response model for verification operations."""
     message: str
     success: bool
     verified: bool
@@ -48,12 +58,43 @@ CMSUserUpdate = CMSUserUpdate
 CMSUserResponse = CMSUserResponse
 
 
-class CMSUserCreateResponse(BaseModel):
-    message: str
-    cmsUserId: str
-    userName: str
-    temparyPassword: str
 
 
 class FetchCMSUserResponse(CMSUserResponse):
-    pass
+    """Response model for fetching CMS users."""
+
+
+class SendSignupOTPRequest(BaseModel):
+    """Request model for sending signup OTP."""
+    email: EmailStr
+
+
+class VerifySignupOTPRequest(BaseModel):
+    """Request model for verifying signup OTP."""
+    email: EmailStr
+    otp: int
+
+
+class CompleteSignupRequest(BaseModel):
+    """Request model for completing signup with password."""
+    email: EmailStr
+    otp: int
+    password: str
+
+
+class CompleteSignupResponse(BaseModel):
+    """Response model for signup completion."""
+    message: str
+    success: bool
+    user_id: str
+
+
+class CompleteProfileRequest(BaseModel):
+    """Request model for completing user profile."""
+    full_name: str
+    phone: Optional[str] = None
+    college_id: str
+    role: str = "student"
+    department_id: Optional[str] = None
+    branch_id: Optional[str] = None
+    degree_id: Optional[str] = None

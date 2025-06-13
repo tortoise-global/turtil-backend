@@ -1,3 +1,15 @@
+"""Main FastAPI application module.
+
+This module initializes and configures the FastAPI application with:
+- CORS middleware
+- Security headers
+- Rate limiting
+- Request logging
+- Global exception handling
+- Database initialization
+- API route registration
+"""
+
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -18,6 +30,16 @@ from app.models.cms import models
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Application lifespan manager.
+    
+    Handles startup and shutdown tasks for the FastAPI application.
+    
+    Args:
+        app (FastAPI): The FastAPI application instance
+        
+    Yields:
+        None: Yields control to the application
+    """
     setup_logging()
     Base.metadata.create_all(bind=engine)
     yield
@@ -53,6 +75,15 @@ app.add_middleware(
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
+    """Middleware to add process time header to responses.
+    
+    Args:
+        request (Request): The incoming request
+        call_next: The next middleware or route handler
+        
+    Returns:
+        Response: The response with X-Process-Time header added
+    """
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
@@ -62,6 +93,15 @@ async def add_process_time_header(request: Request, call_next):
 
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
+    """Middleware to log request information.
+    
+    Args:
+        request (Request): The incoming request
+        call_next: The next middleware or route handler
+        
+    Returns:
+        Response: The response from downstream handlers
+    """
     start_time = time.time()
 
     response = await call_next(request)
@@ -79,6 +119,15 @@ async def logging_middleware(request: Request, call_next):
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
+    """Handle HTTP exceptions globally.
+    
+    Args:
+        request (Request): The request that caused the exception
+        exc (HTTPException): The HTTP exception that was raised
+        
+    Returns:
+        JSONResponse: Formatted error response
+    """
     logger = logging.getLogger("api")
     logger.warning(
         f"HTTP {exc.status_code}: {exc.detail} - {request.method} {request.url.path}"
@@ -88,6 +137,15 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    """Handle all unhandled exceptions globally.
+    
+    Args:
+        request (Request): The request that caused the exception
+        exc (Exception): The unhandled exception
+        
+    Returns:
+        JSONResponse: Generic error response
+    """
     logger = logging.getLogger("api")
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
@@ -95,6 +153,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/")
 async def root():
+    """Root endpoint that returns API information.
+    
+    Returns:
+        dict: API name, version, environment, and status
+    """
     return {
         "message": f"{settings.PROJECT_NAME} API",
         "version": settings.VERSION,
@@ -105,6 +168,11 @@ async def root():
 
 @app.get("/health")
 async def health_check():
+    """Health check endpoint.
+    
+    Returns:
+        dict: Health status and timestamp
+    """
     return {"status": "healthy", "timestamp": time.time()}
 
 

@@ -34,14 +34,14 @@ async def create_batch(
     ## Request Payload Example:
     ```json
     {
-        "department_id": "123e4567-e89b-12d3-a456-426614174000",
-        "branch_id": "123e4567-e89b-12d3-a456-426614174001",
-        "degree_id": "123e4567-e89b-12d3-a456-426614174002",
+        "departmentId": "123e4567-e89b-12d3-a456-426614174000",
+        "branchId": "123e4567-e89b-12d3-a456-426614174001",
+        "degreeId": "123e4567-e89b-12d3-a456-426614174002",
         "name": "2024-CSE-A",
         "year": 2024,
         "semester": 1,
-        "start_date": 1706764200,
-        "end_date": 1722550800
+        "startDate": 1706764200,
+        "endDate": 1722550800
     }
     ```
 
@@ -50,42 +50,42 @@ async def create_batch(
     ### Engineering Batch:
     ```json
     {
-        "department_id": "dept-cse-2024",
-        "branch_id": "branch-cse",
-        "degree_id": "degree-btech",
+        "departmentId": "dept-cse-2024",
+        "branchId": "branch-cse",
+        "degreeId": "degree-btech",
         "name": "BTech-CSE-2024",
         "year": 2024,
         "semester": 1,
-        "start_date": 1706764200,
-        "end_date": 1722550800
+        "startDate": 1706764200,
+        "endDate": 1722550800
     }
     ```
 
     ### Medical Batch:
     ```json
     {
-        "department_id": "dept-medicine-2024",
-        "branch_id": "branch-general-medicine",
-        "degree_id": "degree-mbbs",
+        "departmentId": "dept-medicine-2024",
+        "branchId": "branch-general-medicine",
+        "degreeId": "degree-mbbs",
         "name": "MBBS-2024-Batch1",
         "year": 2024,
         "semester": 1,
-        "start_date": 1706764200,
-        "end_date": 1875142800
+        "startDate": 1706764200,
+        "endDate": 1875142800
     }
     ```
 
     ### Commerce Batch:
     ```json
     {
-        "department_id": "dept-commerce-2024",
-        "branch_id": "branch-accounting",
-        "degree_id": "degree-bcom",
+        "departmentId": "dept-commerce-2024",
+        "branchId": "branch-accounting",
+        "degreeId": "degree-bcom",
         "name": "BCom-Accounting-2024",
         "year": 2024,
         "semester": 1,
-        "start_date": 1706764200,
-        "end_date": 1801459200
+        "startDate": 1706764200,
+        "endDate": 1801459200
     }
     ```
 
@@ -179,10 +179,10 @@ async def create_section(
     ## Request Payload Example:
     ```json
     {
-        "batch_id": "batch-123e4567-e89b-12d3-a456-426614174000",
+        "batchId": "batch-123e4567-e89b-12d3-a456-426614174000",
         "name": "Section-A",
         "capacity": 60,
-        "class_teacher_id": "teacher-123e4567-e89b-12d3-a456-426614174001"
+        "classTeacherId": "teacher-123e4567-e89b-12d3-a456-426614174001"
     }
     ```
 
@@ -191,30 +191,30 @@ async def create_section(
     ### Engineering Section:
     ```json
     {
-        "batch_id": "batch-btech-cse-2024",
+        "batchId": "batch-btech-cse-2024",
         "name": "CSE-A",
         "capacity": 60,
-        "class_teacher_id": "teacher-dr-rajesh-kumar"
+        "classTeacherId": "teacher-dr-rajesh-kumar"
     }
     ```
 
     ### Medical Section:
     ```json
     {
-        "batch_id": "batch-mbbs-2024",
+        "batchId": "batch-mbbs-2024",
         "name": "MBBS-Group-1",
         "capacity": 100,
-        "class_teacher_id": "teacher-dr-priya-sharma"
+        "classTeacherId": "teacher-dr-priya-sharma"
     }
     ```
 
     ### Arts Section:
     ```json
     {
-        "batch_id": "batch-ba-english-2024",
+        "batchId": "batch-ba-english-2024",
         "name": "English-A",
         "capacity": 50,
-        "class_teacher_id": "teacher-prof-anita-singh"
+        "classTeacherId": "teacher-prof-anita-singh"
     }
     ```
 
