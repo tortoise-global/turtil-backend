@@ -24,10 +24,10 @@ Base = declarative_base()
 
 def get_db():
     """Get database session dependency for FastAPI.
-    
+
     Yields:
         Session: SQLAlchemy database session
-        
+
     Note:
         Session is automatically closed after use
     """

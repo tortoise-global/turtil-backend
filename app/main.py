@@ -18,11 +18,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api.cms.routes import router as cms_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.middleware import RateLimitMiddleware
+from app.core.redis_client import redis_client
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.db.database import Base, engine
 from app.models.cms import models
@@ -31,17 +33,39 @@ from app.models.cms import models
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager.
-    
+
     Handles startup and shutdown tasks for the FastAPI application.
-    
+
     Args:
         app (FastAPI): The FastAPI application instance
-        
+
     Yields:
         None: Yields control to the application
     """
     setup_logging()
-    Base.metadata.create_all(bind=engine)
+    logger = logging.getLogger("startup")
+
+    # Test PostgreSQL connection
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        logger.info("✅ Successfully connected to PostgreSQL database")
+    except Exception as e:
+        logger.error(f"❌ Failed to connect to PostgreSQL database: {e}")
+
+    # Create database tables
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database tables created/verified successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to create database tables: {e}")
+
+    # Test Redis connection
+    if redis_client.is_available():
+        logger.info("✅ Successfully connected to Redis")
+    else:
+        logger.warning("⚠️ Redis connection not available - operating without cache")
+
     yield
 
 
@@ -76,11 +100,11 @@ app.add_middleware(
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     """Middleware to add process time header to responses.
-    
+
     Args:
         request (Request): The incoming request
         call_next: The next middleware or route handler
-        
+
     Returns:
         Response: The response with X-Process-Time header added
     """
@@ -94,11 +118,11 @@ async def add_process_time_header(request: Request, call_next):
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
     """Middleware to log request information.
-    
+
     Args:
         request (Request): The incoming request
         call_next: The next middleware or route handler
-        
+
     Returns:
         Response: The response from downstream handlers
     """
@@ -120,11 +144,11 @@ async def logging_middleware(request: Request, call_next):
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """Handle HTTP exceptions globally.
-    
+
     Args:
         request (Request): The request that caused the exception
         exc (HTTPException): The HTTP exception that was raised
-        
+
     Returns:
         JSONResponse: Formatted error response
     """
@@ -138,11 +162,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Handle all unhandled exceptions globally.
-    
+
     Args:
         request (Request): The request that caused the exception
         exc (Exception): The unhandled exception
-        
+
     Returns:
         JSONResponse: Generic error response
     """
@@ -154,7 +178,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/")
 async def root():
     """Root endpoint that returns API information.
-    
+
     Returns:
         dict: API name, version, environment, and status
     """
@@ -169,7 +193,7 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint.
-    
+
     Returns:
         dict: Health status and timestamp
     """

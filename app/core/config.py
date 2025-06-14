@@ -15,7 +15,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """Application settings configuration.
-    
+
     Manages all configuration settings for the application including:
     - Application metadata
     - Security settings
@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     - Rate limiting configuration
     - External service settings (AWS, Redis, Gmail)
     """
+
     # Application Settings
     PROJECT_NAME: str = "Turtil Backend"
     VERSION: str = "1.0.0"
@@ -70,7 +71,7 @@ class Settings(BaseSettings):
 
     def __init__(self, **kwargs):
         """Initialize settings with environment variable parsing.
-        
+
         Args:
             **kwargs: Additional configuration parameters
         """
@@ -93,6 +94,7 @@ class Settings(BaseSettings):
 
     class Config:
         """Pydantic settings configuration."""
+
         env_file = ".env"
         case_sensitive = True
 

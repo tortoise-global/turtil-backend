@@ -1,17 +1,17 @@
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-from alembic import context
 import os
 import sys
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config, pool
+from alembic import context
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from app.db.database import Base
-# Import all new normalized models for proper migration
-from app.models.cms.models import *
-from app.models.student.models import *
 from app.core.config import settings
+from app.db.database import Base
+
+import app.models.cms.models
+import app.models.student.models
 
 config = context.config
 

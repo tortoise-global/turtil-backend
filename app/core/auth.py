@@ -30,14 +30,14 @@ async def get_current_user(
     db: Session = Depends(get_db),
 ) -> CMSUser:
     """Get the current authenticated user from JWT token.
-    
+
     Args:
         credentials (HTTPAuthorizationCredentials): Bearer token credentials
         db (Session): Database session
-        
+
     Returns:
         CMSUser: The authenticated user
-        
+
     Raises:
         HTTPException: If token is invalid or user not found
     """
@@ -72,13 +72,13 @@ async def get_current_active_user(
     current_user: CMSUser = Depends(get_current_user),
 ) -> CMSUser:
     """Get the current authenticated and active user.
-    
+
     Args:
         current_user (CMSUser): The authenticated user
-        
+
     Returns:
         CMSUser: The active user
-        
+
     Raises:
         HTTPException: If user account is deactivated
     """
@@ -94,13 +94,13 @@ async def get_admin_user(
     current_user: CMSUser = Depends(get_current_active_user),
 ) -> CMSUser:
     """Get current user with admin or principal privileges.
-    
+
     Args:
         current_user (CMSUser): The authenticated user
-        
+
     Returns:
         CMSUser: The admin/principal user
-        
+
     Raises:
         HTTPException: If user doesn't have admin privileges
     """
@@ -116,13 +116,13 @@ async def get_principal_user(
     current_user: CMSUser = Depends(get_current_active_user),
 ) -> CMSUser:
     """Get current user with principal privileges only.
-    
+
     Args:
         current_user (CMSUser): The authenticated user
-        
+
     Returns:
         CMSUser: The principal user
-        
+
     Raises:
         HTTPException: If user is not a principal
     """
@@ -138,13 +138,13 @@ async def get_super_admin_user(
     current_user: CMSUser = Depends(get_current_active_user),
 ) -> CMSUser:
     """Get current user with super admin privileges.
-    
+
     Args:
         current_user (CMSUser): The authenticated user
-        
+
     Returns:
         CMSUser: The super admin user
-        
+
     Raises:
         HTTPException: If user is not a super admin
     """
@@ -160,13 +160,13 @@ async def get_lecturer_user(
     current_user: CMSUser = Depends(get_current_active_user),
 ) -> CMSUser:
     """Get current user with lecturer privileges (staff, head, admin, or principal).
-    
+
     Args:
         current_user (CMSUser): The authenticated user
-        
+
     Returns:
         CMSUser: The lecturer user
-        
+
     Raises:
         HTTPException: If user doesn't have lecturer privileges
     """
@@ -180,13 +180,14 @@ async def get_lecturer_user(
 
 def require_roles(allowed_roles: List[str]):
     """Create a dependency that requires specific roles.
-    
+
     Args:
         allowed_roles (List[str]): List of allowed role names
-        
+
     Returns:
         Callable: FastAPI dependency function
     """
+
     async def role_checker(
         current_user: CMSUser = Depends(get_current_active_user),
     ) -> CMSUser:
@@ -205,13 +206,14 @@ def require_roles(allowed_roles: List[str]):
 
 def require_college_access(current_user: CMSUser = Depends(get_current_active_user)):
     """Create a dependency that requires access to a specific college.
-    
+
     Args:
         current_user (CMSUser): The authenticated user
-        
+
     Returns:
         Callable: FastAPI dependency function
     """
+
     async def college_checker(college_id: str) -> CMSUser:
         if (
             str(current_user.college_id) != college_id
@@ -234,11 +236,11 @@ def require_college_access(current_user: CMSUser = Depends(get_current_active_us
 
 def require_module_access(module_name: str, action: str = "read"):
     """Create a dependency that requires access to a specific module.
-    
+
     Args:
         module_name (str): Name of the module to check access for
         action (str): Required action (read, write, manage, etc.)
-        
+
     Returns:
         Callable: FastAPI dependency function
     """
@@ -264,10 +266,10 @@ def require_module_access(module_name: str, action: str = "read"):
 
 def require_department_access(target_department_id: Optional[UUID] = None):
     """Create a dependency that requires access to department data.
-    
+
     Args:
         target_department_id (Optional[UUID]): Specific department ID to check
-        
+
     Returns:
         Callable: FastAPI dependency function
     """
@@ -306,10 +308,10 @@ def require_department_access(target_department_id: Optional[UUID] = None):
 
 def require_branch_access(target_branch_id: Optional[UUID] = None):
     """Create a dependency that requires access to branch data.
-    
+
     Args:
         target_branch_id (Optional[UUID]): Specific branch ID to check
-        
+
     Returns:
         Callable: FastAPI dependency function
     """
@@ -350,12 +352,12 @@ def require_module_and_scope_access(
     module_name: str, action: str = "read", scope_check: str = None
 ):
     """Create a dependency that requires both module and scope access.
-    
+
     Args:
         module_name (str): Name of the module to check access for
         action (str): Required action (read, write, manage, etc.)
         scope_check (str): Scope to check (department, branch, etc.)
-        
+
     Returns:
         Callable: FastAPI dependency function
     """

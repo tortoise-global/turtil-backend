@@ -26,11 +26,11 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against its hash.
-    
+
     Args:
         plain_password (str): The plain text password to verify
         hashed_password (str): The hashed password to verify against
-        
+
     Returns:
         bool: True if password matches, False otherwise
     """
@@ -39,10 +39,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     """Generate password hash from plain text password.
-    
+
     Args:
         password (str): Plain text password to hash
-        
+
     Returns:
         str: Hashed password
     """
@@ -51,11 +51,11 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT access token.
-    
+
     Args:
         data (dict): Data to encode in the token
         expires_delta (Optional[timedelta]): Custom expiration time
-        
+
     Returns:
         str: Encoded JWT token
     """
@@ -76,13 +76,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def verify_token(token: str) -> dict:
     """Verify and decode a JWT token.
-    
+
     Args:
         token (str): JWT token to verify
-        
+
     Returns:
         dict: Decoded token payload
-        
+
     Raises:
         HTTPException: If token is invalid or expired
     """

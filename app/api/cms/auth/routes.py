@@ -41,17 +41,17 @@ logger = logging.getLogger(__name__)
 async def send_signup_otp(request: SendSignupOTPRequest, db: Session = Depends(get_db)):
     """
     Send OTP to email for new user signup (no existing user required)
-    
+
     **Request Body:**
     - email (string, required): Email address for signup
-    
+
     **Example Request:**
     ```json
     {
         "email": "newuser@example.com"
     }
     ```
-    
+
     **Example Response:**
     ```json
     {
@@ -59,7 +59,7 @@ async def send_signup_otp(request: SendSignupOTPRequest, db: Session = Depends(g
         "success": true
     }
     ```
-    
+
     **Status Codes:**
     - 200: OTP sent successfully
     - 400: Email already registered
@@ -69,7 +69,7 @@ async def send_signup_otp(request: SendSignupOTPRequest, db: Session = Depends(g
     existing_user = db.query(CMSUser).filter(CMSUser.email == request.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     # Send OTP for signup
     try:
         otp = send_email_otp(request.email)
@@ -79,7 +79,9 @@ async def send_signup_otp(request: SendSignupOTPRequest, db: Session = Depends(g
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Unexpected error sending signup OTP to {request.email}: {str(e)}")
+        logger.error(
+            f"Unexpected error sending signup OTP to {request.email}: {str(e)}"
+        )
         raise HTTPException(
             status_code=500, detail="Failed to send OTP. Please try again."
         )
@@ -89,11 +91,11 @@ async def send_signup_otp(request: SendSignupOTPRequest, db: Session = Depends(g
 async def verify_signup_otp(request: VerifySignupOTPRequest):
     """
     Verify signup OTP (allows password setup if valid)
-    
+
     **Request Body:**
     - email (string, required): Email address
     - otp (integer, required): 6-digit OTP received via email
-    
+
     **Example Request:**
     ```json
     {
@@ -101,7 +103,7 @@ async def verify_signup_otp(request: VerifySignupOTPRequest):
         "otp": 123456
     }
     ```
-    
+
     **Example Response:**
     ```json
     {
@@ -110,7 +112,7 @@ async def verify_signup_otp(request: VerifySignupOTPRequest):
         "verified": true
     }
     ```
-    
+
     **Status Codes:**
     - 200: OTP verified successfully
     - 400: Invalid or expired OTP
@@ -118,24 +120,26 @@ async def verify_signup_otp(request: VerifySignupOTPRequest):
     """
     if not verify_otp(request.email, str(request.otp), consume=False):
         raise HTTPException(status_code=400, detail="Invalid or expired OTP")
-    
+
     return VerifyResponse(
         message="OTP verified successfully. You can now set your password.",
         success=True,
-        verified=True
+        verified=True,
     )
 
 
 @router.post("/complete-signup", response_model=CompleteSignupResponse)
-async def complete_signup(request: CompleteSignupRequest, db: Session = Depends(get_db)):
+async def complete_signup(
+    request: CompleteSignupRequest, db: Session = Depends(get_db)
+):
     """
     Complete signup by setting password (creates minimal user record)
-    
+
     **Request Body:**
     - email (string, required): Email address
     - otp (integer, required): 6-digit OTP for final verification
     - password (string, required): User password
-    
+
     **Example Request:**
     ```json
     {
@@ -144,7 +148,7 @@ async def complete_signup(request: CompleteSignupRequest, db: Session = Depends(
         "password": "SecurePass123!"
     }
     ```
-    
+
     **Example Response:**
     ```json
     {
@@ -153,7 +157,7 @@ async def complete_signup(request: CompleteSignupRequest, db: Session = Depends(
         "user_id": "usr_abc123xyz"
     }
     ```
-    
+
     **Status Codes:**
     - 200: Signup completed successfully
     - 400: Invalid OTP or email already registered
@@ -162,12 +166,12 @@ async def complete_signup(request: CompleteSignupRequest, db: Session = Depends(
     # Verify OTP one final time
     if not verify_otp(request.email, str(request.otp)):
         raise HTTPException(status_code=400, detail="Invalid or expired OTP")
-    
+
     # Check if user was created in the meantime
     existing_user = db.query(CMSUser).filter(CMSUser.email == request.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     # Create minimal user record
     user_id = generate_user_id()
     db_user = CMSUser(
@@ -178,22 +182,16 @@ async def complete_signup(request: CompleteSignupRequest, db: Session = Depends(
         profile_completed=False,
         # All other fields remain null
     )
-    
+
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    
+
     return CompleteSignupResponse(
         message="Signup completed successfully. Please login to complete your profile.",
         success=True,
-        user_id=str(user_id)
+        user_id=str(user_id),
     )
-
-
-
-
-
-
 
 
 @router.post("/login", response_model=Token)
@@ -240,8 +238,6 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
     ```
     """
-    logger = logging.getLogger(__name__)
-
     # Authenticate user with enhanced auth manager
     user = auth_manager.authenticate_user(
         credentials.userName, credentials.Password, db
@@ -510,7 +506,7 @@ async def complete_profile(
 ):
     """
     Complete user profile after initial signup
-    
+
     **Request Body:**
     - full_name (string, required): Full name of the user
     - phone (string, optional): Phone number
@@ -519,10 +515,10 @@ async def complete_profile(
     - department_id (string, optional): Department UUID
     - branch_id (string, optional): Branch UUID
     - degree_id (string, optional): Degree UUID
-    
+
     **Headers:**
     - Authorization: Bearer {access_token}
-    
+
     **Example Request:**
     ```json
     {
@@ -535,7 +531,7 @@ async def complete_profile(
         "degree_id": "123e4567-e89b-12d3-a456-426614174003"
     }
     ```
-    
+
     **Example Response:**
     ```json
     {
@@ -543,7 +539,7 @@ async def complete_profile(
         "profile_completed": true
     }
     ```
-    
+
     **Status Codes:**
     - 200: Profile completed successfully
     - 400: Profile already completed
@@ -555,11 +551,11 @@ async def complete_profile(
     user = db.query(CMSUser).filter(CMSUser.id == current_user["user_id"]).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Check if profile is already completed
     if user.profile_completed:
         raise HTTPException(status_code=400, detail="Profile already completed")
-    
+
     # Update user profile
     user.full_name = profile_data.full_name
     user.phone = profile_data.phone
@@ -570,14 +566,11 @@ async def complete_profile(
     user.degree_id = profile_data.degree_id
     user.username = user.email  # Set username to email
     user.profile_completed = True
-    
+
     db.commit()
     db.refresh(user)
-    
-    return {
-        "message": "Profile completed successfully",
-        "profile_completed": True
-    }
+
+    return {"message": "Profile completed successfully", "profile_completed": True}
 
 
 @router.get("/cache/stats")
