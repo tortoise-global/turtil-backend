@@ -249,109 +249,109 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # Store parameters in AWS SSM Parameter Store
-      - name: Store Parameters in SSM
-        run: |
-          # Define environment prefix
-          ENV_PREFIX="/dev"
-          if [ "${{ github.ref_name }}" == "main" ]; then
-            ENV_PREFIX="/prod"
-          fi
+      # # Store parameters in AWS SSM Parameter Store
+      # - name: Store Parameters in SSM
+      #   run: |
+      #     # Define environment prefix
+      #     ENV_PREFIX="/dev"
+      #     if [ "${{ github.ref_name }}" == "main" ]; then
+      #       ENV_PREFIX="/prod"
+      #     fi
 
-          # Store parameters with appropriate type
-          aws ssm put-parameter \
-            --name "$ENV_PREFIX/DATABASE_URL" \
-            --value "${{ secrets.DATABASE_URL }}" \
-            --type SecureString \
-            --overwrite \
-            --region ${{ secrets.AWS_REGION }}
+      #     # Store parameters with appropriate type
+      #     aws ssm put-parameter \
+      #       --name "$ENV_PREFIX/DATABASE_URL" \
+      #       --value "${{ secrets.DATABASE_URL }}" \
+      #       --type SecureString \
+      #       --overwrite \
+      #       --region ${{ secrets.AWS_REGION }}
 
-          aws ssm put-parameter \
-            --name "$ENV_PREFIX/SECRET_KEY" \
-            --value "${{ secrets.SECRET_KEY }}" \
-            --type SecureString \
-            --overwrite \
-            --region ${{ secrets.AWS_REGION }}
+      #     aws ssm put-parameter \
+      #       --name "$ENV_PREFIX/SECRET_KEY" \
+      #       --value "${{ secrets.SECRET_KEY }}" \
+      #       --type SecureString \
+      #       --overwrite \
+      #       --region ${{ secrets.AWS_REGION }}
 
-          aws ssm put-parameter \
-            --name "$ENV_PREFIX/AWS_ACCESS_KEY_ID" \
-            --value "${{ secrets.AWS_ACCESS_KEY_ID }}" \
-            --type SecureString \
-            --overwrite \
-            --region ${{ secrets.AWS_REGION }}
+      #     aws ssm put-parameter \
+      #       --name "$ENV_PREFIX/AWS_ACCESS_KEY_ID" \
+      #       --value "${{ secrets.AWS_ACCESS_KEY_ID }}" \
+      #       --type SecureString \
+      #       --overwrite \
+      #       --region ${{ secrets.AWS_REGION }}
 
-          aws ssm put-parameter \
-            --name "$ENV_PREFIX/AWS_SECRET_ACCESS_KEY" \
-            --value "${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
-            --type SecureString \
-            --overwrite \
-            --region ${{ secrets.AWS_REGION }}
+      #     aws ssm put-parameter \
+      #       --name "$ENV_PREFIX/AWS_SECRET_ACCESS_KEY" \
+      #       --value "${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+      #       --type SecureString \
+      #       --overwrite \
+      #       --region ${{ secrets.AWS_REGION }}
 
-          aws ssm put-parameter \
-            --name "$ENV_PREFIX/S3_BUCKET_NAME" \
-            --value "${{ secrets.S3_BUCKET_NAME }}" \
-            --type String \
-            --overwrite \
-            --region ${{ secrets.AWS_REGION }}
+      #     aws ssm put-parameter \
+      #       --name "$ENV_PREFIX/S3_BUCKET_NAME" \
+      #       --value "${{ secrets.S3_BUCKET_NAME }}" \
+      #       --type String \
+      #       --overwrite \
+      #       --region ${{ secrets.AWS_REGION }}
 
-          aws ssm put-parameter \
-            --name "$ENV_PREFIX/UPSTASH_REDIS_URL" \
-            --value "${{ secrets.UPSTASH_REDIS_URL }}" \
-            --type SecureString \
-            --overwrite \
-            --region ${{ secrets.AWS_REGION }}
+      #     aws ssm put-parameter \
+      #       --name "$ENV_PREFIX/UPSTASH_REDIS_URL" \
+      #       --value "${{ secrets.UPSTASH_REDIS_URL }}" \
+      #       --type SecureString \
+      #       --overwrite \
+      #       --region ${{ secrets.AWS_REGION }}
 
-          aws ssm put-parameter \
-            --name "$ENV_PREFIX/UPSTASH_REDIS_TOKEN" \
-            --value "${{ secrets.UPSTASH_REDIS_TOKEN }}" \
-            --type SecureString \
-            --overwrite \
-            --region ${{ secrets.AWS_REGION }}
+      #     aws ssm put-parameter \
+      #       --name "$ENV_PREFIX/UPSTASH_REDIS_TOKEN" \
+      #       --value "${{ secrets.UPSTASH_REDIS_TOKEN }}" \
+      #       --type SecureString \
+      #       --overwrite \
+      #       --region ${{ secrets.AWS_REGION }}
 
-          aws ssm put-parameter \
-            --name "$ENV_PREFIX/GMAIL_EMAIL" \
-            --value "${{ secrets.GMAIL_EMAIL }}" \
-            --type String \
-            --overwrite \
-            --region ${{ secrets.AWS_REGION }}
+      #     aws ssm put-parameter \
+      #       --name "$ENV_PREFIX/GMAIL_EMAIL" \
+      #       --value "${{ secrets.GMAIL_EMAIL }}" \
+      #       --type String \
+      #       --overwrite \
+      #       --region ${{ secrets.AWS_REGION }}
 
-          aws ssm put-parameter \
-            --name "$ENV_PREFIX/GMAIL_APP_PASSWORD" \
-            --value "${{ secrets.GMAIL_APP_PASSWORD }}" \
-            --type SecureString \
-            --overwrite \
-            --region ${{ secrets.AWS_REGION }}
+      #     aws ssm put-parameter \
+      #       --name "$ENV_PREFIX/GMAIL_APP_PASSWORD" \
+      #       --value "${{ secrets.GMAIL_APP_PASSWORD }}" \
+      #       --type SecureString \
+      #       --overwrite \
+      #       --region ${{ secrets.AWS_REGION }}
 
-      # Create .env file from environment secrets
-      - name: Create .env file
-        run: |
-          cat > .env << EOF
-          DATABASE_URL=${{ secrets.DATABASE_URL }}
-          SECRET_KEY=${{ secrets.SECRET_KEY }}
-          ALGORITHM=${{ secrets.ALGORITHM }}
-          ACCESS_TOKEN_EXPIRE_MINUTES=${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
-          PROJECT_NAME=${{ secrets.PROJECT_NAME }}
-          VERSION=${{ secrets.VERSION }}
-          ENVIRONMENT=${{ github.ref_name == 'main' && 'production' || 'development' }}
-          DEBUG=${{ github.ref_name == 'main' && 'false' || 'true' }}
-          LOG_LEVEL=${{ secrets.LOG_LEVEL }}
-          CORS_ORIGINS=["http://localhost:3000", "http://localhost:8080"]
-          ALLOWED_HOSTS=["localhost", "127.0.0.1", "0.0.0.0"]
-          RATE_LIMIT_CALLS=${{ secrets.RATE_LIMIT_CALLS }}
-          RATE_LIMIT_PERIOD=${{ secrets.RATE_LIMIT_PERIOD }}
-          OTP_SECRET=${{ secrets.OTP_SECRET }}
-          OTP_EXPIRY_MINUTES=${{ secrets.OTP_EXPIRY_MINUTES }}
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION=${{ secrets.AWS_REGION }}
-          S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
-          UPSTASH_REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }}
-          UPSTASH_REDIS_TOKEN=${{ secrets.UPSTASH_REDIS_TOKEN }}
-          REDIS_USER_CACHE_TTL=${{ secrets.REDIS_USER_CACHE_TTL }}
-          REDIS_BLACKLIST_TTL=${{ secrets.REDIS_BLACKLIST_TTL }}
-          GMAIL_EMAIL=${{ secrets.GMAIL_EMAIL }}
-          GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
-          EOF
+      # # Create .env file from environment secrets
+      # - name: Create .env file
+      #   run: |
+      #     cat > .env << EOF
+      #     DATABASE_URL=${{ secrets.DATABASE_URL }}
+      #     SECRET_KEY=${{ secrets.SECRET_KEY }}
+      #     ALGORITHM=${{ secrets.ALGORITHM }}
+      #     ACCESS_TOKEN_EXPIRE_MINUTES=${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
+      #     PROJECT_NAME=${{ secrets.PROJECT_NAME }}
+      #     VERSION=${{ secrets.VERSION }}
+      #     ENVIRONMENT=${{ github.ref_name == 'main' && 'production' || 'development' }}
+      #     DEBUG=${{ github.ref_name == 'main' && 'false' || 'true' }}
+      #     LOG_LEVEL=${{ secrets.LOG_LEVEL }}
+      #     CORS_ORIGINS=["http://localhost:3000", "http://localhost:8080"]
+      #     ALLOWED_HOSTS=["localhost", "127.0.0.1", "0.0.0.0"]
+      #     RATE_LIMIT_CALLS=${{ secrets.RATE_LIMIT_CALLS }}
+      #     RATE_LIMIT_PERIOD=${{ secrets.RATE_LIMIT_PERIOD }}
+      #     OTP_SECRET=${{ secrets.OTP_SECRET }}
+      #     OTP_EXPIRY_MINUTES=${{ secrets.OTP_EXPIRY_MINUTES }}
+      #     AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     AWS_REGION=${{ secrets.AWS_REGION }}
+      #     S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+      #     UPSTASH_REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }}
+      #     UPSTASH_REDIS_TOKEN=${{ secrets.UPSTASH_REDIS_TOKEN }}
+      #     REDIS_USER_CACHE_TTL=${{ secrets.REDIS_USER_CACHE_TTL }}
+      #     REDIS_BLACKLIST_TTL=${{ secrets.REDIS_BLACKLIST_TTL }}
+      #     GMAIL_EMAIL=${{ secrets.GMAIL_EMAIL }}
+      #     GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
+      #     EOF
 
       # Set up Terraform
       - name: Setup Terraform
