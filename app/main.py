@@ -22,8 +22,14 @@ from sqlalchemy import text
 
 from app.api.cms.routes import router as cms_router
 from app.core.config import settings
+from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import setup_logging
 from app.core.middleware import RateLimitMiddleware
+from app.core.monitoring import (
+    get_health_status,
+    request_monitoring_middleware,
+    setup_database_monitoring,
+)
 from app.core.redis_client import redis_client
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.db.database import Base, engine
@@ -66,6 +72,10 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("⚠️ Redis connection not available - operating without cache")
 
+    # Setup database monitoring
+    setup_database_monitoring()
+    logger.info("✅ Database monitoring enabled")
+
     yield
 
 
@@ -95,6 +105,9 @@ app.add_middleware(
     calls=settings.RATE_LIMIT_CALLS,
     period=settings.RATE_LIMIT_PERIOD,
 )
+
+# Add monitoring middleware
+app.middleware("http")(request_monitoring_middleware)
 
 
 @app.middleware("http")
@@ -141,38 +154,8 @@ async def logging_middleware(request: Request, call_next):
     return response
 
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """Handle HTTP exceptions globally.
-
-    Args:
-        request (Request): The request that caused the exception
-        exc (HTTPException): The HTTP exception that was raised
-
-    Returns:
-        JSONResponse: Formatted error response
-    """
-    logger = logging.getLogger("api")
-    logger.warning(
-        f"HTTP {exc.status_code}: {exc.detail} - {request.method} {request.url.path}"
-    )
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """Handle all unhandled exceptions globally.
-
-    Args:
-        request (Request): The request that caused the exception
-        exc (Exception): The unhandled exception
-
-    Returns:
-        JSONResponse: Generic error response
-    """
-    logger = logging.getLogger("api")
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+# Register exception handlers
+register_exception_handlers(app)
 
 
 @app.get("/")
@@ -192,12 +175,24 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint.
+    """Health check endpoint with detailed metrics.
 
     Returns:
-        dict: Health status and timestamp
+        dict: Health status, timestamp, and system metrics
     """
-    return {"status": "healthy", "timestamp": time.time()}
+    return get_health_status()
+
+
+@app.get("/metrics")
+async def get_metrics():
+    """Get application metrics for monitoring.
+
+    Returns:
+        dict: Application performance metrics
+    """
+    from app.core.monitoring import PerformanceMonitor
+
+    return PerformanceMonitor.get_metrics()
 
 
 app.include_router(cms_router, prefix="/cms")

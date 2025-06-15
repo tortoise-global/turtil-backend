@@ -34,9 +34,9 @@ class BatchBase(BaseModel):
         "name": "BTech-CSE-2024",
         "year": 2024,
         "semester": 1,
-        "start_date": 1706764200,
-        "end_date": 1722550800,
-        "is_active": true
+        "startDate": 1706764200,
+        "endDate": 1722550800,
+        "isActive": true
     }
     ```
 
@@ -46,9 +46,9 @@ class BatchBase(BaseModel):
         "name": "MBBS-2024-Batch1",
         "year": 2024,
         "semester": 1,
-        "start_date": 1706764200,
-        "end_date": 1875142800,
-        "is_active": true
+        "startDate": 1706764200,
+        "endDate": 1875142800,
+        "isActive": true
     }
     ```
 
@@ -58,9 +58,9 @@ class BatchBase(BaseModel):
         "name": "कला संकाय-2024 (BA-Arts-2024)",
         "year": 2024,
         "semester": 1,
-        "start_date": 1706764200,
-        "end_date": 1801459200,
-        "is_active": true
+        "startDate": 1706764200,
+        "endDate": 1801459200,
+        "isActive": true
     }
     ```
     """
@@ -70,34 +70,46 @@ class BatchBase(BaseModel):
     )
     year: int = Field(..., description="Academic year")
     semester: int = Field(..., description="Current semester")
-    start_date: Optional[int] = Field(None, description="Start date timestamp")
-    end_date: Optional[int] = Field(None, description="End date timestamp")
-    is_active: Optional[bool] = Field(True, description="Batch status")
+    start_date: Optional[int] = Field(
+        None, description="Start date timestamp", alias="startDate"
+    )
+    end_date: Optional[int] = Field(
+        None, description="End date timestamp", alias="endDate"
+    )
+    is_active: Optional[bool] = Field(
+        True, description="Batch status", alias="isActive"
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class BatchCreate(BatchBase):
-    department_id: UUID = Field(..., description="Department UUID")
-    branch_id: UUID = Field(..., description="Branch UUID")
-    degree_id: UUID = Field(..., description="Degree UUID")
+    department_id: UUID = Field(
+        ..., description="Department UUID", alias="departmentId"
+    )
+    branch_id: UUID = Field(..., description="Branch UUID", alias="branchId")
+    degree_id: UUID = Field(..., description="Degree UUID", alias="degreeId")
 
 
 class BatchUpdate(BaseModel):
     name: Optional[str] = None
     semester: Optional[int] = None
-    start_date: Optional[int] = None
-    end_date: Optional[int] = None
-    is_active: Optional[bool] = None
+    start_date: Optional[int] = Field(None, alias="startDate")
+    end_date: Optional[int] = Field(None, alias="endDate")
+    is_active: Optional[bool] = Field(None, alias="isActive")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class BatchResponse(BatchBase):
     id: UUID
-    college_id: UUID
-    department_id: UUID
-    branch_id: UUID
-    degree_id: UUID
-    created_at: int
+    college_id: UUID = Field(..., alias="collegeId")
+    department_id: UUID = Field(..., alias="departmentId")
+    branch_id: UUID = Field(..., alias="branchId")
+    degree_id: UUID = Field(..., alias="degreeId")
+    created_at: int = Field(..., alias="createdAt")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # Section Schemas
@@ -143,29 +155,35 @@ class SectionBase(BaseModel):
 
     name: str = Field(..., description="Section name (CSE-A, MBBS-Group-1, Hindi-A)")
     capacity: Optional[int] = Field(60, description="Section capacity")
-    current_strength: Optional[int] = Field(0, description="Current student count")
-    class_teacher_id: Optional[UUID] = Field(None, description="Class teacher UUID")
-    is_active: Optional[bool] = Field(True, description="Section status")
+    current_strength: Optional[int] = Field(0, description="Current student count", alias="currentStrength")
+    class_teacher_id: Optional[UUID] = Field(None, description="Class teacher UUID", alias="classTeacherId")
+    is_active: Optional[bool] = Field(True, description="Section status", alias="isActive")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SectionCreate(SectionBase):
-    batch_id: UUID = Field(..., description="Batch UUID")
+    batch_id: UUID = Field(..., description="Batch UUID", alias="batchId")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SectionUpdate(BaseModel):
     name: Optional[str] = None
     capacity: Optional[int] = None
-    current_strength: Optional[int] = None
-    class_teacher_id: Optional[UUID] = None
-    is_active: Optional[bool] = None
+    current_strength: Optional[int] = Field(None, alias="currentStrength")
+    class_teacher_id: Optional[UUID] = Field(None, alias="classTeacherId")
+    is_active: Optional[bool] = Field(None, alias="isActive")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SectionResponse(SectionBase):
     id: UUID
-    batch_id: UUID
-    created_at: int
+    batch_id: UUID = Field(..., alias="batchId")
+    created_at: int = Field(..., alias="createdAt")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # Subject Schemas
@@ -235,14 +253,18 @@ class SubjectBase(BaseModel):
     credits: Optional[int] = Field(3, description="Credit hours")
     semester: int = Field(..., description="Semester number")
     subject_type: Optional[SubjectType] = Field(
-        SubjectType.THEORY, description="Subject type"
+        SubjectType.THEORY, description="Subject type", alias="subjectType"
     )
     description: Optional[str] = Field(None, description="Subject description")
-    is_active: Optional[bool] = Field(True, description="Subject status")
+    is_active: Optional[bool] = Field(True, description="Subject status", alias="isActive")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SubjectCreate(SubjectBase):
-    department_id: UUID = Field(..., description="Department UUID")
+    department_id: UUID = Field(..., description="Department UUID", alias="departmentId")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SubjectUpdate(BaseModel):
@@ -250,18 +272,20 @@ class SubjectUpdate(BaseModel):
     code: Optional[str] = None
     credits: Optional[int] = None
     semester: Optional[int] = None
-    subject_type: Optional[SubjectType] = None
+    subject_type: Optional[SubjectType] = Field(None, alias="subjectType")
     description: Optional[str] = None
-    is_active: Optional[bool] = None
+    is_active: Optional[bool] = Field(None, alias="isActive")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SubjectResponse(SubjectBase):
     id: UUID
-    college_id: UUID
-    department_id: UUID
-    created_at: int
+    college_id: UUID = Field(..., alias="collegeId")
+    department_id: UUID = Field(..., alias="departmentId")
+    created_at: int = Field(..., alias="createdAt")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # Timetable Schemas
@@ -316,39 +340,45 @@ class TimetableBase(BaseModel):
     ```
     """
 
-    day_of_week: TimetableDay = Field(..., description="Day of the week")
-    start_time: str = Field(..., description="Start time (HH:MM) - 24-hour format")
-    end_time: str = Field(..., description="End time (HH:MM) - 24-hour format")
+    day_of_week: TimetableDay = Field(..., description="Day of the week", alias="dayOfWeek")
+    start_time: str = Field(..., description="Start time (HH:MM) - 24-hour format", alias="startTime")
+    end_time: str = Field(..., description="End time (HH:MM) - 24-hour format", alias="endTime")
     room_number: Optional[str] = Field(
-        None, description="Room number (supports Hindi/regional naming)"
+        None, description="Room number (supports Hindi/regional naming)", alias="roomNumber"
     )
-    is_active: Optional[bool] = Field(True, description="Timetable entry status")
+    is_active: Optional[bool] = Field(True, description="Timetable entry status", alias="isActive")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class TimetableCreate(TimetableBase):
-    section_id: UUID = Field(..., description="Section UUID")
-    subject_id: UUID = Field(..., description="Subject UUID")
-    teacher_id: UUID = Field(..., description="Teacher UUID")
+    section_id: UUID = Field(..., description="Section UUID", alias="sectionId")
+    subject_id: UUID = Field(..., description="Subject UUID", alias="subjectId")
+    teacher_id: UUID = Field(..., description="Teacher UUID", alias="teacherId")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class TimetableUpdate(BaseModel):
-    day_of_week: Optional[TimetableDay] = None
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-    room_number: Optional[str] = None
-    teacher_id: Optional[UUID] = None
-    is_active: Optional[bool] = None
+    day_of_week: Optional[TimetableDay] = Field(None, alias="dayOfWeek")
+    start_time: Optional[str] = Field(None, alias="startTime")
+    end_time: Optional[str] = Field(None, alias="endTime")
+    room_number: Optional[str] = Field(None, alias="roomNumber")
+    teacher_id: Optional[UUID] = Field(None, alias="teacherId")
+    is_active: Optional[bool] = Field(None, alias="isActive")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class TimetableResponse(TimetableBase):
     id: UUID
-    college_id: UUID
-    section_id: UUID
-    subject_id: UUID
-    teacher_id: UUID
-    created_at: int
+    college_id: UUID = Field(..., alias="collegeId")
+    section_id: UUID = Field(..., alias="sectionId")
+    subject_id: UUID = Field(..., alias="subjectId")
+    teacher_id: UUID = Field(..., alias="teacherId")
+    created_at: int = Field(..., alias="createdAt")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # Cross-Department Teaching Schemas
@@ -396,9 +426,11 @@ class CrossDepartmentAssignment(BaseModel):
     ```
     """
 
-    teacher_id: UUID = Field(..., description="Teacher UUID")
-    department_id: UUID = Field(..., description="Additional department UUID")
-    subject_ids: List[UUID] = Field(..., description="List of subject UUIDs")
+    teacher_id: UUID = Field(..., description="Teacher UUID", alias="teacherId")
+    department_id: UUID = Field(..., description="Additional department UUID", alias="departmentId")
+    subject_ids: List[UUID] = Field(..., description="List of subject UUIDs", alias="subjectIds")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class TeacherAssignmentResponse(BaseModel):
@@ -437,29 +469,29 @@ class TeacherAssignmentResponse(BaseModel):
     ```
     """
 
-    teacher_id: UUID
+    teacher_id: UUID = Field(..., alias="teacherId")
     teacher_full_name: Optional[str] = Field(
-        None, description="Teacher's full name with designation"
+        None, description="Teacher's full name with designation", alias="teacherFullName"
     )
-    primary_department_id: Optional[UUID]
+    primary_department_id: Optional[UUID] = Field(None, alias="primaryDepartmentId")
     primary_department_name: Optional[str] = Field(
-        None, description="Primary department name (supports regional languages)"
+        None, description="Primary department name (supports regional languages)", alias="primaryDepartmentName"
     )
-    managed_departments: List[str]
-    teaching_subjects: List[dict]
+    managed_departments: List[str] = Field(..., alias="managedDepartments")
+    teaching_subjects: List[dict] = Field(..., alias="teachingSubjects")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # Academic Hierarchy Schemas
 class AcademicHierarchy(BaseModel):
-    college_id: UUID
+    college_id: UUID = Field(..., alias="collegeId")
     departments: List[dict]
-    total_batches: int
-    total_sections: int
-    total_subjects: int
+    total_batches: int = Field(..., alias="totalBatches")
+    total_sections: int = Field(..., alias="totalSections")
+    total_subjects: int = Field(..., alias="totalSubjects")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # Bulk Operations
@@ -519,14 +551,14 @@ class AcademicStatistics(BaseModel):
     ```
     """
 
-    total_batches: int
-    total_sections: int
-    total_subjects: int
-    active_timetable_entries: int
-    teachers_with_cross_dept_assignments: int
+    total_batches: int = Field(..., alias="totalBatches")
+    total_sections: int = Field(..., alias="totalSections")
+    total_subjects: int = Field(..., alias="totalSubjects")
+    active_timetable_entries: int = Field(..., alias="activeTimetableEntries")
+    teachers_with_cross_dept_assignments: int = Field(..., alias="teachersWithCrossDeptAssignments")
     departments: Optional[dict] = Field(None, description="Department-wise breakdown")
     language_breakdown: Optional[dict] = Field(
-        None, description="Subjects by language of instruction"
+        None, description="Subjects by language of instruction", alias="languageBreakdown"
     )
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)

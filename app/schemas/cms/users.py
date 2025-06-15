@@ -57,26 +57,28 @@ class CMSUserUpdate(BaseModel):
 
     username: Optional[str] = None
     email: Optional[EmailStr] = None
-    full_name: Optional[str] = None
+    full_name: Optional[str] = Field(None, alias="fullName")
     phone: Optional[str] = None
     role: Optional[CMSUserRole] = None
-    department_id: Optional[UUID] = None
-    branch_id: Optional[UUID] = None
-    degree_id: Optional[UUID] = None
-    is_active: Optional[bool] = None
-    email_verified: Optional[bool] = None
+    department_id: Optional[UUID] = Field(None, alias="departmentId")
+    branch_id: Optional[UUID] = Field(None, alias="branchId")
+    degree_id: Optional[UUID] = Field(None, alias="degreeId")
+    is_active: Optional[bool] = Field(None, alias="isActive")
+    email_verified: Optional[bool] = Field(None, alias="emailVerified")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class CMSUserResponse(CMSUserBase):
     """Model for CMS user API responses."""
 
     id: UUID
-    college_id: UUID
-    last_login: Optional[int] = None
-    created_at: int
-    updated_at: Optional[int] = None
+    college_id: UUID = Field(..., alias="collegeId")
+    last_login: Optional[int] = Field(None, alias="lastLogin")
+    created_at: int = Field(..., alias="createdAt")
+    updated_at: Optional[int] = Field(None, alias="updatedAt")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class CMSUserLogin(BaseModel):
@@ -89,19 +91,29 @@ class CMSUserLogin(BaseModel):
 class CMSUserToken(BaseModel):
     """Model for CMS user authentication token response."""
 
-    access_token: str = Field(..., description="JWT access token")
-    token_type: str = Field("bearer", description="Token type")
-    user_id: UUID = Field(..., description="User UUID")
+    access_token: str = Field(..., description="JWT access token", alias="accessToken")
+    token_type: str = Field("bearer", description="Token type", alias="tokenType")
+    user_id: UUID = Field(..., description="User UUID", alias="userId")
     role: CMSUserRole = Field(..., description="User role")
-    college_id: UUID = Field(..., description="College UUID")
-    expires_in: int = Field(..., description="Token expiration time in seconds")
+    college_id: UUID = Field(..., description="College UUID", alias="collegeId")
+    expires_in: int = Field(
+        ..., description="Token expiration time in seconds", alias="expiresIn"
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class CMSPasswordChange(BaseModel):
     """Model for password change request."""
 
-    current_password: str = Field(..., description="Current password")
-    new_password: str = Field(..., min_length=8, description="New password")
+    current_password: str = Field(
+        ..., description="Current password", alias="currentPassword"
+    )
+    new_password: str = Field(
+        ..., min_length=8, description="New password", alias="newPassword"
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class CMSPasswordReset(BaseModel):
@@ -114,16 +126,24 @@ class CMSPasswordResetConfirm(BaseModel):
     """Model for password reset confirmation."""
 
     token: str = Field(..., description="Reset token")
-    new_password: str = Field(..., min_length=8, description="New password")
+    new_password: str = Field(
+        ..., min_length=8, description="New password", alias="newPassword"
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class CMSSystemModuleBase(BaseModel):
     """Base model for CMS system modules."""
 
     name: str = Field(..., description="Module name")
-    display_name: str = Field(..., description="Display name")
+    display_name: str = Field(..., description="Display name", alias="displayName")
     description: Optional[str] = Field(None, description="Module description")
-    is_core: Optional[bool] = Field(False, description="Core module flag")
+    is_core: Optional[bool] = Field(
+        False, description="Core module flag", alias="isCore"
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class CMSSystemModuleCreate(CMSSystemModuleBase):
@@ -136,37 +156,45 @@ class CMSSystemModuleUpdate(BaseModel):
     """Model for updating system module data."""
 
     name: Optional[str] = None
-    display_name: Optional[str] = None
+    display_name: Optional[str] = Field(None, alias="displayName")
     description: Optional[str] = None
-    is_core: Optional[bool] = None
+    is_core: Optional[bool] = Field(None, alias="isCore")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class CMSSystemModuleResponse(CMSSystemModuleBase):
     """Model for system module API responses."""
 
     id: UUID
-    created_at: int
+    created_at: int = Field(..., alias="createdAt")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class CMSCollegeModuleBase(BaseModel):
     """Base model for college module configuration."""
 
-    is_enabled: bool = Field(True, description="Module enabled status")
+    is_enabled: bool = Field(
+        True, description="Module enabled status", alias="isEnabled"
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class CMSCollegeModuleCreate(CMSCollegeModuleBase):
     """Model for creating college module configuration."""
 
-    college_id: UUID = Field(..., description="College UUID")
-    module_id: UUID = Field(..., description="Module UUID")
+    college_id: UUID = Field(..., description="College UUID", alias="collegeId")
+    module_id: UUID = Field(..., description="Module UUID", alias="moduleId")
 
 
 class CMSCollegeModuleUpdate(BaseModel):
     """Model for updating college module configuration."""
 
-    is_enabled: Optional[bool] = None
+    is_enabled: Optional[bool] = Field(None, alias="isEnabled")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class CMSCollegeModuleResponse(CMSCollegeModuleBase):

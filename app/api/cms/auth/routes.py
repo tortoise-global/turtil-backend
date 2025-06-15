@@ -18,20 +18,27 @@ from app.core.security import (
 from app.db.database import get_db
 from app.models.cms.models import CMSUser
 from app.schemas.cms.auth import (
+    AdminActionResponse,
+    AuthStatusResponse,
+    CacheStatsResponse,
     ChangePasswordRequest,
     CMSUserResponse,
     CMSUserUpdate,
     CompleteProfileRequest,
+    CompleteProfileResponse,
     CompleteSignupRequest,
     CompleteSignupResponse,
     EmailResponse,
     FetchCMSUserResponse,
     LoginRequest,
+    LogoutResponse,
     SendSignupOTPRequest,
     Token,
     VerifyResponse,
     VerifySignupOTPRequest,
 )
+from app.schemas.shared.responses import MessageResponse
+from app.services.cms.auth_service import auth_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -65,26 +72,8 @@ async def send_signup_otp(request: SendSignupOTPRequest, db: Session = Depends(g
     - 400: Email already registered
     - 422: Validation error
     """
-    # Check if user already exists
-    existing_user = db.query(CMSUser).filter(CMSUser.email == request.email).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    # Send OTP for signup
-    try:
-        otp = send_email_otp(request.email)
-        return EmailResponse(
-            message="OTP sent successfully to your email address", success=True
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            f"Unexpected error sending signup OTP to {request.email}: {str(e)}"
-        )
-        raise HTTPException(
-            status_code=500, detail="Failed to send OTP. Please try again."
-        )
+    response = auth_service.send_signup_otp(db, request)
+    return EmailResponse(**response)
 
 
 @router.post("/verify-signup-otp", response_model=VerifyResponse)
@@ -118,14 +107,8 @@ async def verify_signup_otp(request: VerifySignupOTPRequest):
     - 400: Invalid or expired OTP
     - 422: Validation error
     """
-    if not verify_otp(request.email, str(request.otp), consume=False):
-        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
-
-    return VerifyResponse(
-        message="OTP verified successfully. You can now set your password.",
-        success=True,
-        verified=True,
-    )
+    response = auth_service.verify_signup_otp(request)
+    return VerifyResponse(**response)
 
 
 @router.post("/complete-signup", response_model=CompleteSignupResponse)
@@ -154,7 +137,7 @@ async def complete_signup(
     {
         "message": "Signup completed successfully. Please login to complete your profile.",
         "success": true,
-        "user_id": "usr_abc123xyz"
+        "userId": "usr_abc123xyz"
     }
     ```
 
@@ -201,7 +184,7 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
 
     **Request Body:**
     - userName (string, required): CMSUsername or email address
-    - Password (string, required): CMSUser password
+    - password (string, required): CMSUser password
 
     **Parameters:** None
 
@@ -212,7 +195,7 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     ```json
     {
         "userName": "admin@rajivgandhi.edu",
-        "Password": "SecurePass123!"
+        "password": "SecurePass123!"
     }
     ```
 
@@ -222,7 +205,8 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
         "tokenType": "bearer",
         "cmsUserId": "usr_abc123xyz",
-        "role": "admin"
+        "role": "admin",
+        "profileCompleted": false
     }
     ```
 
@@ -240,7 +224,7 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     """
     # Authenticate user with enhanced auth manager
     user = auth_manager.authenticate_user(
-        credentials.userName, credentials.Password, db
+        credentials.userName, credentials.password, db
     )
 
     if not user:
@@ -266,13 +250,13 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     return Token(
         access_token=token_response["access_token"],
         token_type=token_response["token_type"],
-        cmsUserId=str(user.id),
+        cms_user_id=str(user.id),
         role=user.role,
         profile_completed=user.profile_completed or False,
     )
 
 
-@router.post("/change-password")
+@router.post("/change-password", response_model=MessageResponse)
 async def change_password(
     request: ChangePasswordRequest,
     db: Session = Depends(get_db),
@@ -328,7 +312,7 @@ async def change_password(
     user.hashed_password = get_password_hash(request.newPassword)
     db.commit()
 
-    return {"message": "Password changed successfully"}
+    return MessageResponse(message="Password changed successfully")
 
 
 @router.get("/users/{user_id}", response_model=CMSUserResponse)
@@ -392,7 +376,7 @@ async def fetch_users(
     return users
 
 
-@router.delete("/admin/{admin_id}")
+@router.delete("/admin/{admin_id}", response_model=AdminActionResponse)
 async def revoke_admin_access(
     admin_id: str,
     reason: str = "admin_revoked",
@@ -424,15 +408,15 @@ async def revoke_admin_access(
 
     logger.info(f"Principal {current_user.id} revoked access for admin {admin_id}")
 
-    return {
-        "message": "Admin access revoked immediately",
-        "user_id": admin_id,
-        "revoked_at": int(time.time()),
-        "reason": reason,
-    }
+    return AdminActionResponse(
+        message="Admin access revoked immediately",
+        user_id=admin_id,
+        revoked_at=int(time.time()),
+        reason=reason,
+    )
 
 
-@router.post("/admin/{admin_id}/restore")
+@router.post("/admin/{admin_id}/restore", response_model=AdminActionResponse)
 async def restore_admin_access(
     admin_id: str,
     db: Session = Depends(get_db),
@@ -457,32 +441,31 @@ async def restore_admin_access(
 
     logger.info(f"Principal {current_user.id} restored access for admin {admin_id}")
 
-    return {
-        "message": "Admin access restored",
-        "user_id": admin_id,
-        "restored_at": int(time.time()),
-    }
+    return AdminActionResponse(
+        message="Admin access restored",
+        user_id=admin_id,
+        restored_at=int(time.time()),
+    )
 
 
-@router.get("/auth/status")
+@router.get("/auth/status", response_model=AuthStatusResponse)
 async def get_auth_status(current_user: CMSUser = Depends(get_current_user)):
     # Get detailed authentication status
     auth_status = auth_manager.get_authentication_status(str(current_user.id))
 
-    return {
-        "user_id": str(current_user.id),
-        "username": current_user.username,
-        "email": current_user.email,
-        "role": current_user.role,
-        "college_id": str(current_user.college_id),
-        "is_active": current_user.is_active,
-        "last_login": current_user.last_login,
-        "token_valid": True,
-        **auth_status,
-    }
+    return AuthStatusResponse(
+        user_id=str(current_user.id),
+        username=current_user.username,
+        email=current_user.email,
+        role=current_user.role,
+        college_id=str(current_user.college_id),
+        is_active=current_user.is_active,
+        last_login=current_user.last_login,
+        token_valid=True,
+    )
 
 
-@router.post("/logout")
+@router.post("/logout", response_model=LogoutResponse)
 async def logout(token: str = None, current_user: CMSUser = Depends(get_current_user)):
     # Get token from authorization header if not provided
     if not token:
@@ -495,10 +478,12 @@ async def logout(token: str = None, current_user: CMSUser = Depends(get_current_
 
     logger.info(f"User {current_user.username} logged out")
 
-    return {"message": "Logged out successfully", "user_id": str(current_user.id)}
+    return LogoutResponse(
+        message="Logged out successfully", user_id=str(current_user.id)
+    )
 
 
-@router.post("/complete-profile")
+@router.post("/complete-profile", response_model=CompleteProfileResponse)
 async def complete_profile(
     profile_data: CompleteProfileRequest,
     db: Session = Depends(get_db),
@@ -508,13 +493,13 @@ async def complete_profile(
     Complete user profile after initial signup
 
     **Request Body:**
-    - full_name (string, required): Full name of the user
+    - fullName (string, required): Full name of the user
     - phone (string, optional): Phone number
-    - college_id (string, required): College UUID
+    - collegeId (string, required): College UUID
     - role (string, optional): User role (default: "student")
-    - department_id (string, optional): Department UUID
-    - branch_id (string, optional): Branch UUID
-    - degree_id (string, optional): Degree UUID
+    - departmentId (string, optional): Department UUID
+    - branchId (string, optional): Branch UUID
+    - degreeId (string, optional): Degree UUID
 
     **Headers:**
     - Authorization: Bearer {access_token}
@@ -522,13 +507,13 @@ async def complete_profile(
     **Example Request:**
     ```json
     {
-        "full_name": "John Doe",
+        "fullName": "John Doe",
         "phone": "+91-9876543210",
-        "college_id": "123e4567-e89b-12d3-a456-426614174000",
+        "collegeId": "123e4567-e89b-12d3-a456-426614174000",
         "role": "student",
-        "department_id": "123e4567-e89b-12d3-a456-426614174001",
-        "branch_id": "123e4567-e89b-12d3-a456-426614174002",
-        "degree_id": "123e4567-e89b-12d3-a456-426614174003"
+        "departmentId": "123e4567-e89b-12d3-a456-426614174001",
+        "branchId": "123e4567-e89b-12d3-a456-426614174002",
+        "degreeId": "123e4567-e89b-12d3-a456-426614174003"
     }
     ```
 
@@ -536,7 +521,7 @@ async def complete_profile(
     ```json
     {
         "message": "Profile completed successfully",
-        "profile_completed": true
+        "profileCompleted": true
     }
     ```
 
@@ -570,12 +555,18 @@ async def complete_profile(
     db.commit()
     db.refresh(user)
 
-    return {"message": "Profile completed successfully", "profile_completed": True}
+    return CompleteProfileResponse(
+        message="Profile completed successfully", profile_completed=True
+    )
 
 
-@router.get("/cache/stats")
+@router.get("/cache/stats", response_model=CacheStatsResponse)
 async def get_cache_stats(current_user: CMSUser = Depends(get_principal_user)):
     cache_stats = auth_manager.redis.get_cache_stats()
-    cache_stats["cache_available"] = auth_manager.redis.is_available()
 
-    return cache_stats
+    return CacheStatsResponse(
+        cache_available=auth_manager.redis.is_available(),
+        total_keys=cache_stats.get("total_keys"),
+        memory_usage=cache_stats.get("memory_usage"),
+        hit_rate=cache_stats.get("hit_rate"),
+    )

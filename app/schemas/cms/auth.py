@@ -16,7 +16,7 @@ class LoginRequest(BaseModel):
     """Request model for user login."""
 
     userName: str
-    Password: str
+    password: str
 
 
 class ChangePasswordRequest(BaseModel):
@@ -32,9 +32,9 @@ class Token(BaseModel):
 
     access_token: str = Field(..., alias="accessToken")
     token_type: str = Field(..., alias="tokenType")
-    cmsUserId: str
+    cms_user_id: str = Field(..., alias="cmsUserId")
     role: Optional[str] = None
-    profile_completed: bool = False
+    profile_completed: bool = Field(False, alias="profileCompleted")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -91,16 +91,74 @@ class CompleteSignupResponse(BaseModel):
 
     message: str
     success: bool
-    user_id: str
+    user_id: str = Field(..., alias="userId")
 
 
 class CompleteProfileRequest(BaseModel):
     """Request model for completing user profile."""
 
-    full_name: str
+    full_name: str = Field(..., alias="fullName")
     phone: Optional[str] = None
-    college_id: str
+    college_id: str = Field(..., alias="collegeId")
     role: str = "student"
-    department_id: Optional[str] = None
-    branch_id: Optional[str] = None
-    degree_id: Optional[str] = None
+    department_id: Optional[str] = Field(None, alias="departmentId")
+    branch_id: Optional[str] = Field(None, alias="branchId")
+    degree_id: Optional[str] = Field(None, alias="degreeId")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class CompleteProfileResponse(BaseModel):
+    """Response model for profile completion."""
+
+    message: str
+    profile_completed: bool = Field(..., alias="profileCompleted")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class AuthStatusResponse(BaseModel):
+    """Response model for authentication status."""
+
+    user_id: str = Field(..., alias="userId")
+    username: str
+    email: str
+    role: str
+    college_id: str = Field(..., alias="collegeId")
+    is_active: bool = Field(..., alias="isActive")
+    last_login: Optional[int] = Field(None, alias="lastLogin")
+    token_valid: bool = Field(..., alias="tokenValid")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class LogoutResponse(BaseModel):
+    """Response model for logout."""
+
+    message: str
+    user_id: str = Field(..., alias="userId")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class AdminActionResponse(BaseModel):
+    """Response model for admin actions."""
+
+    message: str
+    user_id: str = Field(..., alias="userId")
+    revoked_at: Optional[int] = Field(None, alias="revokedAt")
+    restored_at: Optional[int] = Field(None, alias="restoredAt")
+    reason: Optional[str] = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class CacheStatsResponse(BaseModel):
+    """Response model for cache statistics."""
+
+    cache_available: bool = Field(..., alias="cacheAvailable")
+    total_keys: Optional[int] = Field(None, alias="totalKeys")
+    memory_usage: Optional[str] = Field(None, alias="memoryUsage")
+    hit_rate: Optional[float] = Field(None, alias="hitRate")
+
+    model_config = ConfigDict(populate_by_name=True)
