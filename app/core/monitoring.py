@@ -234,23 +234,31 @@ def monitor_function(operation_name: str):
             start_time = time.time()
 
             try:
-                logger.info(f"{operation_name} started", function=func.__name__)
+                logger.info(
+                    "%s started", operation_name, extra={"function": func.__name__}
+                )
                 result = await func(*args, **kwargs)
                 duration = time.time() - start_time
                 logger.info(
-                    f"{operation_name} completed successfully",
-                    function=func.__name__,
-                    duration=duration,
+                    "%s completed successfully",
+                    operation_name,
+                    extra={
+                        "function": func.__name__,
+                        "duration": duration,
+                    },
                 )
                 return result
             except Exception as e:
                 duration = time.time() - start_time
                 logger.error(
-                    f"{operation_name} failed",
-                    function=func.__name__,
-                    duration=duration,
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    "%s failed",
+                    operation_name,
+                    extra={
+                        "function": func.__name__,
+                        "duration": duration,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    },
                 )
                 raise
 
@@ -260,7 +268,9 @@ def monitor_function(operation_name: str):
             start_time = time.time()
 
             try:
-                logger.info(f"{operation_name} started", function=func.__name__)
+                logger.info(
+                    "%s started", operation_name, extra={"function": func.__name__}
+                )
                 result = func(*args, **kwargs)
                 duration = time.time() - start_time
                 logger.info(
@@ -296,10 +306,12 @@ def operation_context(operation_name: str, **context_data):
     start_time = time.time()
 
     try:
-        logger.info(f"{operation_name} started", **context_data)
+        logger.info("%s started", operation_name, extra=context_data)
         yield logger
         duration = time.time() - start_time
-        logger.info(f"{operation_name} completed", duration=duration, **context_data)
+        logger.info(
+            "%s completed", operation_name, extra={"duration": duration, **context_data}
+        )
     except Exception as e:
         duration = time.time() - start_time
         logger.error(

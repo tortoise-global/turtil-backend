@@ -205,7 +205,7 @@ class PermissionService:
             return self._has_default_role_permission(user.role, module_name, action)
 
         except Exception as e:
-            logger.error(f"Error checking module access for user {user.id}: {e}")
+            logger.error("Error checking module access for user %s: %s", user.id, e)
             return False
 
     def get_user_accessible_modules(self, user: CMSUser) -> List[Dict[str, Any]]:
@@ -228,7 +228,7 @@ class PermissionService:
             return accessible_modules
 
         except Exception as e:
-            logger.error(f"Error getting accessible modules for user {user.id}: {e}")
+            logger.error("Error getting accessible modules for user %s: %s", user.id, e)
             return []
 
     def can_access_department_data(
@@ -258,7 +258,7 @@ class PermissionService:
             return False
 
         except Exception as e:
-            logger.error(f"Error checking department access for user {user.id}: {e}")
+            logger.error("Error checking department access for user %s: %s", user.id, e)
             return False
 
     def can_access_branch_data(self, user: CMSUser, target_branch_id: UUID) -> bool:
@@ -284,7 +284,7 @@ class PermissionService:
             return False
 
         except Exception as e:
-            logger.error(f"Error checking branch access for user {user.id}: {e}")
+            logger.error("Error checking branch access for user %s: %s", user.id, e)
             return False
 
     def get_accessible_departments(self, user: CMSUser) -> List[UUID]:
@@ -357,7 +357,9 @@ class PermissionService:
             return []
 
         except Exception as e:
-            logger.error(f"Error getting accessible branches for user {user.id}: {e}")
+            logger.error(
+                "Error getting accessible branches for user %s: %s", user.id, e
+            )
             return []
 
     def get_modules_for_role_creation(
@@ -403,7 +405,7 @@ class PermissionService:
             return visible_modules
 
         except Exception as e:
-            logger.error(f"Error getting modules for role creation: {e}")
+            logger.error("Error getting modules for role creation: %s", e)
             return []
 
     def create_default_permissions_for_user(self, user: CMSUser) -> bool:
@@ -440,7 +442,9 @@ class PermissionService:
             return True
 
         except Exception as e:
-            logger.error(f"Error creating default permissions for user {user.id}: {e}")
+            logger.error(
+                "Error creating default permissions for user %s: %s", user.id, e
+            )
             self.db.rollback()
             return False
 

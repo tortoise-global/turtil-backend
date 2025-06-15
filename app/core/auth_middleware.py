@@ -63,7 +63,7 @@ class RedisAuthMiddleware(BaseHTTPMiddleware):
             # Check if user is blacklisted (immediate revocation)
             if auth_manager.redis.is_available():
                 if auth_manager.redis.is_user_blacklisted(user_id):
-                    logger.warning(f"Blocked request from blacklisted user: {user_id}")
+                    logger.warning("Blocked request from blacklisted user: %s", user_id)
                     return self._unauthorized_response("Access revoked")
 
             # Add user info to request state for downstream handlers
@@ -87,7 +87,7 @@ class RedisAuthMiddleware(BaseHTTPMiddleware):
             )
             return self._unauthorized_response(e.detail)
         except Exception as e:
-            logger.error(f"Unexpected auth error: {e}")
+            logger.error("Unexpected auth error: %s", e)
             return self._unauthorized_response("Authentication failed")
 
     def _is_excluded_path(self, path: str) -> bool:
@@ -180,7 +180,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return True
 
         except Exception as e:
-            logger.error(f"Rate limit check failed: {e}")
+            logger.error("Rate limit check failed: %s", e)
             return True  # Fail open
 
 
@@ -196,9 +196,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers[
-            "Strict-Transport-Security"
-        ] = "max-age=31536000; includeSubDomains"
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
         # API-specific headers

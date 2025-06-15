@@ -87,13 +87,15 @@ def sanitize_string(value: str, max_length: int = 1000) -> str:
     # Check for SQL injection
     for pattern in ValidationRules.SQL_INJECTION_REGEX:
         if pattern.search(value):
-            logger.warning(f"Potential SQL injection attempt detected: {value[:50]}...")
+            logger.warning(
+                "Potential SQL injection attempt detected: %s...", value[:50]
+            )
             raise ValidationError("Input contains potentially malicious content")
 
     # Check for XSS
     for pattern in ValidationRules.XSS_REGEX:
         if pattern.search(value):
-            logger.warning(f"Potential XSS attempt detected: {value[:50]}...")
+            logger.warning("Potential XSS attempt detected: %s...", value[:50])
             raise ValidationError("Input contains potentially malicious content")
 
     # HTML escape

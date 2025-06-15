@@ -245,7 +245,7 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
 
     token_response = auth_manager.create_access_token(user_data)
 
-    logger.info(f"User {user.username} logged in successfully")
+    logger.info("User %s logged in successfully", user.username)
 
     return Token(
         access_token=token_response["access_token"],
@@ -406,7 +406,7 @@ async def revoke_admin_access(
     admin_user.is_active = False
     db.commit()
 
-    logger.info(f"Principal {current_user.id} revoked access for admin {admin_id}")
+    logger.info("Principal %s revoked access for admin %s", current_user.id, admin_id)
 
     return AdminActionResponse(
         message="Admin access revoked immediately",
@@ -439,7 +439,7 @@ async def restore_admin_access(
     admin_user.is_active = True
     db.commit()
 
-    logger.info(f"Principal {current_user.id} restored access for admin {admin_id}")
+    logger.info("Principal %s restored access for admin %s", current_user.id, admin_id)
 
     return AdminActionResponse(
         message="Admin access restored",
@@ -476,7 +476,7 @@ async def logout(token: str = None, current_user: CMSUser = Depends(get_current_
     # Invalidate user cache
     auth_manager.redis.invalidate_user_cache(str(current_user.id))
 
-    logger.info(f"User {current_user.username} logged out")
+    logger.info("User %s logged out", current_user.username)
 
     return LogoutResponse(
         message="Logged out successfully", user_id=str(current_user.id)

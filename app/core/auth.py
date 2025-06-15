@@ -58,7 +58,7 @@ async def get_current_user(
     # Get user with cache-first approach
     user = auth_manager.get_user_from_cache_or_db(user_id, db)
     if user is None:
-        logger.warning(f"User not found: {user_id}")
+        logger.warning("User not found: %s", user_id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
@@ -83,7 +83,7 @@ async def get_current_active_user(
         HTTPException: If user account is deactivated
     """
     if not current_user.is_active:
-        logger.warning(f"Inactive user attempted access: {current_user.id}")
+        logger.warning("Inactive user attempted access: %s", current_user.id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deactivated"
         )
@@ -105,7 +105,7 @@ async def get_admin_user(
         HTTPException: If user doesn't have admin privileges
     """
     if current_user.role not in ["admin", "principal"]:
-        logger.warning(f"Insufficient permissions for user: {current_user.id}")
+        logger.warning("Insufficient permissions for user: %s", current_user.id)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
         )
@@ -127,7 +127,7 @@ async def get_principal_user(
         HTTPException: If user is not a principal
     """
     if current_user.role != "principal":
-        logger.warning(f"Principal access denied for user: {current_user.id}")
+        logger.warning("Principal access denied for user: %s", current_user.id)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Principal access required"
         )
@@ -149,7 +149,7 @@ async def get_super_admin_user(
         HTTPException: If user is not a super admin
     """
     if current_user.role != "super_admin":
-        logger.warning(f"Super admin access denied for user: {current_user.id}")
+        logger.warning("Super admin access denied for user: %s", current_user.id)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Super admin access required"
         )
@@ -171,7 +171,7 @@ async def get_lecturer_user(
         HTTPException: If user doesn't have lecturer privileges
     """
     if current_user.role not in ["staff", "head", "admin", "principal"]:
-        logger.warning(f"Lecturer access denied for user: {current_user.id}")
+        logger.warning("Lecturer access denied for user: %s", current_user.id)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Lecturer access required"
         )
@@ -286,7 +286,7 @@ def require_department_access(target_department_id: Optional[UUID] = None):
                 current_user
             )
             if not accessible_departments:
-                logger.warning(f"No department access for user {current_user.id}")
+                logger.warning("No department access for user %s", current_user.id)
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN, detail="No department access"
                 )
@@ -328,7 +328,7 @@ def require_branch_access(target_branch_id: Optional[UUID] = None):
                 current_user
             )
             if not accessible_branches:
-                logger.warning(f"No branch access for user {current_user.id}")
+                logger.warning("No branch access for user %s", current_user.id)
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN, detail="No branch access"
                 )

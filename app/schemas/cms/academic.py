@@ -155,9 +155,15 @@ class SectionBase(BaseModel):
 
     name: str = Field(..., description="Section name (CSE-A, MBBS-Group-1, Hindi-A)")
     capacity: Optional[int] = Field(60, description="Section capacity")
-    current_strength: Optional[int] = Field(0, description="Current student count", alias="currentStrength")
-    class_teacher_id: Optional[UUID] = Field(None, description="Class teacher UUID", alias="classTeacherId")
-    is_active: Optional[bool] = Field(True, description="Section status", alias="isActive")
+    current_strength: Optional[int] = Field(
+        0, description="Current student count", alias="currentStrength"
+    )
+    class_teacher_id: Optional[UUID] = Field(
+        None, description="Class teacher UUID", alias="classTeacherId"
+    )
+    is_active: Optional[bool] = Field(
+        True, description="Section status", alias="isActive"
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -256,13 +262,17 @@ class SubjectBase(BaseModel):
         SubjectType.THEORY, description="Subject type", alias="subjectType"
     )
     description: Optional[str] = Field(None, description="Subject description")
-    is_active: Optional[bool] = Field(True, description="Subject status", alias="isActive")
+    is_active: Optional[bool] = Field(
+        True, description="Subject status", alias="isActive"
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
 
 class SubjectCreate(SubjectBase):
-    department_id: UUID = Field(..., description="Department UUID", alias="departmentId")
+    department_id: UUID = Field(
+        ..., description="Department UUID", alias="departmentId"
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -340,13 +350,23 @@ class TimetableBase(BaseModel):
     ```
     """
 
-    day_of_week: TimetableDay = Field(..., description="Day of the week", alias="dayOfWeek")
-    start_time: str = Field(..., description="Start time (HH:MM) - 24-hour format", alias="startTime")
-    end_time: str = Field(..., description="End time (HH:MM) - 24-hour format", alias="endTime")
-    room_number: Optional[str] = Field(
-        None, description="Room number (supports Hindi/regional naming)", alias="roomNumber"
+    day_of_week: TimetableDay = Field(
+        ..., description="Day of the week", alias="dayOfWeek"
     )
-    is_active: Optional[bool] = Field(True, description="Timetable entry status", alias="isActive")
+    start_time: str = Field(
+        ..., description="Start time (HH:MM) - 24-hour format", alias="startTime"
+    )
+    end_time: str = Field(
+        ..., description="End time (HH:MM) - 24-hour format", alias="endTime"
+    )
+    room_number: Optional[str] = Field(
+        None,
+        description="Room number (supports Hindi/regional naming)",
+        alias="roomNumber",
+    )
+    is_active: Optional[bool] = Field(
+        True, description="Timetable entry status", alias="isActive"
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -427,8 +447,12 @@ class CrossDepartmentAssignment(BaseModel):
     """
 
     teacher_id: UUID = Field(..., description="Teacher UUID", alias="teacherId")
-    department_id: UUID = Field(..., description="Additional department UUID", alias="departmentId")
-    subject_ids: List[UUID] = Field(..., description="List of subject UUIDs", alias="subjectIds")
+    department_id: UUID = Field(
+        ..., description="Additional department UUID", alias="departmentId"
+    )
+    subject_ids: List[UUID] = Field(
+        ..., description="List of subject UUIDs", alias="subjectIds"
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -471,11 +495,15 @@ class TeacherAssignmentResponse(BaseModel):
 
     teacher_id: UUID = Field(..., alias="teacherId")
     teacher_full_name: Optional[str] = Field(
-        None, description="Teacher's full name with designation", alias="teacherFullName"
+        None,
+        description="Teacher's full name with designation",
+        alias="teacherFullName",
     )
     primary_department_id: Optional[UUID] = Field(None, alias="primaryDepartmentId")
     primary_department_name: Optional[str] = Field(
-        None, description="Primary department name (supports regional languages)", alias="primaryDepartmentName"
+        None,
+        description="Primary department name (supports regional languages)",
+        alias="primaryDepartmentName",
     )
     managed_departments: List[str] = Field(..., alias="managedDepartments")
     teaching_subjects: List[dict] = Field(..., alias="teachingSubjects")
@@ -555,10 +583,14 @@ class AcademicStatistics(BaseModel):
     total_sections: int = Field(..., alias="totalSections")
     total_subjects: int = Field(..., alias="totalSubjects")
     active_timetable_entries: int = Field(..., alias="activeTimetableEntries")
-    teachers_with_cross_dept_assignments: int = Field(..., alias="teachersWithCrossDeptAssignments")
+    teachers_with_cross_dept_assignments: int = Field(
+        ..., alias="teachersWithCrossDeptAssignments"
+    )
     departments: Optional[dict] = Field(None, description="Department-wise breakdown")
     language_breakdown: Optional[dict] = Field(
-        None, description="Subjects by language of instruction", alias="languageBreakdown"
+        None,
+        description="Subjects by language of instruction",
+        alias="languageBreakdown",
     )
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)

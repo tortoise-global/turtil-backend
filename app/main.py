@@ -14,10 +14,9 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api.cms.routes import router as cms_router
@@ -33,7 +32,6 @@ from app.core.monitoring import (
 from app.core.redis_client import redis_client
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.db.database import Base, engine
-from app.models.cms import models
 
 
 @asynccontextmanager
@@ -57,14 +55,14 @@ async def lifespan(app: FastAPI):
             connection.execute(text("SELECT 1"))
         logger.info("✅ Successfully connected to PostgreSQL database")
     except Exception as e:
-        logger.error(f"❌ Failed to connect to PostgreSQL database: {e}")
+        logger.error("❌ Failed to connect to PostgreSQL database: %s", e)
 
     # Create database tables
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("✅ Database tables created/verified successfully")
     except Exception as e:
-        logger.error(f"❌ Failed to create database tables: {e}")
+        logger.error("❌ Failed to create database tables: %s", e)
 
     # Test Redis connection
     if redis_client.is_available():
@@ -146,9 +144,11 @@ async def logging_middleware(request: Request, call_next):
     process_time = time.time() - start_time
     logger = logging.getLogger("api")
     logger.info(
-        f"{request.method} {request.url.path} - "
-        f"Status: {response.status_code} - "
-        f"Time: {process_time:.4f}s"
+        "%s %s - Status: %s - Time: %.4fs",
+        request.method,
+        request.url.path,
+        response.status_code,
+        process_time,
     )
 
     return response

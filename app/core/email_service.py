@@ -66,11 +66,11 @@ class EmailService:
             server.sendmail(self.sender_email, to_email, text)
             server.quit()
 
-            logger.info(f"Email sent successfully to {to_email}")
+            logger.info("Email sent successfully to %s", to_email)
             return True
 
         except Exception as e:
-            logger.error(f"Error sending email to {to_email}: {str(e)}")
+            logger.error("Error sending email to %s: %s", to_email, str(e))
             return False
 
     def send_otp_email(
@@ -114,15 +114,15 @@ Best regards,
                 <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #007bff;">
                     <h2 style="color: #333; margin-top: 0;">Email Verification</h2>
                     <p style="color: #666; font-size: 16px;">Hello,</p>
-                    
+
                     <p style="color: #666; font-size: 16px;">
                         Your One-Time Password (OTP) for <strong>{college_display}</strong> is:
                     </p>
-                    
+
                     <div style="background-color: #007bff; color: white; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; border-radius: 4px; margin: 20px 0; letter-spacing: 2px;">
                         {otp}
                     </div>
-                    
+
                     <p style="color: #666; font-size: 14px;">
                         <strong>Important:</strong>
                     </p>
@@ -131,9 +131,9 @@ Best regards,
                         <li>Please do not share this code with anyone</li>
                         <li>If you did not request this OTP, please ignore this email</li>
                     </ul>
-                    
+
                     <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-                    
+
                     <p style="color: #999; font-size: 12px; text-align: center;">
                         Best regards,<br>
                         <strong>{college_display} Team</strong>

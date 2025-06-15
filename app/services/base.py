@@ -48,7 +48,9 @@ class BaseService:
         try:
             return db.query(self.model).filter(self.model.id == id).first()
         except SQLAlchemyError as e:
-            self.logger.error(f"Error getting {self.model.__name__} with id {id}: {e}")
+            self.logger.error(
+                "Error getting %s with id %s: %s", self.model.__name__, id, e
+            )
             raise
 
     def get_multi(
@@ -80,7 +82,7 @@ class BaseService:
 
             return query.offset(skip).limit(limit).all()
         except SQLAlchemyError as e:
-            self.logger.error(f"Error getting {self.model.__name__} records: {e}")
+            self.logger.error("Error getting %s records: %s", self.model.__name__, e)
             raise
 
     def create(self, db: Session, *, obj_in: CreateSchemaType) -> ModelType:
@@ -105,16 +107,16 @@ class BaseService:
             db.commit()
             db.refresh(db_obj)
 
-            self.logger.info(f"Created {self.model.__name__} with id {db_obj.id}")
+            self.logger.info("Created %s with id %s", self.model.__name__, db_obj.id)
             return db_obj
 
         except IntegrityError as e:
             db.rollback()
-            self.logger.error(f"Integrity error creating {self.model.__name__}: {e}")
+            self.logger.error("Integrity error creating %s: %s", self.model.__name__, e)
             raise ValueError("Record already exists or violates constraints")
         except SQLAlchemyError as e:
             db.rollback()
-            self.logger.error(f"Error creating {self.model.__name__}: {e}")
+            self.logger.error("Error creating %s: %s", self.model.__name__, e)
             raise
 
     def update(
@@ -148,12 +150,12 @@ class BaseService:
             db.commit()
             db.refresh(db_obj)
 
-            self.logger.info(f"Updated {self.model.__name__} with id {db_obj.id}")
+            self.logger.info("Updated %s with id %s", self.model.__name__, db_obj.id)
             return db_obj
 
         except SQLAlchemyError as e:
             db.rollback()
-            self.logger.error(f"Error updating {self.model.__name__}: {e}")
+            self.logger.error("Error updating %s: %s", self.model.__name__, e)
             raise
 
     def remove(self, db: Session, *, id: UUID) -> ModelType:
@@ -171,13 +173,13 @@ class BaseService:
             if obj:
                 db.delete(obj)
                 db.commit()
-                self.logger.info(f"Deleted {self.model.__name__} with id {id}")
+                self.logger.info("Deleted %s with id %s", self.model.__name__, id)
                 return obj
             return None
 
         except SQLAlchemyError as e:
             db.rollback()
-            self.logger.error(f"Error deleting {self.model.__name__}: {e}")
+            self.logger.error("Error deleting %s: %s", self.model.__name__, e)
             raise
 
     def exists(self, db: Session, *, id: UUID) -> bool:
@@ -193,7 +195,9 @@ class BaseService:
         try:
             return db.query(self.model).filter(self.model.id == id).first() is not None
         except SQLAlchemyError as e:
-            self.logger.error(f"Error checking existence of {self.model.__name__}: {e}")
+            self.logger.error(
+                "Error checking existence of %s: %s", self.model.__name__, e
+            )
             raise
 
     def count(self, db: Session, *, filters: Optional[Dict[str, Any]] = None) -> int:
@@ -216,5 +220,5 @@ class BaseService:
 
             return query.count()
         except SQLAlchemyError as e:
-            self.logger.error(f"Error counting {self.model.__name__} records: {e}")
+            self.logger.error("Error counting %s records: %s", self.model.__name__, e)
             raise

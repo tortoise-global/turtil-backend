@@ -65,13 +65,15 @@ class AuthService(BaseService):
         # Send OTP for signup
         try:
             otp = send_email_otp(request.email)
-            self.logger.info(f"Signup OTP sent to {request.email}")
+            self.logger.info("Signup OTP sent to %s", request.email)
             return {
                 "message": "OTP sent successfully to your email address",
                 "success": True,
             }
         except Exception as e:
-            self.logger.error(f"Failed to send signup OTP to {request.email}: {str(e)}")
+            self.logger.error(
+                "Failed to send signup OTP to %s: %s", request.email, str(e)
+            )
             raise HTTPException(
                 status_code=500, detail="Failed to send OTP. Please try again."
             )
@@ -135,7 +137,7 @@ class AuthService(BaseService):
         db.commit()
         db.refresh(db_user)
 
-        self.logger.info(f"User signup completed: {request.email}")
+        self.logger.info("User signup completed: %s", request.email)
         return {
             "message": "Signup completed successfully. Please login to complete your profile.",
             "success": True,
@@ -159,9 +161,9 @@ class AuthService(BaseService):
         )
 
         if user:
-            self.logger.info(f"User authenticated: {user.username}")
+            self.logger.info("User authenticated: %s", user.username)
         else:
-            self.logger.warning(f"Authentication failed for: {credentials.userName}")
+            self.logger.warning("Authentication failed for: %s", credentials.userName)
 
         return user
 
@@ -219,7 +221,7 @@ class AuthService(BaseService):
         user.hashed_password = get_password_hash(new_password)
         db.commit()
 
-        self.logger.info(f"Password changed for user: {user_email}")
+        self.logger.info("Password changed for user: %s", user_email)
         return {"message": "Password changed successfully"}
 
     def complete_profile(
@@ -259,7 +261,7 @@ class AuthService(BaseService):
         db.commit()
         db.refresh(user)
 
-        self.logger.info(f"Profile completed for user: {user.email}")
+        self.logger.info("Profile completed for user: %s", user.email)
         return {"message": "Profile completed successfully", "profile_completed": True}
 
     def revoke_admin_access(
@@ -299,7 +301,7 @@ class AuthService(BaseService):
         admin_user.is_active = False
         db.commit()
 
-        self.logger.info(f"Admin access revoked: {admin_id} by {current_user_id}")
+        self.logger.info("Admin access revoked: %s by %s", admin_id, current_user_id)
         return {
             "message": "Admin access revoked immediately",
             "user_id": admin_id,
@@ -338,7 +340,7 @@ class AuthService(BaseService):
         admin_user.is_active = True
         db.commit()
 
-        self.logger.info(f"Admin access restored: {admin_id} by {current_user_id}")
+        self.logger.info("Admin access restored: %s by %s", admin_id, current_user_id)
         return {
             "message": "Admin access restored",
             "user_id": admin_id,
@@ -377,7 +379,7 @@ class AuthService(BaseService):
             Logout response
         """
         auth_manager.redis.invalidate_user_cache(str(user.id))
-        self.logger.info(f"User logged out: {user.username}")
+        self.logger.info("User logged out: %s", user.username)
 
         return {"message": "Logged out successfully", "user_id": str(user.id)}
 

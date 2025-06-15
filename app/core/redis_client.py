@@ -27,7 +27,7 @@ class UpstashRedisClient:
                     "Upstash Redis credentials not found. Operating without cache."
                 )
         except Exception as e:
-            logger.error(f"Failed to initialize Upstash Redis client: {e}")
+            logger.error("Failed to initialize Upstash Redis client: %s", e)
             self.redis = None
 
     def is_available(self) -> bool:
@@ -38,7 +38,7 @@ class UpstashRedisClient:
             result = self.redis.ping()
             return result == "PONG"
         except Exception as e:
-            logger.error(f"Redis availability check failed: {e}")
+            logger.error("Redis availability check failed: %s", e)
             return False
 
     # User Cache Methods
@@ -55,10 +55,10 @@ class UpstashRedisClient:
                 key, settings.REDIS_USER_CACHE_TTL, serialized_data
             )
 
-            logger.info(f"Cached user data for user_id: {user_id}")
+            logger.info("Cached user data for user_id: %s", user_id)
             return result == "OK"
         except Exception as e:
-            logger.error(f"Failed to cache user {user_id}: {e}")
+            logger.error("Failed to cache user %s: %s", user_id, e)
             return False
 
     def get_cached_user(self, user_id: str) -> Optional[Dict[str, Any]]:
@@ -72,13 +72,13 @@ class UpstashRedisClient:
 
             if cached_data:
                 user_data = json.loads(cached_data)
-                logger.info(f"Retrieved cached user data for user_id: {user_id}")
+                logger.info("Retrieved cached user data for user_id: %s", user_id)
                 return user_data
 
-            logger.info(f"No cached data found for user_id: {user_id}")
+            logger.info("No cached data found for user_id: %s", user_id)
             return None
         except Exception as e:
-            logger.error(f"Failed to retrieve cached user {user_id}: {e}")
+            logger.error("Failed to retrieve cached user %s: %s", user_id, e)
             return None
 
     def invalidate_user_cache(self, user_id: str) -> bool:
@@ -89,10 +89,10 @@ class UpstashRedisClient:
         try:
             key = f"user:{user_id}"
             result = self.redis.delete(key)
-            logger.info(f"Invalidated cache for user_id: {user_id}")
+            logger.info("Invalidated cache for user_id: %s", user_id)
             return result > 0
         except Exception as e:
-            logger.error(f"Failed to invalidate cache for user {user_id}: {e}")
+            logger.error("Failed to invalidate cache for user %s: %s", user_id, e)
             return False
 
     # Blacklist Methods for Immediate Revocation
@@ -116,10 +116,10 @@ class UpstashRedisClient:
             # Also invalidate user cache
             self.invalidate_user_cache(user_id)
 
-            logger.info(f"Blacklisted user_id: {user_id}, reason: {reason}")
+            logger.info("Blacklisted user_id: %s, reason: %s", user_id, reason)
             return result == "OK"
         except Exception as e:
-            logger.error(f"Failed to blacklist user {user_id}: {e}")
+            logger.error("Failed to blacklist user %s: %s", user_id, e)
             return False
 
     def is_user_blacklisted(self, user_id: str) -> bool:
@@ -132,12 +132,12 @@ class UpstashRedisClient:
             result = self.redis.get(key)
 
             if result:
-                logger.info(f"User {user_id} is blacklisted")
+                logger.info("User %s is blacklisted", user_id)
                 return True
 
             return False
         except Exception as e:
-            logger.error(f"Failed to check blacklist for user {user_id}: {e}")
+            logger.error("Failed to check blacklist for user %s: %s", user_id, e)
             return False
 
     def remove_from_blacklist(self, user_id: str) -> bool:
@@ -148,10 +148,10 @@ class UpstashRedisClient:
         try:
             key = f"blacklist:{user_id}"
             result = self.redis.delete(key)
-            logger.info(f"Removed user_id {user_id} from blacklist")
+            logger.info("Removed user_id %s from blacklist", user_id)
             return result > 0
         except Exception as e:
-            logger.error(f"Failed to remove user {user_id} from blacklist: {e}")
+            logger.error("Failed to remove user %s from blacklist: %s", user_id, e)
             return False
 
     # Token Management
@@ -166,10 +166,10 @@ class UpstashRedisClient:
 
             result = self.redis.setex(key, expires_in, json.dumps(token_data))
 
-            logger.info(f"Cached token for user_id: {user_id}")
+            logger.info("Cached token for user_id: %s", user_id)
             return result == "OK"
         except Exception as e:
-            logger.error(f"Failed to cache token: {e}")
+            logger.error("Failed to cache token: %s", e)
             return False
 
     def get_token_data(self, token_id: str) -> Optional[Dict[str, Any]]:
@@ -186,7 +186,7 @@ class UpstashRedisClient:
 
             return None
         except Exception as e:
-            logger.error(f"Failed to retrieve token data: {e}")
+            logger.error("Failed to retrieve token data: %s", e)
             return None
 
     def invalidate_token(self, token_id: str) -> bool:
@@ -199,7 +199,7 @@ class UpstashRedisClient:
             result = self.redis.delete(key)
             return result > 0
         except Exception as e:
-            logger.error(f"Failed to invalidate token: {e}")
+            logger.error("Failed to invalidate token: %s", e)
             return False
 
     # Bulk Operations
@@ -225,10 +225,10 @@ class UpstashRedisClient:
                 except Exception:
                     continue
 
-            logger.info(f"Invalidated {deleted_count} tokens for user_id: {user_id}")
+            logger.info("Invalidated %s tokens for user_id: %s", deleted_count, user_id)
             return True
         except Exception as e:
-            logger.error(f"Failed to invalidate all tokens for user {user_id}: {e}")
+            logger.error("Failed to invalidate all tokens for user %s: %s", user_id, e)
             return False
 
     # Statistics and Monitoring
@@ -250,7 +250,7 @@ class UpstashRedisClient:
                 "cached_tokens": token_keys,
             }
         except Exception as e:
-            logger.error(f"Failed to get cache stats: {e}")
+            logger.error("Failed to get cache stats: %s", e)
             return {"status": "error", "error": str(e)}
 
 

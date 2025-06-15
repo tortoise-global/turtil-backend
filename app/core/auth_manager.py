@@ -87,7 +87,7 @@ class AuthenticationManager:
 
             # Check if user is blacklisted (immediate revocation)
             if self.redis.is_available() and self.redis.is_user_blacklisted(user_id):
-                logger.warning(f"Blocked access for blacklisted user: {user_id}")
+                logger.warning("Blocked access for blacklisted user: %s", user_id)
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Access revoked",
@@ -98,7 +98,7 @@ class AuthenticationManager:
             if self.redis.is_available() and token_id:
                 token_data = self.redis.get_token_data(token_id)
                 if not token_data:
-                    logger.warning(f"Token not found in cache: {token_id}")
+                    logger.warning("Token not found in cache: %s", token_id)
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail="Token not found",
@@ -108,7 +108,7 @@ class AuthenticationManager:
             return payload
 
         except JWTError as e:
-            logger.error(f"JWT verification failed: {e}")
+            logger.error("JWT verification failed: %s", e)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
@@ -122,24 +122,24 @@ class AuthenticationManager:
             if self.redis.is_available():
                 cached_user = self.redis.get_cached_user(user_id)
                 if cached_user:
-                    logger.info(f"User {user_id} retrieved from cache")
+                    logger.info("User %s retrieved from cache", user_id)
                     # Convert cached dict back to user-like object
                     return self._dict_to_user_object(cached_user)
 
             # Cache miss or Redis unavailable - fetch from database
-            logger.info(f"Cache miss for user {user_id}, fetching from database")
+            logger.info("Cache miss for user %s, fetching from database", user_id)
             user = db.query(CMSUser).filter(CMSUser.id == user_id).first()
 
             if user and self.redis.is_available():
                 # Cache the user data for next time
                 user_dict = self._user_to_dict(user)
                 self.redis.cache_user(user_id, user_dict)
-                logger.info(f"Cached user {user_id} from database")
+                logger.info("Cached user %s from database", user_id)
 
             return user
 
         except Exception as e:
-            logger.error(f"Error getting user {user_id}: {e}")
+            logger.error("Error getting user %s: %s", user_id, e)
             return None
 
     def authenticate_user(
@@ -158,24 +158,26 @@ class AuthenticationManager:
             )
 
             if not user:
-                logger.warning(f"User not found: {username_or_email}")
+                logger.warning("User not found: %s", username_or_email)
                 return None
 
             # Verify password
             if not verify_password(password, user.password_hash):
-                logger.warning(f"Invalid password for user: {username_or_email}")
+                logger.warning("Invalid password for user: %s", username_or_email)
                 return None
 
             # Check if user is active
             if not user.is_active:
-                logger.warning(f"Inactive user attempted login: {username_or_email}")
+                logger.warning("Inactive user attempted login: %s", username_or_email)
                 return None
 
             # Check Redis blacklist
             if self.redis.is_available() and self.redis.is_user_blacklisted(
                 str(user.id)
             ):
-                logger.warning(f"Blacklisted user attempted login: {username_or_email}")
+                logger.warning(
+                    "Blacklisted user attempted login: %s", username_or_email
+                )
                 return None
 
             # Update last login
@@ -187,11 +189,11 @@ class AuthenticationManager:
                 user_dict = self._user_to_dict(user)
                 self.redis.cache_user(str(user.id), user_dict)
 
-            logger.info(f"User authenticated successfully: {username_or_email}")
+            logger.info("User authenticated successfully: %s", username_or_email)
             return user
 
         except Exception as e:
-            logger.error(f"Authentication error for {username_or_email}: {e}")
+            logger.error("Authentication error for %s: %s", username_or_email, e)
             return None
 
     def revoke_user_access(self, user_id: str, reason: str = "admin_revoked") -> bool:
@@ -211,11 +213,11 @@ class AuthenticationManager:
                 )
                 success = False
 
-            logger.info(f"User access revoked: {user_id}, reason: {reason}")
+            logger.info("User access revoked: %s, reason: %s", user_id, reason)
             return success
 
         except Exception as e:
-            logger.error(f"Error revoking access for user {user_id}: {e}")
+            logger.error("Error revoking access for user %s: %s", user_id, e)
             return False
 
     def restore_user_access(self, user_id: str) -> bool:
@@ -223,13 +225,13 @@ class AuthenticationManager:
         try:
             if self.redis.is_available():
                 success = self.redis.remove_from_blacklist(user_id)
-                logger.info(f"User access restored: {user_id}")
+                logger.info("User access restored: %s", user_id)
                 return success
 
             return False
 
         except Exception as e:
-            logger.error(f"Error restoring access for user {user_id}: {e}")
+            logger.error("Error restoring access for user %s: %s", user_id, e)
             return False
 
     def invalidate_token(self, token: str) -> bool:
@@ -246,7 +248,7 @@ class AuthenticationManager:
             return False
 
         except Exception as e:
-            logger.error(f"Error invalidating token: {e}")
+            logger.error("Error invalidating token: %s", e)
             return False
 
     def get_authentication_status(self, user_id: str) -> Dict[str, Any]:
@@ -277,7 +279,7 @@ class AuthenticationManager:
             return status_info
 
         except Exception as e:
-            logger.error(f"Error getting auth status for user {user_id}: {e}")
+            logger.error("Error getting auth status for user %s: %s", user_id, e)
             return {"error": str(e)}
 
     def _user_to_dict(self, user: CMSUser) -> Dict[str, Any]:
