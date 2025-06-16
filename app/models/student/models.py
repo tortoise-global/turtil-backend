@@ -13,12 +13,12 @@ from sqlalchemy import (
     Text,
     Time,
 )
-from sqlalchemy.dialects.postgresql import ENUM, UUID
+from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.database import Base
-from app.models.cms.models import Branch, CMSUser, College, Degree, Department, Subject
+from app.models.cms.models import Branch, CMSUser, College, Degree, Department, Subject, UUID
 
 student_user_role = ENUM("student", name="student_user_role", create_type=False)
 

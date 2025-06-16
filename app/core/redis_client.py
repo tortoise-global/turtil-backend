@@ -21,7 +21,12 @@ class UpstashRedisClient:
                 self.redis = Redis(
                     url=settings.UPSTASH_REDIS_URL, token=settings.UPSTASH_REDIS_TOKEN
                 )
-                logger.info("Upstash Redis client initialized successfully")
+                # Test the connection immediately during initialization
+                if self._test_connection():
+                    logger.info("Upstash Redis client initialized and connected successfully")
+                else:
+                    logger.error("Redis client initialized but connection test failed")
+                    self.redis = None
             else:
                 logger.warning(
                     "Upstash Redis credentials not found. Operating without cache."
@@ -30,16 +35,45 @@ class UpstashRedisClient:
             logger.error("Failed to initialize Upstash Redis client: %s", e)
             self.redis = None
 
-    def is_available(self) -> bool:
+    def _test_connection(self) -> bool:
+        """Test Redis connection with multiple operations to ensure authentication works."""
         if not self.redis:
             return False
         try:
-            # Test connection with ping
-            result = self.redis.ping()
-            return result == "PONG"
+            # Test 1: Ping
+            ping_result = self.redis.ping()
+            if ping_result != "PONG":
+                logger.error("Redis ping failed: expected 'PONG', got %s", ping_result)
+                return False
+            
+            # Test 2: Set and get a test key to verify read/write permissions
+            test_key = "connection_test"
+            test_value = "test_value_123"
+            
+            # Set test key
+            set_result = self.redis.set(test_key, test_value)
+            if set_result not in ["OK", True]:
+                logger.error("Redis SET operation failed: %s", set_result)
+                return False
+            
+            # Get test key
+            get_result = self.redis.get(test_key)
+            if get_result != test_value:
+                logger.error("Redis GET operation failed: expected %s, got %s", test_value, get_result)
+                return False
+            
+            # Clean up test key
+            self.redis.delete(test_key)
+            
+            return True
+            
         except Exception as e:
-            logger.error("Redis availability check failed: %s", e)
+            logger.error("Redis connection test failed: %s", e)
             return False
+
+    def is_available(self) -> bool:
+        """Check if Redis is available by testing the connection."""
+        return self._test_connection()
 
     # User Cache Methods
     def cache_user(self, user_id: str, user_data: Dict[str, Any]) -> bool:

@@ -21,7 +21,42 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import ENUM, UUID
+from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy import TypeDecorator, String as SQLString
+from sqlalchemy.dialects import postgresql
+
+class UUID(TypeDecorator):
+    """Database-agnostic UUID type that works with both PostgreSQL and SQLite."""
+    impl = SQLString
+    cache_ok = True
+
+    def __init__(self, as_uuid=True, *args, **kwargs):
+        self.as_uuid = as_uuid
+        super().__init__(*args, **kwargs)
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(postgresql.UUID(as_uuid=self.as_uuid))
+        else:
+            return dialect.type_descriptor(SQLString(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == 'postgresql':
+            return value
+        else:
+            if not isinstance(value, str):
+                return str(value)
+            return value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == 'postgresql':
+            return value
+        else:
+            return uuid.UUID(value) if isinstance(value, str) and self.as_uuid else value
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 

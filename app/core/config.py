@@ -105,7 +105,7 @@ except ImportError:
             os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
         )
 
-        DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./turtil.db")
+        DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./db/turtil.db")
 
         CORS_ORIGINS = ["http://localhost:3000", "http://localhost:8080"]
         ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
@@ -121,8 +121,8 @@ except ImportError:
         AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
         S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 
-        UPSTASH_REDIS_URL = os.getenv("UPSTASH_REDIS_URL", "redis://localhost:6379")
-        UPSTASH_REDIS_TOKEN = os.getenv("UPSTASH_REDIS_TOKEN")
+        UPSTASH_REDIS_URL = os.getenv("UPSTASH_REDIS_URL", "http://localhost:8079")
+        UPSTASH_REDIS_TOKEN = os.getenv("UPSTASH_REDIS_TOKEN", "example_token")
         REDIS_USER_CACHE_TTL = int(os.getenv("REDIS_USER_CACHE_TTL", "300"))
         REDIS_BLACKLIST_TTL = int(os.getenv("REDIS_BLACKLIST_TTL", "86400"))
 
