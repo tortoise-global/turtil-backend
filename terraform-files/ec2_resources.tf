@@ -43,7 +43,7 @@ data "aws_ami" "ubuntu" {
 # Security Group for EC2 instances
 resource "aws_security_group" "ec2_sg" {
   name        = "${terraform.workspace}-cms-api-sg"
-  description = "Security group for CMS FastAPI EC2 instances"
+  description = "Security group for CMS Bun API EC2 instances"
   vpc_id      = data.aws_vpc.this.id
 
   dynamic "ingress" {
@@ -71,7 +71,7 @@ resource "aws_security_group" "ec2_sg" {
 }
 
 # Launch Template for ASG
-resource "aws_launch_template" "cms_fast_api" {
+resource "aws_launch_template" "cms_bun_api" {
   name          = "${terraform.workspace}-cms-api-lt"
   image_id      = data.aws_ami.ubuntu.id
   instance_type = var.ec2_instance_type[terraform.workspace]
@@ -126,7 +126,7 @@ resource "aws_launch_template" "cms_fast_api" {
 }
 
 # Auto Scaling Group
-resource "aws_autoscaling_group" "cms_fast_api" {
+resource "aws_autoscaling_group" "cms_bun_api" {
   name                = "${terraform.workspace}-cms-api-asg"
   min_size            = var.asg_min_size[terraform.workspace]
   desired_capacity    = var.asg_desired_capacity[terraform.workspace]
@@ -135,7 +135,7 @@ resource "aws_autoscaling_group" "cms_fast_api" {
   target_group_arns   = [module.example_alb.target_group_arn]
 
   launch_template {
-    id      = aws_launch_template.cms_fast_api.id
+    id      = aws_launch_template.cms_bun_api.id
     version = "$Latest"
   }
 
@@ -153,9 +153,9 @@ resource "aws_autoscaling_group" "cms_fast_api" {
 }
 
 # Scaling Policy for ASG (Target Tracking based on CPU Utilization)
-resource "aws_autoscaling_policy" "cms_fast_api_target_tracking" {
+resource "aws_autoscaling_policy" "cms_bun_api_target_tracking" {
   name                   = "${terraform.workspace}-cms-api-target-tracking"
-  autoscaling_group_name = aws_autoscaling_group.cms_fast_api.name
+  autoscaling_group_name = aws_autoscaling_group.cms_bun_api.name
   policy_type            = "TargetTrackingScaling"
 
   target_tracking_configuration {
@@ -214,7 +214,7 @@ output "cloudfront_with_alb_domain_name" {
 }
 
 output "asg_name" {
-  value = aws_autoscaling_group.cms_fast_api.name
+  value = aws_autoscaling_group.cms_bun_api.name
 }
 
 
@@ -250,7 +250,7 @@ output "asg_name" {
 # # Security Group for EC2 instances
 # resource "aws_security_group" "ec2_sg" {
 #   name        = "${terraform.workspace}-cms-fast-api-sg"
-#   description = "Security group for CMS FastAPI EC2 instances"
+#   description = "Security group for CMS Bun API EC2 instances"
 #   vpc_id      = data.aws_vpc.this.id
 
 #   dynamic "ingress" {
@@ -278,7 +278,7 @@ output "asg_name" {
 # }
 
 # # Launch Template for ASG
-# resource "aws_launch_template" "cms_fast_api" {
+# resource "aws_launch_template" "cms_bun_api" {
 #   name          = "${terraform.workspace}-cms-fast-api-lt"
 #   image_id      = data.aws_ami.ubuntu.id
 #   instance_type = var.ec2_instance_type[terraform.workspace]
@@ -310,7 +310,7 @@ output "asg_name" {
 # }
 
 # # Auto Scaling Group
-# resource "aws_autoscaling_group" "cms_fast_api" {
+# resource "aws_autoscaling_group" "cms_bun_api" {
 #   name                = "${terraform.workspace}-cms-fast-api-asg"
 #   min_size            = var.asg_min_size[terraform.workspace]
 #   desired_capacity    = var.asg_desired_capacity[terraform.workspace]
@@ -319,7 +319,7 @@ output "asg_name" {
 #   target_group_arns   = [module.example_alb.target_group_arn]
 
 #   launch_template {
-#     id      = aws_launch_template.cms_fast_api.id
+#     id      = aws_launch_template.cms_bun_api.id
 #     version = "$Latest"
 #   }
 
@@ -337,9 +337,9 @@ output "asg_name" {
 # }
 
 # # Scaling Policy for ASG (Target Tracking based on CPU Utilization)
-# resource "aws_autoscaling_policy" "cms_fast_api_target_tracking" {
+# resource "aws_autoscaling_policy" "cms_bun_api_target_tracking" {
 #   name                   = "${terraform.workspace}-cms-fast-api-target-tracking"
-#   autoscaling_group_name = aws_autoscaling_group.cms_fast_api.name
+#   autoscaling_group_name = aws_autoscaling_group.cms_bun_api.name
 #   policy_type            = "TargetTrackingScaling"
 
 #   target_tracking_configuration {
@@ -398,5 +398,5 @@ output "asg_name" {
 # }
 
 # output "asg_name" {
-#   value = aws_autoscaling_group.cms_fast_api.name
+#   value = aws_autoscaling_group.cms_bun_api.name
 # }

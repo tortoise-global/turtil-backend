@@ -1,1 +1,0 @@
-# Shared schemas between CMS and Student apps

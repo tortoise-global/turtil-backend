@@ -1,1 +1,0 @@
-# Student app models

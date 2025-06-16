@@ -1,0 +1,36 @@
+{
+  "name": "cms-backend-bun",
+  "version": "1.0.0",
+  "description": "CMS Backend API built with Bun and Drizzle",
+  "main": "src/server.ts",
+  "scripts": {
+    "dev": "bun run --watch src/server.ts",
+    "build": "bun build src/server.ts --outdir dist",
+    "start": "bun run dist/server.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun run src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@hono/swagger-ui": "^0.5.2",
+    "@hono/zod-openapi": "^0.19.8",
+    "@upstash/redis": "^1.25.1",
+    "bcryptjs": "^2.4.3",
+    "drizzle-orm": "^0.33.0",
+    "hono": "^4.6.10",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.15",
+    "pg": "^8.11.3",
+    "uuid": "^10.0.0",
+    "zod": "^3.25.64"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/nodemailer": "^6.4.15",
+    "@types/uuid": "^10.0.0",
+    "@types/pg": "^8.10.9",
+    "drizzle-kit": "^0.24.0",
+    "bun-types": "latest"
+  }
+}

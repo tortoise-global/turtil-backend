@@ -1,27 +1,33 @@
-FROM python:3.11-slim
+# Use Bun runtime as base image
+FROM oven/bun:1.2.15-slim
 
+# Create app user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
+# Set working directory
 WORKDIR /app
 
-COPY requirements.txt .
+# Copy package files first for better caching
+COPY package.json bun.lock* ./
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install dependencies
+RUN bun install --frozen-lockfile --production
 
+# Copy application code
 COPY . .
 
+# Set up app directory ownership
 RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
 USER appuser
 
+# Expose port
 EXPOSE 8000
 
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health/ || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Start the application
+CMD ["bun", "run", "src/server.ts"]

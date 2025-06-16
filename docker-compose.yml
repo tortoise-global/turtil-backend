@@ -6,10 +6,17 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Bun/Node.js specific
+      - NODE_ENV=${NODE_ENV}
+      - PORT=${PORT}
       - DATABASE_URL=${DATABASE_URL}
+      
+      # Authentication config
       - SECRET_KEY=${SECRET_KEY}
       - ALGORITHM=${ALGORITHM}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      
+      # Application config
       - PROJECT_NAME=${PROJECT_NAME}
       - VERSION=${VERSION}
       - ENVIRONMENT=${ENVIRONMENT}
@@ -19,21 +26,29 @@ services:
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
       - RATE_LIMIT_CALLS=${RATE_LIMIT_CALLS}
       - RATE_LIMIT_PERIOD=${RATE_LIMIT_PERIOD}
+      
+      # OTP Configuration
       - OTP_SECRET=${OTP_SECRET}
       - OTP_EXPIRY_MINUTES=${OTP_EXPIRY_MINUTES}
+      
+      # AWS Configuration
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      
+      # Redis Configuration
       - UPSTASH_REDIS_URL=${UPSTASH_REDIS_URL}
       - UPSTASH_REDIS_TOKEN=${UPSTASH_REDIS_TOKEN}
       - REDIS_USER_CACHE_TTL=${REDIS_USER_CACHE_TTL}
       - REDIS_BLACKLIST_TTL=${REDIS_BLACKLIST_TTL}
+      
+      # Email Configuration
       - GMAIL_EMAIL=${GMAIL_EMAIL}
       - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3

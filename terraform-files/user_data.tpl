@@ -74,32 +74,51 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Bun/Node.js specific
+      - NODE_ENV=${environment}
+      - PORT=8000
       - DATABASE_URL=${database_url}
+      - JWT_SECRET=${secret_key}
+      - JWT_EXPIRES_IN=30m
+      
+      # Legacy Python config (for compatibility)
       - SECRET_KEY=${secret_key}
       - ALGORITHM=${algorithm}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${access_token_expire_minutes}
+      
+      # Application config
       - PROJECT_NAME=${project_name}
       - VERSION=${version}
       - ENVIRONMENT=${environment}
       - DEBUG=${debug}
       - LOG_LEVEL=${log_level}
-      - CORS_ORIGINS=["*", "http://localhost:3000", "http://localhost:8080"]
-      - ALLOWED_HOSTS=["*", "localhost", "127.0.0.1", "0.0.0.0"]
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+      - ALLOWED_HOSTS=*,localhost,127.0.0.1,0.0.0.0
       - RATE_LIMIT_CALLS=${rate_limit_calls}
       - RATE_LIMIT_PERIOD=${rate_limit_period}
+      
+      # OTP Configuration
       - OTP_SECRET=${otp_secret}
       - OTP_EXPIRY_MINUTES=${otp_expiry_minutes}
+      
+      # AWS Configuration
       - AWS_ACCESS_KEY_ID=${aws_access_key_id}
       - AWS_SECRET_ACCESS_KEY=${aws_secret_access_key}
       - AWS_REGION=ap-south-1
       - S3_BUCKET_NAME=${s3_bucket_name}
+      
+      # Redis Configuration (optional)
       - UPSTASH_REDIS_URL=${upstash_redis_url}
       - UPSTASH_REDIS_TOKEN=${upstash_redis_token}
       - REDIS_USER_CACHE_TTL=${redis_user_cache_ttl}
       - REDIS_BLACKLIST_TTL=${redis_blacklist_ttl}
+      
+      # Email Configuration
       - GMAIL_EMAIL=${gmail_email}
       - GMAIL_APP_PASSWORD=${gmail_app_password}
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    volumes:
+      - /app/data:/app/data
+    command: ["bun", "run", "src/server.ts"]
     restart: always
     networks:
       - default
