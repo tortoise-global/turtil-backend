@@ -281,23 +281,19 @@ auth.openapi(getUserRoute, authenticateToken, async (c) => {
     const { userId } = c.req.valid('param');
     const user = await authService.getUserById(userId);
     
-    // Format response to match frontend expectations
+    // Format response with simplified user model
     const response = {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
       phone: user.phone,
       role: user.role,
-      status: user.status || 'approved',
-      profileCompleted: user.profileCompleted,
-      collegeName: user.collegeName || '',
-      parentId: user.parentId || '',
-      modelAccess: user.modelAccess || [],
-      resultFormat: user.resultFormat || [],
-      collegeDetails: user.collegeDetails || [],
-      affilliatedUnversity: user.affiliatedUniversity || [],
-      address: user.addressDetails || [],
-      logo: user.logoUrls || [],
+      departmentId: user.departmentId,
+      hodId: user.hodId,
+      collegeId: user.collegeId,
+      staffType: user.staffType,
+      jobTitle: user.jobTitle,
+      isActive: user.isActive,
       lastLogin: user.lastLogin?.toISOString() || null,
       createdAt: user.createdAt?.toISOString() || '',
       updatedAt: user.updatedAt?.toISOString() || ''
@@ -405,25 +401,19 @@ auth.openapi(updateUserRoute, authenticateToken, async (c) => {
     
     const updatedUser = await authService.updateUser(userId, dbUpdates);
     
-    // Format response to match frontend expectations
+    // Format response with simplified user model
     const response = {
       id: updatedUser.id,
       email: updatedUser.email,
       fullName: updatedUser.fullName,
       phone: updatedUser.phone,
       role: updatedUser.role,
-      status: updatedUser.status || 'approved',
-      profileCompleted: updatedUser.profileCompleted,
-      emailVerified: updatedUser.emailVerified,
+      departmentId: updatedUser.departmentId,
+      hodId: updatedUser.hodId,
+      collegeId: updatedUser.collegeId,
+      staffType: updatedUser.staffType,
+      jobTitle: updatedUser.jobTitle,
       isActive: updatedUser.isActive,
-      collegeDetails: updatedUser.collegeDetails,
-      affiliatedUniversity: updatedUser.affiliatedUniversity,
-      addressDetails: updatedUser.addressDetails,
-      logoUrls: updatedUser.logoUrls,
-      collegeName: updatedUser.collegeName,
-      parentId: updatedUser.parentId,
-      modelAccess: updatedUser.modelAccess,
-      resultFormat: updatedUser.resultFormat,
       lastLogin: updatedUser.lastLogin?.toISOString() || null,
       createdAt: updatedUser.createdAt?.toISOString() || '',
       updatedAt: updatedUser.updatedAt?.toISOString() || ''

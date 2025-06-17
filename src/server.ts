@@ -2,6 +2,10 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { swaggerUI } from '@hono/swagger-ui';
 import { initializeDatabase } from './db';
 import authRoutes from './routes/auth';
+import departmentRoutes from './routes/departments';
+import programRoutes from './routes/programs';
+import userRoutes from './routes/users';
+import calendarRoutes from './routes/calendar';
 import { redisService } from './services/redis';
 
 const app = new OpenAPIHono();
@@ -70,8 +74,32 @@ app.doc('/openapi.json', {
       description: 'Authentication related endpoints',
     },
     {
-      name: 'Users',
-      description: 'User management endpoints',
+      name: 'User Management',
+      description: 'User management and role assignment endpoints',
+    },
+    {
+      name: 'Departments',
+      description: 'Department management and HOD assignment endpoints',
+    },
+    {
+      name: 'Programs & Structure',
+      description: 'Academic hierarchy management (batches, degrees, branches, subjects, sections)',
+    },
+    {
+      name: 'Students',
+      description: 'Student management endpoints',
+    },
+    {
+      name: 'Calendar',
+      description: 'Academic calendar and event management endpoints',
+    },
+    {
+      name: 'Timetable',
+      description: 'Timetable and schedule management endpoints',
+    },
+    {
+      name: 'Attendance',
+      description: 'Student attendance tracking endpoints',
     },
   ],
 });
@@ -81,6 +109,10 @@ app.get('/docs', swaggerUI({ url: '/openapi.json' }));
 
 // Routes
 app.route('/cms/auth', authRoutes);
+app.route('/cms/departments', departmentRoutes);
+app.route('/cms/programs', programRoutes);
+app.route('/cms/users', userRoutes);
+app.route('/cms/calendar', calendarRoutes);
 
 // Error handling
 app.onError((error, c) => {
@@ -111,6 +143,10 @@ async function startServer() {
     console.log(`🚀 Server starting on http://localhost:${port}`);
     console.log(`📊 Health check: http://localhost:${port}/health`);
     console.log(`🔐 Auth API: http://localhost:${port}/cms/auth`);
+    console.log(`👥 User Management API: http://localhost:${port}/cms/users`);
+    console.log(`🏢 Departments API: http://localhost:${port}/cms/departments`);
+    console.log(`🎓 Programs & Structure API: http://localhost:${port}/cms/programs`);
+    console.log(`📅 Calendar API: http://localhost:${port}/cms/calendar`);
     console.log(`📚 API Documentation: http://localhost:${port}/docs`);
     console.log(`📋 OpenAPI JSON: http://localhost:${port}/openapi.json`);
     

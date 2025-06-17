@@ -101,12 +101,12 @@ export class AuthService {
       // Hash password
       const passwordHash = await bcrypt.hash(password, 10);
 
-      // Create user
+      // Create user as Principal (first user is always principal)
       const newUsers = await db.insert(cmsUsers).values({
         email,
         passwordHash,
-        emailVerified: true,
-        profileCompleted: false,
+        role: 'principal',
+        isActive: true,
       }).returning();
       
       const newUser = newUsers[0];
@@ -152,7 +152,6 @@ export class AuthService {
           userId: user.id,
           email: user.email,
           role: user.role,
-          profileCompleted: user.profileCompleted
         },
         process.env.JWT_SECRET!,
         { expiresIn: process.env.JWT_EXPIRES_IN || '30m' }
@@ -163,7 +162,7 @@ export class AuthService {
         tokenType: 'bearer',
         cmsUserId: user.id,
         role: user.role || undefined,
-        profileCompleted: user.profileCompleted || false
+        profileCompleted: true // Always true in simplified model
       };
     } catch (error) {
       console.error('Login error:', error);
@@ -193,14 +192,6 @@ export class AuthService {
 
   async updateUser(userId: string, updates: Partial<CMSUser>): Promise<CMSUser> {
     try {
-      // Check if this is a college registration update
-      const isCollegeRegistration = updates.collegeDetails || updates.affiliatedUniversity || updates.addressDetails;
-      
-      if (isCollegeRegistration) {
-        updates.profileCompleted = true;
-        updates.status = 'approved';
-      }
-
       updates.updatedAt = new Date();
 
       const updatedUsers = await db.update(cmsUsers)
