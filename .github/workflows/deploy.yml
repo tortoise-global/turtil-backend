@@ -252,60 +252,22 @@ jobs:
         if: github.ref_name == 'main' || github.ref_name == 'dev'
         working-directory: ./terraform-files
         run: |
-          echo "Verifying deployment health..."
-          ASG_NAME=$(terraform output -raw asg_name)
+          echo "Verifying deployment health via ALB..."
           
-          # Get new instance IDs
-          NEW_INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
-            --auto-scaling-group-names "$ASG_NAME" \
-            --region ${{ secrets.AWS_REGION }} \
-            --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`].InstanceId' \
-            --output text)
+          # Get ALB DNS name from Terraform output
+          ALB_DNS=$(terraform output -raw example_alb_dns_name)
+          ALB_ENDPOINT="http://$ALB_DNS/health/simple"
           
-          echo "New instances: $NEW_INSTANCE_IDS"
+          echo "Testing ALB health endpoint: $ALB_ENDPOINT"
           
-          # Verify health of new instances
-          ALL_HEALTHY=true
-          for INSTANCE_ID in $NEW_INSTANCE_IDS; do
-            echo "Verifying health of instance: $INSTANCE_ID"
-            
-            INSTANCE_IP=$(aws ec2 describe-instances \
-              --instance-ids $INSTANCE_ID \
-              --region ${{ secrets.AWS_REGION }} \
-              --query 'Reservations[0].Instances[0].PublicIpAddress' \
-              --output text)
-            
-            if [ "$INSTANCE_IP" != "None" ] && [ -n "$INSTANCE_IP" ]; then
-              echo "Testing health endpoint: http://$INSTANCE_IP/health/simple"
-              
-              # Wait a bit for the application to fully start
-              sleep 30
-              
-              if ! curl -f --max-time 10 "http://$INSTANCE_IP/health/simple"; then
-                echo "❌ Health check failed for instance $INSTANCE_ID"
-                echo "🔍 Debugging instance $INSTANCE_ID..."
-                
-                # Check if Docker is running
-                echo "Checking Docker status:"
-                aws ssm send-command \
-                  --instance-ids $INSTANCE_ID \
-                  --region ${{ secrets.AWS_REGION }} \
-                  --document-name "AWS-RunShellScript" \
-                  --parameters 'commands=["docker ps", "docker logs $(docker ps -q)", "curl -v http://localhost:8000/health/simple"]' \
-                  --query 'Command.CommandId' \
-                  --output text 2>/dev/null || echo "Could not run debugging commands"
-                
-                ALL_HEALTHY=false
-              else
-                echo "✅ Instance $INSTANCE_ID is healthy"
-              fi
-            fi
-          done
+          # Wait for deployment to complete and ALB to route to healthy instances
+          sleep 60
           
-          if [ "$ALL_HEALTHY" = true ]; then
-            echo "🎉 All instances are healthy! Deployment verification successful."
+          # Test ALB health check (ALB will only route to healthy instances)
+          if curl -f --max-time 30 --retry 3 --retry-delay 10 "$ALB_ENDPOINT"; then
+            echo "✅ ALB health check passed! Deployment verification successful."
           else
-            echo "❌ Some instances failed health checks. Please investigate."
+            echo "❌ ALB health check failed. Deployment may have issues."
             exit 1
           fi
 
