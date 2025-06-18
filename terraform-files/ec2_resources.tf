@@ -102,8 +102,8 @@ resource "aws_launch_template" "cms_fast_api" {
     access_token_expire_minutes = var.app_access_token_expire_minutes
     project_name                = var.app_project_name
     version                     = var.app_version
-    environment                 = terraform.workspace == "main" ? "production" : "development"
-    debug                       = terraform.workspace == "main" ? "false" : "true"
+    environment                 = var.app_environment
+    debug                       = var.app_debug
     log_level                   = var.app_log_level
     rate_limit_calls            = var.app_rate_limit_calls
     rate_limit_period           = var.app_rate_limit_period

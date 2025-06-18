@@ -476,7 +476,7 @@ variable "app_aws_region" {
 variable "app_jwt_secret_key" {
   description = "JWT secret key (alias for SECRET_KEY)"
   type        = string
-  default     = ""
+  sensitive   = true
 }
 
 variable "app_jwt_algorithm" {
@@ -489,5 +489,18 @@ variable "app_jwt_expire_minutes" {
   description = "JWT expiration time in minutes"
   type        = number
   default     = 30
+}
+
+# Environment and Debug Configuration
+variable "app_environment" {
+  description = "Application environment"
+  type        = string
+  default     = "development"
+}
+
+variable "app_debug" {
+  description = "Debug mode"
+  type        = string
+  default     = "true"
 }
 
