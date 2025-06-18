@@ -1,0 +1,303 @@
+name: CI/CD Pipeline with Zero-Downtime Deployment
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+
+    steps:
+      # Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Set up Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      # Terraform Init
+      - name: Terraform Init
+        working-directory: ./terraform-files
+        run: terraform init
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      # Select Terraform Workspace
+      - name: Select Terraform Workspace
+        working-directory: ./terraform-files
+        run: |
+          terraform workspace select dev || terraform workspace new dev
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      # Terraform Plan
+      - name: Terraform Plan
+        working-directory: ./terraform-files
+        run: terraform plan -out=tfplan
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_app_algorithm: ${{ secrets.ALGORITHM }}
+          TF_VAR_app_access_token_expire_minutes: ${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
+          TF_VAR_app_version: ${{ secrets.VERSION }}
+          TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
+          TF_VAR_app_rate_limit_calls: ${{ secrets.RATE_LIMIT_CALLS }}
+          TF_VAR_app_rate_limit_period: ${{ secrets.RATE_LIMIT_PERIOD }}
+          TF_VAR_app_otp_secret: ${{ secrets.OTP_SECRET }}
+          TF_VAR_app_otp_expiry_minutes: ${{ secrets.OTP_EXPIRY_MINUTES }}
+          TF_VAR_app_redis_user_cache_ttl: ${{ secrets.REDIS_USER_CACHE_TTL }}
+          TF_VAR_app_redis_blacklist_ttl: ${{ secrets.REDIS_BLACKLIST_TTL }}
+          TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
+          TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
+          TF_VAR_app_aws_ses_from_email: ${{ secrets.AWS_SES_FROM_EMAIL }}
+          TF_VAR_app_aws_ses_region: ${{ secrets.AWS_SES_REGION }}
+          TF_VAR_app_aws_default_region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      # Terraform Apply
+      - name: Terraform Apply
+        if: github.event_name == 'push'
+        working-directory: ./terraform-files
+        run: terraform apply -auto-approve tfplan
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_app_algorithm: ${{ secrets.ALGORITHM }}
+          TF_VAR_app_access_token_expire_minutes: ${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
+          TF_VAR_app_version: ${{ secrets.VERSION }}
+          TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
+          TF_VAR_app_rate_limit_calls: ${{ secrets.RATE_LIMIT_CALLS }}
+          TF_VAR_app_rate_limit_period: ${{ secrets.RATE_LIMIT_PERIOD }}
+          TF_VAR_app_otp_secret: ${{ secrets.OTP_SECRET }}
+          TF_VAR_app_otp_expiry_minutes: ${{ secrets.OTP_EXPIRY_MINUTES }}
+          TF_VAR_app_redis_user_cache_ttl: ${{ secrets.REDIS_USER_CACHE_TTL }}
+          TF_VAR_app_redis_blacklist_ttl: ${{ secrets.REDIS_BLACKLIST_TTL }}
+          TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
+          TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
+          TF_VAR_app_aws_ses_from_email: ${{ secrets.AWS_SES_FROM_EMAIL }}
+          TF_VAR_app_aws_ses_region: ${{ secrets.AWS_SES_REGION }}
+          TF_VAR_app_aws_default_region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      # Docker build and deploy
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # Pre-deployment health check
+      - name: Check Current Deployment Health
+        working-directory: ./terraform-files
+        continue-on-error: true
+        run: |
+          ASG_NAME=$(terraform output -raw asg_name)
+          echo "Checking health of current instances in ASG: $ASG_NAME"
+          
+          # Get current instance IDs
+          INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
+            --auto-scaling-group-names "$ASG_NAME" \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`].InstanceId' \
+            --output text)
+          
+          echo "Current instances: $INSTANCE_IDS"
+          
+          # Check health of each instance
+          for INSTANCE_ID in $INSTANCE_IDS; do
+            echo "Checking health of instance: $INSTANCE_ID"
+            
+            # Get instance IP
+            INSTANCE_IP=$(aws ec2 describe-instances \
+              --instance-ids $INSTANCE_ID \
+              --region ${{ secrets.AWS_REGION }} \
+              --query 'Reservations[0].Instances[0].PublicIpAddress' \
+              --output text)
+            
+            if [ "$INSTANCE_IP" != "None" ] && [ -n "$INSTANCE_IP" ]; then
+              echo "Testing health endpoint: http://$INSTANCE_IP/health/simple"
+              curl -f "http://$INSTANCE_IP/health/simple" || echo "Health check failed for $INSTANCE_ID"
+            fi
+          done
+
+      # Login to ECR
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+            | docker login --username AWS --password-stdin 033464272864.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      # Build Docker Image
+      - name: Build Docker Image
+        run: |
+          docker build --platform linux/arm64 -t dev-cms-api-repo .
+
+      # Tag Docker Image
+      - name: Tag Docker Image
+        run: |
+          docker tag dev-cms-api-repo:latest 033464272864.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/dev-cms-api-repo:latest
+
+      # Push Docker Image to ECR
+      - name: Push Docker Image to ECR
+        run: |
+          docker push 033464272864.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/dev-cms-api-repo:latest
+
+      # Zero-downtime ASG refresh with monitoring
+      - name: Zero-Downtime Instance Refresh
+        if: github.ref_name == 'main' || github.ref_name == 'dev'
+        working-directory: ./terraform-files
+        run: |
+          ASG_NAME=$(terraform output -raw asg_name)
+          echo "Starting zero-downtime deployment for ASG: $ASG_NAME"
+
+          # Wait for any existing instance refresh to complete
+          echo "Checking for existing instance refreshes..."
+          while true; do
+            STATUS=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name "$ASG_NAME" \
+              --region ${{ secrets.AWS_REGION }} \
+              --query 'InstanceRefreshes[?Status==`InProgress`].Status' \
+              --output text)
+            if [ -z "$STATUS" ]; then
+              echo "No instance refresh in progress. Proceeding..."
+              break
+            fi
+            echo "Instance refresh in progress. Waiting..."
+            sleep 30
+          done
+
+          # Start new instance refresh with zero-downtime configuration
+          echo "Starting instance refresh with zero-downtime configuration..."
+          REFRESH_ID=$(aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name "$ASG_NAME" \
+            --region ${{ secrets.AWS_REGION }} \
+            --strategy Rolling \
+            --preferences "MinHealthyPercentage=100,InstanceWarmup=300,CheckpointPercentages=50,CheckpointDelay=600" \
+            --query 'InstanceRefreshId' \
+            --output text)
+
+          echo "Instance refresh started with ID: $REFRESH_ID"
+
+          # Monitor the refresh progress
+          echo "Monitoring deployment progress..."
+          while true; do
+            REFRESH_STATUS=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name "$ASG_NAME" \
+              --region ${{ secrets.AWS_REGION }} \
+              --instance-refresh-ids "$REFRESH_ID" \
+              --query 'InstanceRefreshes[0].Status' \
+              --output text)
+            
+            PERCENTAGE=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name "$ASG_NAME" \
+              --region ${{ secrets.AWS_REGION }} \
+              --instance-refresh-ids "$REFRESH_ID" \
+              --query 'InstanceRefreshes[0].PercentageComplete' \
+              --output text)
+
+            echo "Deployment status: $REFRESH_STATUS ($PERCENTAGE% complete)"
+
+            case $REFRESH_STATUS in
+              "Successful")
+                echo "✅ Zero-downtime deployment completed successfully!"
+                break
+                ;;
+              "Failed"|"Cancelled")
+                echo "❌ Deployment failed with status: $REFRESH_STATUS"
+                exit 1
+                ;;
+              "InProgress")
+                echo "🔄 Deployment in progress..."
+                sleep 60
+                ;;
+              *)
+                echo "⚠️ Unknown status: $REFRESH_STATUS"
+                sleep 30
+                ;;
+            esac
+          done
+
+      # Post-deployment verification
+      - name: Verify Deployment
+        if: github.ref_name == 'main' || github.ref_name == 'dev'
+        working-directory: ./terraform-files
+        run: |
+          echo "Verifying deployment health..."
+          ASG_NAME=$(terraform output -raw asg_name)
+          
+          # Get new instance IDs
+          NEW_INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
+            --auto-scaling-group-names "$ASG_NAME" \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`].InstanceId' \
+            --output text)
+          
+          echo "New instances: $NEW_INSTANCE_IDS"
+          
+          # Verify health of new instances
+          ALL_HEALTHY=true
+          for INSTANCE_ID in $NEW_INSTANCE_IDS; do
+            echo "Verifying health of instance: $INSTANCE_ID"
+            
+            INSTANCE_IP=$(aws ec2 describe-instances \
+              --instance-ids $INSTANCE_ID \
+              --region ${{ secrets.AWS_REGION }} \
+              --query 'Reservations[0].Instances[0].PublicIpAddress' \
+              --output text)
+            
+            if [ "$INSTANCE_IP" != "None" ] && [ -n "$INSTANCE_IP" ]; then
+              if ! curl -f "http://$INSTANCE_IP/health/simple"; then
+                echo "❌ Health check failed for instance $INSTANCE_ID"
+                ALL_HEALTHY=false
+              else
+                echo "✅ Instance $INSTANCE_ID is healthy"
+              fi
+            fi
+          done
+          
+          if [ "$ALL_HEALTHY" = true ]; then
+            echo "🎉 All instances are healthy! Deployment verification successful."
+          else
+            echo "❌ Some instances failed health checks. Please investigate."
+            exit 1
+          fi
+
+      # Notification on success
+      - name: Deployment Success Notification
+        if: success()
+        run: |
+          echo "🚀 Deployment completed successfully!"
+          echo "Environment: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Zero-downtime deployment with health verification passed."
