@@ -134,9 +134,6 @@ services:
       - AWS_SES_FROM_EMAIL=${aws_ses_from_email}
       - AWS_SES_REGION=${aws_ses_region}
       - AWS_DEFAULT_REGION=${aws_default_region}
-      - JWT_SECRET_KEY=${jwt_secret_key}
-      - JWT_ALGORITHM=${jwt_algorithm}
-      - JWT_EXPIRE_MINUTES=${jwt_expire_minutes}
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     restart: always
     networks:

@@ -61,25 +61,12 @@ class Settings(BaseSettings):
     # Additional AWS Configuration
     aws_default_region: str = Field(default="ap-south-1", env="AWS_DEFAULT_REGION", description="AWS default region")
     
-    # Application-specific settings
-    jwt_secret_key: Optional[str] = Field(default=None, env="JWT_SECRET_KEY", description="Alias for SECRET_KEY")
-    jwt_algorithm: str = Field(default="HS256", env="JWT_ALGORITHM", description="Alias for ALGORITHM")
-    jwt_expire_minutes: int = Field(default=30, env="JWT_EXPIRE_MINUTES", description="Alias for ACCESS_TOKEN_EXPIRE_MINUTES")
     
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
         
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Set aliases for backward compatibility
-        if not self.jwt_secret_key:
-            self.jwt_secret_key = self.secret_key
-        if self.jwt_algorithm:
-            self.algorithm = self.jwt_algorithm
-        if self.jwt_expire_minutes:
-            self.access_token_expire_minutes = self.jwt_expire_minutes
 
 
 # Global settings instance
@@ -90,7 +77,7 @@ def print_config():
     """Print non-sensitive configuration for debugging"""
     config_dict = settings.dict()
     sensitive_keys = {
-        "secret_key", "jwt_secret_key", "database_url", "aws_access_key_id", 
+        "secret_key", "database_url", "aws_access_key_id", 
         "aws_secret_access_key", "upstash_redis_token", "otp_secret"
     }
     

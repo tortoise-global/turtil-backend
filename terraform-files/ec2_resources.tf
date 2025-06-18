@@ -122,9 +122,6 @@ resource "aws_launch_template" "cms_fast_api" {
     aws_region                  = var.app_aws_region
     cors_origins                = var.app_cors_origins
     allowed_hosts               = var.app_allowed_hosts
-    jwt_secret_key              = var.app_jwt_secret_key
-    jwt_algorithm               = var.app_jwt_algorithm
-    jwt_expire_minutes          = var.app_jwt_expire_minutes
   }))
 
   tags = {

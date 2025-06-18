@@ -17,7 +17,6 @@
 # - TF_VAR_app_upstash_redis_url
 # - TF_VAR_app_upstash_redis_token
 # - TF_VAR_app_otp_secret
-# - TF_VAR_app_jwt_secret_key
 # - TF_VAR_app_environment (development/production)
 # - TF_VAR_app_debug (true/false)
 # 
@@ -38,8 +37,6 @@
 # - TF_VAR_app_aws_region (default: "ap-south-1")
 # - TF_VAR_app_cors_origins (default: ["*", "http://localhost:3000", "http://localhost:8080"])
 # - TF_VAR_app_allowed_hosts (default: ["*", "localhost", "127.0.0.1", "0.0.0.0"])
-# - TF_VAR_app_jwt_algorithm (default: "HS256")
-# - TF_VAR_app_jwt_expire_minutes (default: 30)
 # 
 # ============================================================================
 

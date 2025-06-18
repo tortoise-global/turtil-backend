@@ -472,24 +472,6 @@ variable "app_aws_region" {
   default     = "ap-south-1"
 }
 
-# JWT Configuration
-variable "app_jwt_secret_key" {
-  description = "JWT secret key (alias for SECRET_KEY)"
-  type        = string
-  sensitive   = true
-}
-
-variable "app_jwt_algorithm" {
-  description = "JWT algorithm"
-  type        = string
-  default     = "HS256"
-}
-
-variable "app_jwt_expire_minutes" {
-  description = "JWT expiration time in minutes"
-  type        = number
-  default     = 30
-}
 
 # Environment and Debug Configuration
 variable "app_environment" {
