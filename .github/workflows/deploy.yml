@@ -276,8 +276,25 @@ jobs:
               --output text)
             
             if [ "$INSTANCE_IP" != "None" ] && [ -n "$INSTANCE_IP" ]; then
-              if ! curl -f "http://$INSTANCE_IP/health/simple"; then
+              echo "Testing health endpoint: http://$INSTANCE_IP/health/simple"
+              
+              # Wait a bit for the application to fully start
+              sleep 30
+              
+              if ! curl -f --max-time 10 "http://$INSTANCE_IP/health/simple"; then
                 echo "❌ Health check failed for instance $INSTANCE_ID"
+                echo "🔍 Debugging instance $INSTANCE_ID..."
+                
+                # Check if Docker is running
+                echo "Checking Docker status:"
+                aws ssm send-command \
+                  --instance-ids $INSTANCE_ID \
+                  --region ${{ secrets.AWS_REGION }} \
+                  --document-name "AWS-RunShellScript" \
+                  --parameters 'commands=["docker ps", "docker logs $(docker ps -q)", "curl -v http://localhost:8000/health/simple"]' \
+                  --query 'Command.CommandId' \
+                  --output text 2>/dev/null || echo "Could not run debugging commands"
+                
                 ALL_HEALTHY=false
               else
                 echo "✅ Instance $INSTANCE_ID is healthy"
