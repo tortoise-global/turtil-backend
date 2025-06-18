@@ -56,11 +56,11 @@ server {
     }
 
     # Health check endpoint for ALB
-    location /health/simple {
+    location /health {
         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
         add_header 'Access-Control-Allow-Headers' 'Authorization';
         add_header 'Access-Control-Allow-Origins' '*';
-        proxy_pass http://localhost:8000/health/simple;
+        proxy_pass http://localhost:8000/health;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -72,12 +72,12 @@ server {
         proxy_read_timeout 1s;
     }
 
-    # Comprehensive health check endpoint
-    location /health {
+    # Detailed health check endpoint
+    location /health/detailed {
         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
         add_header 'Access-Control-Allow-Headers' 'Authorization';
         add_header 'Access-Control-Allow-Origins' '*';
-        proxy_pass http://localhost:8000/health;
+        proxy_pass http://localhost:8000/health/detailed;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -98,13 +98,13 @@ ECR_URI="033464272864.dkr.ecr.ap-south-1.amazonaws.com"
 
 aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin $ECR_URI
 
-docker pull $ECR_URI/dev-cms-api-repo:latest
+docker pull $ECR_URI/dev-fast-api-repo:latest
 
 # Generate docker-compose.yml with environment variables
 cat <<EOF > /home/ubuntu/docker-compose.yml
 services:
   web:
-    image: $ECR_URI/dev-cms-api-repo:latest
+    image: $ECR_URI/dev-fast-api-repo:latest
     ports:
       - "8000:8000"
     environment:
@@ -164,7 +164,7 @@ RETRIES=0
 MAX_RETRIES=30
 
 while [ $RETRIES -lt $MAX_RETRIES ]; do
-    if curl -f http://localhost:8000/health/simple >/dev/null 2>&1; then
+    if curl -f http://localhost:8000/health >/dev/null 2>&1; then
         echo "$(date): Application is healthy" >> $LOG_FILE
         echo "HEALTHY" > $STATUS_FILE
         exit 0
