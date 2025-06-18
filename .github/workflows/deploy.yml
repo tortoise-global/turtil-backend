@@ -47,7 +47,8 @@ jobs:
       - name: Select Terraform Workspace
         working-directory: ./terraform-files
         run: |
-          terraform workspace select dev || terraform workspace new dev
+          WORKSPACE=${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+          terraform workspace select $WORKSPACE || terraform workspace new $WORKSPACE
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -121,61 +122,44 @@ jobs:
       # Docker build and deploy
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       # Pre-deployment health check
       - name: Check Current Deployment Health
         working-directory: ./terraform-files
         continue-on-error: true
         run: |
-          ASG_NAME=$(terraform output -raw asg_name)
-          echo "Checking health of current instances in ASG: $ASG_NAME"
+          echo "Checking current deployment health via ALB..."
           
-          # Get current instance IDs
-          INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
-            --auto-scaling-group-names "$ASG_NAME" \
-            --region ${{ secrets.AWS_REGION }} \
-            --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`].InstanceId' \
-            --output text)
+          # Get ALB DNS name from Terraform output
+          ALB_DNS=$(terraform output -raw example_alb_dns_name)
+          ALB_ENDPOINT="http://$ALB_DNS/health"
           
-          echo "Current instances: $INSTANCE_IDS"
-          
-          # Check health of each instance
-          for INSTANCE_ID in $INSTANCE_IDS; do
-            echo "Checking health of instance: $INSTANCE_ID"
-            
-            # Get instance IP
-            INSTANCE_IP=$(aws ec2 describe-instances \
-              --instance-ids $INSTANCE_ID \
-              --region ${{ secrets.AWS_REGION }} \
-              --query 'Reservations[0].Instances[0].PublicIpAddress' \
-              --output text)
-            
-            if [ "$INSTANCE_IP" != "None" ] && [ -n "$INSTANCE_IP" ]; then
-              echo "Testing health endpoint: http://$INSTANCE_IP/health/simple"
-              curl -f "http://$INSTANCE_IP/health/simple" || echo "Health check failed for $INSTANCE_ID"
-            fi
-          done
+          echo "Testing current ALB health endpoint: $ALB_ENDPOINT"
+          curl -f --max-time 10 "$ALB_ENDPOINT" || echo "Current deployment health check failed"
 
       # Login to ECR
       - name: Login to ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-            | docker login --username AWS --password-stdin 033464272864.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+            | docker login --username AWS --password-stdin ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
       # Build Docker Image
       - name: Build Docker Image
         run: |
-          docker build --platform linux/arm64 -t dev-cms-api-repo .
+          docker build --platform linux/arm64 -t ${{ secrets.ECR_REPOSITORY_NAME }} .
 
       # Tag Docker Image
       - name: Tag Docker Image
         run: |
-          docker tag dev-cms-api-repo:latest 033464272864.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/dev-cms-api-repo:latest
+          docker tag ${{ secrets.ECR_REPOSITORY_NAME }}:latest ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY_NAME }}:latest
 
       # Push Docker Image to ECR
       - name: Push Docker Image to ECR
         run: |
-          docker push 033464272864.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/dev-cms-api-repo:latest
+          docker push ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY_NAME }}:latest
 
       # Zero-downtime ASG refresh with monitoring
       - name: Zero-Downtime Instance Refresh
@@ -256,7 +240,7 @@ jobs:
           
           # Get ALB DNS name from Terraform output
           ALB_DNS=$(terraform output -raw example_alb_dns_name)
-          ALB_ENDPOINT="http://$ALB_DNS/health/simple"
+          ALB_ENDPOINT="http://$ALB_DNS/health"
           
           echo "Testing ALB health endpoint: $ALB_ENDPOINT"
           
@@ -268,6 +252,41 @@ jobs:
             echo "✅ ALB health check passed! Deployment verification successful."
           else
             echo "❌ ALB health check failed. Deployment may have issues."
+            echo "🔍 Gathering debugging information..."
+            
+            # Get ASG and instance information
+            ASG_NAME=$(terraform output -raw asg_name)
+            echo "📋 ASG Name: $ASG_NAME"
+            
+            # Check ASG status
+            echo "🔄 ASG Status:"
+            aws autoscaling describe-auto-scaling-groups \
+              --auto-scaling-group-names "$ASG_NAME" \
+              --region ${{ secrets.AWS_REGION }} \
+              --query 'AutoScalingGroups[0].{DesiredCapacity:DesiredCapacity,MinSize:MinSize,MaxSize:MaxSize,Instances:Instances[].{InstanceId:InstanceId,LifecycleState:LifecycleState,HealthStatus:HealthStatus}}' \
+              --output table
+            
+            # Check ALB target group health
+            TARGET_GROUP_ARN=$(terraform output -raw example_alb_target_group_arn)
+            echo "🎯 Target Group Health:"
+            aws elbv2 describe-target-health \
+              --target-group-arn "$TARGET_GROUP_ARN" \
+              --region ${{ secrets.AWS_REGION }} \
+              --output table
+            
+            # Check recent instance refresh status
+            echo "🔄 Recent Instance Refresh Status:"
+            aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name "$ASG_NAME" \
+              --region ${{ secrets.AWS_REGION }} \
+              --max-records 3 \
+              --query 'InstanceRefreshes[*].{Status:Status,StatusReason:StatusReason,StartTime:StartTime,EndTime:EndTime,PercentageComplete:PercentageComplete}' \
+              --output table
+            
+            # Test ALB response with verbose output
+            echo "🌐 ALB Response Details:"
+            curl -v --max-time 10 "$ALB_ENDPOINT" || true
+            
             exit 1
           fi
 

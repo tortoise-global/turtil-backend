@@ -169,12 +169,18 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Comprehensive health check endpoint"""
+    """Simple health check for AWS load balancers"""
+    return {"status": "healthy"}
+
+
+@app.get("/health/detailed")
+async def detailed_health_check():
+    """Comprehensive health check endpoint with system diagnostics"""
     try:
         health_status = await check_system_health()
         return health_status
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        logger.error(f"Detailed health check failed: {e}")
         return JSONResponse(
             status_code=503,
             content={
@@ -183,12 +189,6 @@ async def health_check():
                 "timestamp": time.time()
             }
         )
-
-
-@app.get("/health/simple")
-async def simple_health_check():
-    """Simple health check for load balancers"""
-    return {"status": "healthy"}
 
 
 @app.get("/info")
@@ -212,6 +212,7 @@ async def app_info():
             "email": "/api/email", 
             "upload": "/api/cms-image-upload",
             "health": "/health",
+            "healthDetailed": "/health/detailed",
             "docs": "/docs" if settings.debug else "disabled"
         }
     }
@@ -242,7 +243,7 @@ async def startup_message():
     📊 Environment: {settings.environment}
     🔧 Debug mode: {settings.debug}
     🌐 CORS origins: {settings.cors_origins}
-    📡 Health check: /health
+    📡 Health checks: /health (simple), /health/detailed (comprehensive)
     📚 API docs: {'/docs' if settings.debug else 'disabled'}
     """)
 

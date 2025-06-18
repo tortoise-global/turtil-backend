@@ -19,8 +19,8 @@ variable "alb_target_group_port" {
 variable "alb_health_check_path" {
   type = map(string)
   default = {
-    "dev"  = "/health/simple"
-    "test" = "/health/simple"
-    "prod" = "/health/simple"
+    "dev"  = "/health"
+    "test" = "/health"
+    "prod" = "/health"
   }
 }
