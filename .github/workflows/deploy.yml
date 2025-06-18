@@ -219,7 +219,7 @@ jobs:
           echo "Instance refresh started with ID: $REFRESH_ID"
 
           # Monitor the refresh progress
-          echo "Monitoring deployment progress..."
+          echo "🔄 Deployment in progress..."
           while true; do
             REFRESH_STATUS=$(aws autoscaling describe-instance-refreshes \
               --auto-scaling-group-name "$ASG_NAME" \
@@ -227,15 +227,6 @@ jobs:
               --instance-refresh-ids "$REFRESH_ID" \
               --query 'InstanceRefreshes[0].Status' \
               --output text)
-            
-            PERCENTAGE=$(aws autoscaling describe-instance-refreshes \
-              --auto-scaling-group-name "$ASG_NAME" \
-              --region ${{ secrets.AWS_REGION }} \
-              --instance-refresh-ids "$REFRESH_ID" \
-              --query 'InstanceRefreshes[0].PercentageComplete' \
-              --output text)
-
-            echo "Deployment status: $REFRESH_STATUS ($PERCENTAGE% complete)"
 
             case $REFRESH_STATUS in
               "Successful")
@@ -246,8 +237,7 @@ jobs:
                 echo "❌ Deployment failed with status: $REFRESH_STATUS"
                 exit 1
                 ;;
-              "InProgress")
-                echo "🔄 Deployment in progress..."
+              "InProgress"|"Pending")
                 sleep 60
                 ;;
               *)

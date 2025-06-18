@@ -3,7 +3,7 @@
 sudo apt-get update -y
 sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+sudo add-apt-repository "deb [arch=arm64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
 sudo apt-get update -y
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io
 sudo systemctl start docker
@@ -117,8 +117,8 @@ services:
       - ENVIRONMENT=${environment}
       - DEBUG=${debug}
       - LOG_LEVEL=${log_level}
-      - CORS_ORIGINS=${cors_origins}
-      - ALLOWED_HOSTS=${allowed_hosts}
+      - CORS_ORIGINS='${cors_origins}'
+      - ALLOWED_HOSTS='${allowed_hosts}'
       - RATE_LIMIT_CALLS=${rate_limit_calls}
       - RATE_LIMIT_PERIOD=${rate_limit_period}
       - OTP_SECRET=${otp_secret}
@@ -134,7 +134,6 @@ services:
       - AWS_SES_FROM_EMAIL=${aws_ses_from_email}
       - AWS_SES_REGION=${aws_ses_region}
       - AWS_DEFAULT_REGION=${aws_default_region}
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     restart: always
     networks:
       - default
