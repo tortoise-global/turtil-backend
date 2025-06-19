@@ -88,6 +88,81 @@ jobs:
           TF_VAR_app_environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
           TF_VAR_app_debug: ${{ github.ref_name == 'main' && 'false' || 'true' }}
 
+      # Import Existing Resources (between plan and apply)
+      - name: Import Existing Resources
+        if: github.event_name == 'push'
+        working-directory: ./terraform-files
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking for existing resources to import..."
+          
+          # Set environment variables for terraform
+          export TF_VAR_ecr_account_id="${{ secrets.ECR_ACCOUNT_ID }}"
+          export TF_VAR_ecr_repository_name="${{ secrets.ECR_REPOSITORY_NAME }}"
+          
+          # Import ECR repository if it exists
+          echo "Checking ECR repository: $TF_VAR_ecr_repository_name"
+          if aws ecr describe-repositories --repository-names "$TF_VAR_ecr_repository_name" --region ${{ secrets.AWS_REGION }} > /dev/null 2>&1; then
+            echo "✅ ECR repository exists, importing..."
+            terraform import module.ecr_repo.aws_ecr_repository.this "$TF_VAR_ecr_repository_name" || echo "⚠️ ECR import failed or already imported"
+          else
+            echo "❌ ECR repository does not exist, will be created"
+          fi
+          
+          # Import ALB if it exists
+          WORKSPACE=${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+          ALB_NAME="${WORKSPACE}-cms-alb"
+          echo "Checking ALB: $ALB_NAME"
+          ALB_ARN=$(aws elbv2 describe-load-balancers --names "$ALB_NAME" --query 'LoadBalancers[0].LoadBalancerArn' --output text --region ${{ secrets.AWS_REGION }} 2>/dev/null || echo "None")
+          if [ "$ALB_ARN" != "None" ] && [ "$ALB_ARN" != "null" ]; then
+            echo "✅ ALB exists, importing..."
+            terraform import module.example_alb.aws_lb.this "$ALB_ARN" || echo "⚠️ ALB import failed or already imported"
+          else
+            echo "❌ ALB does not exist, will be created"
+          fi
+          
+          # Import CloudFront distribution if it exists with the expected CNAME
+          EXPECTED_CNAME="${WORKSPACE}api.turtilcms.turtil.co"
+          echo "Checking CloudFront distribution with CNAME: $EXPECTED_CNAME"
+          CF_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Aliases.Items[?@=='$EXPECTED_CNAME']].Id" --output text --region ${{ secrets.AWS_REGION }} 2>/dev/null || echo "None")
+          if [ "$CF_ID" != "None" ] && [ "$CF_ID" != "null" ] && [ -n "$CF_ID" ]; then
+            echo "✅ CloudFront distribution exists, importing..."
+            terraform import module.cloudfront_with_alb.aws_cloudfront_distribution.this "$CF_ID" || echo "⚠️ CloudFront import failed or already imported"
+          else
+            echo "❌ CloudFront distribution does not exist, will be created"
+          fi
+          
+          echo "🔧 Import phase completed"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_app_algorithm: ${{ secrets.ALGORITHM }}
+          TF_VAR_app_access_token_expire_minutes: ${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
+          TF_VAR_app_version: ${{ secrets.VERSION }}
+          TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
+          TF_VAR_app_rate_limit_calls: ${{ secrets.RATE_LIMIT_CALLS }}
+          TF_VAR_app_rate_limit_period: ${{ secrets.RATE_LIMIT_PERIOD }}
+          TF_VAR_app_otp_secret: ${{ secrets.OTP_SECRET }}
+          TF_VAR_app_otp_expiry_minutes: ${{ secrets.OTP_EXPIRY_MINUTES }}
+          TF_VAR_app_redis_user_cache_ttl: ${{ secrets.REDIS_USER_CACHE_TTL }}
+          TF_VAR_app_redis_blacklist_ttl: ${{ secrets.REDIS_BLACKLIST_TTL }}
+          TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
+          TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
+          TF_VAR_app_aws_ses_from_email: ${{ secrets.AWS_SES_FROM_EMAIL }}
+          TF_VAR_app_aws_ses_region: ${{ secrets.AWS_SES_REGION }}
+          TF_VAR_app_aws_default_region: ${{ secrets.AWS_DEFAULT_REGION }}
+          TF_VAR_ecr_account_id: ${{ secrets.ECR_ACCOUNT_ID }}
+          TF_VAR_ecr_repository_name: ${{ secrets.ECR_REPOSITORY_NAME }}
+          TF_VAR_app_environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+          TF_VAR_app_debug: ${{ github.ref_name == 'main' && 'false' || 'true' }}
+
       # Terraform Apply
       - name: Terraform Apply
         if: github.event_name == 'push'
