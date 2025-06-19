@@ -107,6 +107,7 @@ services:
     image: $ECR_URI/${ecr_repository_name}:latest
     ports:
       - "8000:8000"
+    command: ["python", "run.py"]
     environment:
       - DATABASE_URL=${database_url}
       - SECRET_KEY=${secret_key}
@@ -155,8 +156,21 @@ LOG_FILE="/home/ubuntu/deployment.log"
 echo "$(date): Starting deployment" >> $LOG_FILE
 echo "DEPLOYING" > $STATUS_FILE
 
+# Debug: Log environment variables
+echo "$(date): Checking docker-compose.yml..." >> $LOG_FILE
+cat /home/ubuntu/docker-compose.yml >> $LOG_FILE
+
 # Start the app with environment variables
-docker-compose -f /home/ubuntu/docker-compose.yml up -d
+echo "$(date): Starting docker-compose..." >> $LOG_FILE
+docker-compose -f /home/ubuntu/docker-compose.yml up -d 2>&1 >> $LOG_FILE
+
+# Check if container started
+echo "$(date): Checking container status..." >> $LOG_FILE
+docker ps >> $LOG_FILE
+
+# Check container logs
+echo "$(date): Container logs:" >> $LOG_FILE
+docker-compose -f /home/ubuntu/docker-compose.yml logs >> $LOG_FILE
 
 # Wait for health check to pass
 echo "$(date): Waiting for application to be healthy" >> $LOG_FILE
@@ -164,18 +178,27 @@ RETRIES=0
 MAX_RETRIES=30
 
 while [ $RETRIES -lt $MAX_RETRIES ]; do
-    if curl -f http://localhost:8000/health >/dev/null 2>&1; then
-        echo "$(date): Application is healthy" >> $LOG_FILE
-        echo "HEALTHY" > $STATUS_FILE
-        exit 0
+    # First check if port 8000 is responding at all
+    if curl -f http://localhost:8000/ >/dev/null 2>&1; then
+        echo "$(date): Application root endpoint is responding" >> $LOG_FILE
+        if curl -f http://localhost:8000/health >/dev/null 2>&1; then
+            echo "$(date): Application is healthy" >> $LOG_FILE
+            echo "HEALTHY" > $STATUS_FILE
+            exit 0
+        fi
     fi
     
     echo "$(date): Health check failed, retry $((RETRIES + 1))/$MAX_RETRIES" >> $LOG_FILE
+    # Log what's actually responding on port 8000
+    curl -v http://localhost:8000/ 2>&1 | head -10 >> $LOG_FILE
+    
     sleep 10
     RETRIES=$((RETRIES + 1))
 done
 
 echo "$(date): Deployment failed - health checks not passing" >> $LOG_FILE
+echo "$(date): Final container logs:" >> $LOG_FILE
+docker-compose -f /home/ubuntu/docker-compose.yml logs >> $LOG_FILE
 echo "FAILED" > $STATUS_FILE
 exit 1
 EOF
