@@ -128,8 +128,8 @@ services:
       - AWS_SECRET_ACCESS_KEY=${aws_secret_access_key}
       - AWS_REGION=${aws_region}
       - S3_BUCKET_NAME=${s3_bucket_name}
-      - UPSTASH_REDIS_URL=${upstash_redis_url}
-      - UPSTASH_REDIS_TOKEN=${upstash_redis_token}
+      - UPSTASH_REDIS_URL=https://selected-mayfly-35036.upstash.io
+      - UPSTASH_REDIS_TOKEN=AYXqASQgMWQ5YTFkMzgtMDU4Zi00NWUyLWJhYzgtOGNhN2FlOTUzYzQ2ZTJjYzc5N2JmNzA1NDhhYjliOGFmMjRmM2M3N2Y4YjI=
       - REDIS_USER_CACHE_TTL=${redis_user_cache_ttl}
       - REDIS_BLACKLIST_TTL=${redis_blacklist_ttl}
       - AWS_SES_FROM_EMAIL=${aws_ses_from_email}
