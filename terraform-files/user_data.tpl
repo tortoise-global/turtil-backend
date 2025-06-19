@@ -118,8 +118,8 @@ services:
       - ENVIRONMENT=${environment}
       - DEBUG=${debug}
       - LOG_LEVEL=${log_level}
-      - CORS_ORIGINS='${cors_origins}'
-      - ALLOWED_HOSTS='${allowed_hosts}'
+      - CORS_ORIGINS=${cors_origins}
+      - ALLOWED_HOSTS=${allowed_hosts}
       - RATE_LIMIT_CALLS=${rate_limit_calls}
       - RATE_LIMIT_PERIOD=${rate_limit_period}
       - OTP_SECRET=${otp_secret}
@@ -128,8 +128,8 @@ services:
       - AWS_SECRET_ACCESS_KEY=${aws_secret_access_key}
       - AWS_REGION=${aws_region}
       - S3_BUCKET_NAME=${s3_bucket_name}
-      - UPSTASH_REDIS_URL=https://selected-mayfly-35036.upstash.io
-      - UPSTASH_REDIS_TOKEN=AYXqASQgMWQ5YTFkMzgtMDU4Zi00NWUyLWJhYzgtOGNhN2FlOTUzYzQ2ZTJjYzc5N2JmNzA1NDhhYjliOGFmMjRmM2M3N2Y4YjI=
+      - UPSTASH_REDIS_URL=${upstash_redis_url}
+      - UPSTASH_REDIS_TOKEN=${upstash_redis_token}
       - REDIS_USER_CACHE_TTL=${redis_user_cache_ttl}
       - REDIS_BLACKLIST_TTL=${redis_blacklist_ttl}
       - AWS_SES_FROM_EMAIL=${aws_ses_from_email}
