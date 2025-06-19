@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     # Additional AWS Configuration
     aws_default_region: str = Field(default="ap-south-1", env="AWS_DEFAULT_REGION", description="AWS default region")
     
+    # ECR Configuration
+    ecr_account_id: Optional[str] = Field(default=None, env="ECR_ACCOUNT_ID", description="ECR account ID")
+    ecr_repository_name: Optional[str] = Field(default=None, env="ECR_REPOSITORY_NAME", description="ECR repository name")
+    
     
     class Config:
         env_file = ".env"
