@@ -45,7 +45,7 @@ class UserListQuery(CamelCaseModel):
     is_verified: Optional[bool] = Field(None, description="Filter by verification status")
     is_superuser: Optional[bool] = Field(None, description="Filter by superuser status")
     sort_by: str = Field(default="created_at", description="Sort field")
-    sort_order: str = Field(default="desc", regex="^(asc|desc)$", description="Sort order")
+    sort_order: str = Field(default="desc", pattern="^(asc|desc)$", description="Sort order")
 
 
 class UserListResponse(CamelCaseModel):
@@ -78,7 +78,7 @@ class UserProfileResponse(CamelCaseModel):
 
 class UserActivityResponse(CamelCaseModel):
     """User activity response schema"""
-    user_id: int = Field(..., description="User ID")
+    cms_user_id: int = Field(..., description="CMS User ID")
     login_history: List[dict] = Field(..., description="Recent login history")
     activity_summary: dict = Field(..., description="Activity summary")
     last_seen: Optional[datetime] = Field(None, description="Last seen timestamp")
@@ -88,8 +88,8 @@ class UserActivityResponse(CamelCaseModel):
 
 class BulkUserActionRequest(CamelCaseModel):
     """Bulk user action request schema"""
-    user_ids: List[int] = Field(..., min_items=1, description="List of user IDs")
-    action: str = Field(..., regex="^(activate|deactivate|verify|unverify|delete)$", description="Action to perform")
+    cms_user_ids: List[int] = Field(..., min_items=1, description="List of CMS user IDs")
+    action: str = Field(..., pattern="^(activate|deactivate|verify|unverify|delete)$", description="Action to perform")
 
 
 class BulkUserActionResponse(CamelCaseModel):
@@ -105,14 +105,14 @@ class BulkUserActionResponse(CamelCaseModel):
 class UserPreferencesRequest(CamelCaseModel):
     """User preferences update request schema"""
     email_notifications: bool = Field(default=True, description="Email notification preference")
-    theme: str = Field(default="light", regex="^(light|dark|auto)$", description="UI theme preference")
+    theme: str = Field(default="light", pattern="^(light|dark|auto)$", description="UI theme preference")
     language: str = Field(default="en", description="Language preference")
     timezone: str = Field(default="UTC", description="Timezone preference")
 
 
 class UserPreferencesResponse(CamelCaseModel):
     """User preferences response schema"""
-    user_id: int = Field(..., description="User ID")
+    cms_user_id: int = Field(..., description="CMS User ID")
     email_notifications: bool = Field(..., description="Email notification preference")
     theme: str = Field(..., description="UI theme preference")
     language: str = Field(..., description="Language preference")

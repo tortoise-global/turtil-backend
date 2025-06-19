@@ -1,5 +1,6 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Integer
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 import uuid
 from datetime import datetime, timezone
@@ -30,6 +31,26 @@ class User(BaseModel):
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     login_count = Column(Integer, default=0, nullable=False)
     
+    # CMS-specific fields
+    phone_number = Column(String(20), nullable=True)
+    marketing_consent = Column(Boolean, default=False, nullable=False)
+    terms_accepted = Column(Boolean, default=False, nullable=False)
+    college_id = Column(Integer, ForeignKey("colleges.id"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    cms_role = Column(String(50), default='staff', nullable=False)  # 'principal', 'college_admin', 'hod', 'staff'
+    
+    # Invitation & Onboarding System
+    invitation_status = Column(String(50), default='pending', nullable=False)  # 'pending', 'accepted', 'active'
+    temporary_password = Column(Boolean, default=False, nullable=False)
+    must_reset_password = Column(Boolean, default=False, nullable=False)
+    can_assign_department = Column(Boolean, default=False, nullable=False)
+    invited_by_cms_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    # Relationships
+    # college = relationship("College", back_populates="users")
+    # department = relationship("Department", back_populates="users")
+    # invited_by = relationship("User", remote_side=[id])
+    
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email})>"
     
@@ -55,7 +76,7 @@ class User(BaseModel):
         """
         base_dict = super().to_dict()
         result = {
-            "id": base_dict["id"],
+            "cmsUserId": base_dict["id"],
             "uuid": str(self.uuid),
             "email": base_dict["email"],
             "firstName": base_dict["first_name"],
@@ -67,6 +88,18 @@ class User(BaseModel):
             "emailVerifiedAt": base_dict["email_verified_at"],
             "lastLoginAt": base_dict["last_login_at"],
             "loginCount": base_dict["login_count"],
+            # CMS-specific fields
+            "phoneNumber": base_dict["phone_number"],
+            "marketingConsent": base_dict["marketing_consent"],
+            "termsAccepted": base_dict["terms_accepted"],
+            "collegeId": base_dict["college_id"],
+            "departmentId": base_dict["department_id"],
+            "cmsRole": base_dict["cms_role"],
+            "invitationStatus": base_dict["invitation_status"],
+            "temporaryPassword": base_dict["temporary_password"],
+            "mustResetPassword": base_dict["must_reset_password"],
+            "canAssignDepartment": base_dict["can_assign_department"],
+            "invitedByCmsUserId": base_dict["invited_by_cms_user_id"],
             "createdAt": base_dict["created_at"],
             "updatedAt": base_dict["updated_at"]
         }
@@ -84,5 +117,11 @@ class User(BaseModel):
             "firstName": self.first_name,
             "lastName": self.last_name,
             "isVerified": self.is_verified,
-            "isSuperuser": self.is_superuser
+            "isSuperuser": self.is_superuser,
+            # CMS-specific token data
+            "cmsRole": self.cms_role,
+            "collegeId": self.college_id,
+            "departmentId": self.department_id,
+            "invitationStatus": self.invitation_status,
+            "mustResetPassword": self.must_reset_password
         }

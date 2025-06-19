@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     otp_secret: str = Field(default="123456", env="OTP_SECRET", description="OTP secret key")
     otp_expiry_minutes: int = Field(default=5, env="OTP_EXPIRY_MINUTES", description="OTP expiration time")
     
+    # CMS Authentication Settings
+    cms_auto_approve: bool = Field(default=True, env="CMS_AUTO_APPROVE", description="Auto-approve college registrations (development mode)")
+    cms_otp_max_attempts: int = Field(default=3, env="CMS_OTP_MAX_ATTEMPTS", description="Maximum OTP attempts")
+    cms_otp_expiry_seconds: int = Field(default=300, env="CMS_OTP_EXPIRY_SECONDS", description="CMS OTP expiry in seconds")
+    cms_access_token_expire_minutes: int = Field(default=15, env="CMS_ACCESS_TOKEN_EXPIRE_MINUTES", description="CMS access token expiry")
+    cms_refresh_token_expire_days: int = Field(default=30, env="CMS_REFRESH_TOKEN_EXPIRE_DAYS", description="CMS refresh token expiry")
+    
     # AWS Configuration
     aws_access_key_id: str = Field(..., env="AWS_ACCESS_KEY_ID", description="AWS access key ID")
     aws_secret_access_key: str = Field(..., env="AWS_SECRET_ACCESS_KEY", description="AWS secret access key")
@@ -66,11 +73,14 @@ class Settings(BaseSettings):
     ecr_repository_name: Optional[str] = Field(default=None, env="ECR_REPOSITORY_NAME", description="ECR repository name")
     
     
+    @property
+    def is_development(self) -> bool:
+        return self.environment.lower() in ['development', 'dev', 'local']
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
-        
 
 
 # Global settings instance

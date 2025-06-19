@@ -13,7 +13,7 @@ from app.database import init_db, close_db
 from app.redis_client import close_redis
 
 # Import API routers
-from app.api import auth, email, upload
+from app.api import upload, cms_auth
 
 # Import health check dependencies
 from app.api.deps import check_system_health
@@ -154,8 +154,8 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Health check endpoints
-@app.get("/")
+# Health check endpoints (hidden from Swagger)
+@app.get("/", include_in_schema=False)
 async def root():
     """Root endpoint"""
     return {
@@ -167,13 +167,13 @@ async def root():
     }
 
 
-@app.get("/health")
+@app.get("/health", include_in_schema=False)
 async def health_check():
     """Simple health check for AWS load balancers"""
     return {"status": "healthy"}
 
 
-@app.get("/health/detailed")
+@app.get("/health/detailed", include_in_schema=False)
 async def detailed_health_check():
     """Comprehensive health check endpoint with system diagnostics"""
     try:
@@ -191,7 +191,7 @@ async def detailed_health_check():
         )
 
 
-@app.get("/info")
+@app.get("/info", include_in_schema=False)
 async def app_info():
     """Application information endpoint"""
     return {
@@ -200,17 +200,16 @@ async def app_info():
         "environment": settings.environment,
         "debug": settings.debug,
         "features": {
-            "authentication": True,
-            "email_otp": True,
+            "cms_authentication": True,
+            "combined_signin_flow": True,
             "file_upload": True,
-            "aws_integration": True,
+            "aws_s3_integration": True,
             "redis_caching": True,
             "camelcase_api": True
         },
         "endpoints": {
-            "auth": "/api/auth",
-            "email": "/api/email", 
-            "upload": "/api/cms-image-upload",
+            "cmsAuth": "/api/cms/auth",
+            "fileUpload": "/api/file-upload",
             "health": "/health",
             "healthDetailed": "/health/detailed",
             "docs": "/docs" if settings.debug else "disabled"
@@ -219,14 +218,13 @@ async def app_info():
 
 
 # Include API routers
-app.include_router(auth.router, prefix="/api")
-app.include_router(email.router, prefix="/api")
 app.include_router(upload.router, prefix="/api")
+app.include_router(cms_auth.router, prefix="/api")
 
 
 # Rate limiting endpoint (for testing)
 if settings.debug:
-    @app.get("/debug/config")
+    @app.get("/debug/config", include_in_schema=False)
     async def debug_config():
         """Debug endpoint to view configuration (only in debug mode)"""
         from app.config import print_config

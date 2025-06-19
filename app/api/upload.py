@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/cms-image-upload", tags=["cms-image-upload"])
+router = APIRouter(prefix="/file-upload", tags=["File Upload"])
 
 
 @router.post("/generate-presigned-url", response_model=PresignedUrlResponse)
@@ -15,15 +15,15 @@ async def generate_presigned_url_endpoint(
     request: PresignedUrlRequest
 ):
     """
-    Generate a pre-signed S3 URL for uploading a file.
-    This is your exact existing code integrated into the FastAPI structure.
+    Generate a pre-signed S3 URL for uploading files (images, documents, etc.).
+    Supports: images (jpg, jpeg, png), documents (pdf, doc, docx).
     """
     try:
         # Initialize the S3 client - exactly as in your code
         s3 = get_s3_client()
 
-        # Bucket name and object key - exactly as in your code
-        bucket_name = "my-cms-image-upload"  # Updated bucket name
+        # Bucket name for file uploads
+        bucket_name = "my-cms-file-upload"  # Generic file upload bucket
 
         files = request.file_name
 
@@ -111,7 +111,7 @@ async def upload_health_check():
         return {
             "status": "healthy" if s3_status == "healthy" else "unhealthy",
             "s3_status": s3_status,
-            "bucket_name": "my-cms-image-upload",
+            "bucket_name": "my-cms-file-upload",
             "supported_file_types": ["jpg", "jpeg", "png", "pdf", "doc", "docx"],
             "max_file_size": "10MB",
             "url_expiry": "1 hour"
