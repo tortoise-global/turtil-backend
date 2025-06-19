@@ -19,7 +19,7 @@ class Department(BaseModel):
     
     # Foreign Keys
     college_id = Column(Integer, ForeignKey("colleges.id"), nullable=False)
-    hod_cms_user_id = Column(Integer, nullable=True)  # Can be NULL, will be FK after User model update
+    hod_cms_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Head of Department
     
     # Relationships (will be defined after creating other models)
     # college = relationship("College", back_populates="departments")

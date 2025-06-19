@@ -1,4 +1,6 @@
 import re
+import secrets
+import string
 from typing import Any, Dict
 from pydantic import BaseModel
 from pydantic.alias_generators import to_camel
@@ -121,3 +123,62 @@ def convert_response_to_camel(func: Callable) -> Callable:
     # Return appropriate wrapper based on function type
     import asyncio
     return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+
+
+def generate_temporary_password(length: int = 10) -> str:
+    """
+    Generate a secure temporary password.
+    
+    Args:
+        length: Password length (default 10)
+        
+    Returns:
+        Secure temporary password string
+    """
+    # Use alphanumeric characters (uppercase, lowercase, digits)
+    # Avoid confusing characters like O, 0, I, l, 1
+    alphabet = string.ascii_uppercase + string.ascii_lowercase + string.digits
+    excluded_chars = {'O', '0', 'I', 'l', '1'}
+    safe_chars = ''.join(char for char in alphabet if char not in excluded_chars)
+    
+    # Generate secure random password
+    password = ''.join(secrets.choice(safe_chars) for _ in range(length))
+    
+    return password
+
+
+def validate_college_email(email: str) -> bool:
+    """
+    Validate if email looks like a college/university email address.
+    
+    Args:
+        email: Email address to validate
+        
+    Returns:
+        True if email appears to be from educational institution
+    """
+    # Common educational domain patterns
+    edu_patterns = [
+        r'\.edu$',           # .edu domains
+        r'\.edu\.',          # .edu. subdomains
+        r'\.ac\.',           # Academic domains (.ac.in, .ac.uk)
+        r'college\.edu$',    # College domains
+        r'university\.edu$', # University domains
+    ]
+    
+    email_lower = email.lower()
+    
+    # Check against patterns
+    for pattern in edu_patterns:
+        if re.search(pattern, email_lower):
+            return True
+    
+    # Additional check for common educational keywords
+    edu_keywords = ['college', 'university', 'institute', 'school', 'academy']
+    domain = email_lower.split('@')[1] if '@' in email_lower else ''
+    
+    for keyword in edu_keywords:
+        if keyword in domain:
+            return True
+    
+    return False

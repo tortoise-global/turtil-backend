@@ -26,10 +26,12 @@ variable "cloudfront_route53_zone_id" {
 }
 
 variable "cloudfront_acm_certificate_arn" {
-  type = map(string)
-  default = {
-    "dev"  = "arn:aws:acm:us-east-1:033464272864:certificate/18c4d54b-81f8-45af-b192-72fe1bba226b"
-    "test" = null
-    "prod" = null
-  }
+  description = "ACM certificate ARN for CloudFront distribution"
+  type        = string
+  default     = ""
+}
+
+# Local to construct the certificate ARN dynamically
+locals {
+  acm_certificate_arn = var.cloudfront_acm_certificate_arn != "" ? var.cloudfront_acm_certificate_arn : "arn:aws:acm:us-east-1:${var.ecr_account_id}:certificate/18c4d54b-81f8-45af-b192-72fe1bba226b"
 }

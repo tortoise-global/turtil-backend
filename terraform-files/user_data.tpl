@@ -94,17 +94,17 @@ sudo nginx -t
 sudo systemctl reload nginx
 
 # Pull latest image from ECR (IAM role handles authentication)
-ECR_URI="033464272864.dkr.ecr.ap-south-1.amazonaws.com"
+ECR_URI="${ecr_account_id}.dkr.ecr.ap-south-1.amazonaws.com"
 
 aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin $ECR_URI
 
-docker pull $ECR_URI/dev-fast-api-repo:latest
+docker pull $ECR_URI/${ecr_repository_name}:latest
 
 # Generate docker-compose.yml with environment variables
 cat <<EOF > /home/ubuntu/docker-compose.yml
 services:
   web:
-    image: $ECR_URI/dev-fast-api-repo:latest
+    image: $ECR_URI/${ecr_repository_name}:latest
     ports:
       - "8000:8000"
     environment:

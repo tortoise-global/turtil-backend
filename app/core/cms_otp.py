@@ -211,3 +211,27 @@ class CMSOTPManager:
         except Exception as e:
             print(f"Error refreshing session activity: {e}")
             return False
+    
+    @classmethod
+    async def store_blacklist_entry(cls, key: str, data: Dict[str, Any], ttl_seconds: int) -> bool:
+        """Store blacklist entry in Redis with TTL"""
+        try:
+            await redis_client.setex(
+                key,
+                ttl_seconds,
+                json.dumps(data, default=str)
+            )
+            return True
+        except Exception as e:
+            print(f"Error storing blacklist entry: {e}")
+            return False
+    
+    @classmethod
+    async def is_blacklisted(cls, key: str) -> bool:
+        """Check if a key exists in Redis blacklist"""
+        try:
+            result = await redis_client.get(key)
+            return result is not None
+        except Exception as e:
+            print(f"Error checking blacklist: {e}")
+            return False

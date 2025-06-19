@@ -83,6 +83,8 @@ jobs:
           TF_VAR_app_aws_ses_from_email: ${{ secrets.AWS_SES_FROM_EMAIL }}
           TF_VAR_app_aws_ses_region: ${{ secrets.AWS_SES_REGION }}
           TF_VAR_app_aws_default_region: ${{ secrets.AWS_DEFAULT_REGION }}
+          TF_VAR_ecr_account_id: ${{ secrets.ECR_ACCOUNT_ID }}
+          TF_VAR_ecr_repository_name: ${{ secrets.ECR_REPOSITORY_NAME }}
           TF_VAR_app_environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
           TF_VAR_app_debug: ${{ github.ref_name == 'main' && 'false' || 'true' }}
 
@@ -116,6 +118,8 @@ jobs:
           TF_VAR_app_aws_ses_from_email: ${{ secrets.AWS_SES_FROM_EMAIL }}
           TF_VAR_app_aws_ses_region: ${{ secrets.AWS_SES_REGION }}
           TF_VAR_app_aws_default_region: ${{ secrets.AWS_DEFAULT_REGION }}
+          TF_VAR_ecr_account_id: ${{ secrets.ECR_ACCOUNT_ID }}
+          TF_VAR_ecr_repository_name: ${{ secrets.ECR_REPOSITORY_NAME }}
           TF_VAR_app_environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
           TF_VAR_app_debug: ${{ github.ref_name == 'main' && 'false' || 'true' }}
 

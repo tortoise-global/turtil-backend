@@ -222,6 +222,93 @@ class EmailService:
             logger.error(f"Failed to send password reset email via SES: {e}")
             raise Exception(f"Failed to send password reset email: {e}")
 
+    @staticmethod
+    async def send_user_invitation_email(email: str, temporary_password: str, inviter_name: str, college_name: str) -> Dict[str, Any]:
+        """
+        Send user invitation email with temporary password using AWS SES.
+        """
+        try:
+            ses_client = get_ses_client()
+            
+            subject = f"Invitation to join {college_name} on Turtil CMS"
+            body = f"""
+            You have been invited by {inviter_name} to join {college_name} on Turtil CMS.
+            
+            Your temporary password is: {temporary_password}
+            
+            Please sign in using your email and this temporary password. You will be required to set a new password on your first login.
+            
+            Welcome to Turtil!
+            """
+            
+            response = ses_client.send_email(
+                Source=settings.aws_ses_from_email,
+                Destination={"ToAddresses": [email]},
+                Message={
+                    "Subject": {"Data": subject},
+                    "Body": {
+                        "Text": {"Data": body},
+                        "Html": {
+                            "Data": f"""
+                            <html>
+                                <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                                    <div style="background-color: #f8f9fa; padding: 30px; border-radius: 8px;">
+                                        <h2 style="color: #2563eb; margin-bottom: 20px;">You're Invited to Turtil CMS! 🎉</h2>
+                                        
+                                        <p style="font-size: 16px; line-height: 1.5; color: #374151;">
+                                            <strong>{inviter_name}</strong> has invited you to join <strong>{college_name}</strong> on Turtil CMS.
+                                        </p>
+                                        
+                                        <div style="background-color: white; padding: 20px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #2563eb;">
+                                            <h3 style="margin-top: 0; color: #1f2937;">Your Login Credentials</h3>
+                                            <p style="margin: 5px 0;"><strong>Email:</strong> {email}</p>
+                                            <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <code style="background-color: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-weight: bold;">{temporary_password}</code></p>
+                                        </div>
+                                        
+                                        <div style="background-color: #fef3c7; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+                                            <h4 style="margin-top: 0; color: #92400e;">⚠️ Important Security Notice</h4>
+                                            <ul style="margin: 10px 0; color: #92400e;">
+                                                <li>This is a temporary password for your first login only</li>
+                                                <li>You will be required to set a new secure password immediately after signing in</li>
+                                                <li>Please keep this information secure and do not share it with others</li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <a href="#" style="background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                                                Sign In to Turtil CMS
+                                            </a>
+                                        </div>
+                                        
+                                        <p style="font-size: 14px; color: #6b7280; text-align: center; margin-top: 30px;">
+                                            If you did not expect this invitation, please contact {college_name} directly.
+                                        </p>
+                                        
+                                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+                                        
+                                        <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+                                            This email was sent by Turtil CMS on behalf of {college_name}
+                                        </p>
+                                    </div>
+                                </body>
+                            </html>
+                            """
+                        }
+                    },
+                },
+            )
+            
+            logger.info(f"User invitation email sent successfully via SES. MessageId: {response['MessageId']}")
+            return {
+                "success": True,
+                "message_id": response['MessageId'],
+                "provider": "aws_ses"
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to send user invitation email via SES: {e}")
+            raise Exception(f"Failed to send user invitation email: {e}")
+
 
 class S3Service:
     """S3 service for file uploads"""

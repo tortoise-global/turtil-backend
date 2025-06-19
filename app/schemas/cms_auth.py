@@ -80,6 +80,12 @@ class CMSResetPasswordRequest(BaseModel):
         return v
 
 
+class CMSRefreshTokenRequest(BaseModel):
+    """Request schema for refreshing access token"""
+    refreshToken: str = Field(..., description="JWT refresh token")
+    cmsUserId: Optional[int] = Field(None, description="User ID for validation (optional)")
+
+
 # Response Schemas
 
 class CMSTokenResponse(BaseModel):
@@ -109,6 +115,8 @@ class CMSVerifySigninResponse(BaseModel):
     refreshToken: Optional[str] = Field(None, description="JWT refresh token for existing users")
     tokenType: Optional[str] = Field(None, description="Token type")
     expiresIn: Optional[int] = Field(None, description="Token expiry in seconds")
+    # For password reset flow
+    requiresPasswordReset: Optional[bool] = Field(None, description="Whether user must reset password")
     # For new users (registration)
     nextStep: Optional[str] = Field(None, description="Next step in registration for new users")
     tempToken: Optional[str] = Field(None, description="Temporary token for registration steps")
@@ -136,10 +144,21 @@ class CMSUserProfileResponse(BaseModel):
     departmentId: Optional[int]
     invitationStatus: str
     mustResetPassword: bool
+    isHod: bool
     createdAt: datetime
     
     class Config:
         from_attributes = True
+
+
+class CMSRefreshTokenResponse(BaseModel):
+    """Response schema for token refresh"""
+    success: bool = Field(..., description="Operation success status")
+    message: str = Field(..., description="Response message")
+    accessToken: str = Field(..., description="New JWT access token")
+    tokenType: str = Field(default="bearer", description="Token type")
+    expiresIn: int = Field(..., description="Token expiry in seconds")
+    user: CMSUserProfileResponse = Field(..., description="Updated user data")
 
 
 class CMSCollegeProfileResponse(BaseModel):

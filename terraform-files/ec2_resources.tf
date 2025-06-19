@@ -122,6 +122,8 @@ resource "aws_launch_template" "cms_fast_api" {
     aws_region                  = var.app_aws_region
     cors_origins                = var.app_cors_origins
     allowed_hosts               = var.app_allowed_hosts
+    ecr_account_id              = var.ecr_account_id
+    ecr_repository_name         = var.ecr_repository_name
   }))
 
   tags = {
@@ -193,7 +195,7 @@ module "cloudfront_with_alb" {
   alb_dns_name        = module.example_alb.alb_dns_name
   domain_name         = var.cloudfront_domain_name[terraform.workspace]
   route53_zone_id     = var.cloudfront_route53_zone_id[terraform.workspace]
-  acm_certificate_arn = var.cloudfront_acm_certificate_arn[terraform.workspace]
+  acm_certificate_arn = local.acm_certificate_arn
   default_root_object = ""
   tags = {
     Environment = lookup(var.ec2_env_tags, terraform.workspace)

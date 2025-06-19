@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
+from fastapi_pagination import add_pagination
 from contextlib import asynccontextmanager
 import logging
 import time
@@ -13,7 +14,8 @@ from app.database import init_db, close_db
 from app.redis_client import close_redis
 
 # Import API routers
-from app.api import upload, cms_auth
+from app.api import upload
+from app.api.cms import auth as cms_auth, users as cms_users, departments as cms_departments
 
 # Import health check dependencies
 from app.api.deps import check_system_health
@@ -209,6 +211,8 @@ async def app_info():
         },
         "endpoints": {
             "cmsAuth": "/api/cms/auth",
+            "cmsUsers": "/api/cms/users", 
+            "cmsDepartments": "/api/cms/departments",
             "fileUpload": "/api/file-upload",
             "health": "/health",
             "healthDetailed": "/health/detailed",
@@ -220,6 +224,11 @@ async def app_info():
 # Include API routers
 app.include_router(upload.router, prefix="/api")
 app.include_router(cms_auth.router, prefix="/api")
+app.include_router(cms_users.router, prefix="/api")
+app.include_router(cms_departments.router, prefix="/api")
+
+# Add pagination to the app
+add_pagination(app)
 
 
 # Rate limiting endpoint (for testing)

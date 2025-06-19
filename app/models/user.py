@@ -45,6 +45,7 @@ class User(BaseModel):
     must_reset_password = Column(Boolean, default=False, nullable=False)
     can_assign_department = Column(Boolean, default=False, nullable=False)
     invited_by_cms_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    is_hod = Column(Boolean, default=False, nullable=False)  # Head of Department status
     
     # Relationships
     # college = relationship("College", back_populates="users")
@@ -100,6 +101,7 @@ class User(BaseModel):
             "mustResetPassword": base_dict["must_reset_password"],
             "canAssignDepartment": base_dict["can_assign_department"],
             "invitedByCmsUserId": base_dict["invited_by_cms_user_id"],
+            "isHod": base_dict["is_hod"],
             "createdAt": base_dict["created_at"],
             "updatedAt": base_dict["updated_at"]
         }
