@@ -1,25 +1,20 @@
-import asyncio
 from logging.config import fileConfig
 from sqlalchemy import pool
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
+import asyncio
 import sys
 import os
 
 # Add the project root to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import our application configuration and models
 from app.config import settings
 from app.models.base import BaseModel
 
 # Import all models to ensure they're registered with SQLAlchemy
-from app.models.user import User
-from app.models.college import College
-from app.models.department import Department
-from app.models.cms_permission import CMSUserPermission
-from app.models.email_otp import CmsEmailOTP
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -30,7 +25,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set the database URL from our settings
+
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # add your model's MetaData object here
@@ -75,13 +70,9 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    """In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
+    """Run migrations in 'online' mode with asyncpg."""
+    connectable = create_async_engine(
+        settings.database_url,
         poolclass=pool.NullPool,
     )
 

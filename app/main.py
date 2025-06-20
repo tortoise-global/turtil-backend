@@ -6,7 +6,6 @@ from fastapi_pagination import add_pagination
 from contextlib import asynccontextmanager
 import logging
 import time
-from typing import Dict, Any, Annotated
 
 # Import configuration and core modules
 from app.config import settings
@@ -15,7 +14,11 @@ from app.redis_client import close_redis
 
 # Import API routers
 from app.api import upload
-from app.api.cms import auth as cms_auth, users as cms_users, departments as cms_departments
+from app.api.cms import (
+    auth as cms_auth,
+    staff as cms_staff,
+    departments as cms_departments,
+)
 
 # Import health check dependencies
 from app.api.deps import check_system_health
@@ -23,7 +26,7 @@ from app.api.deps import check_system_health
 # Configure logging
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -37,48 +40,51 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Turtil Backend...")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Debug mode: {settings.debug}")
-    
+
     try:
         # Check PostgreSQL connection
         logger.info("🔍 Checking PostgreSQL connection...")
         from app.database import check_db_health
+
         db_healthy = await check_db_health()
         if db_healthy:
             logger.info("✅ PostgreSQL connection successful")
         else:
             logger.error("❌ PostgreSQL connection failed")
             raise Exception("PostgreSQL connection verification failed")
-        
-        # Check Redis connection  
+
+        # Check Redis connection
         logger.info("🔍 Checking Redis connection...")
         from app.redis_client import redis_client
+
         redis_healthy = await redis_client.ping()
         if redis_healthy:
             logger.info("✅ Redis connection successful")
         else:
             logger.error("❌ Redis connection failed")
             raise Exception("Redis connection verification failed")
-        
+
         # Initialize database
         await init_db()
         logger.info("Database initialized successfully")
-        
+
         # Print configuration in debug mode
         if settings.debug:
             from app.config import print_config
+
             print_config()
-            
+
         logger.info("🚀 Turtil Backend started successfully - All connections verified")
-        
+
     except Exception as e:
         logger.error(f"Failed to start application: {e}")
         raise
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down Turtil Backend...")
-    
+
     try:
         await close_db()
         await close_redis()
@@ -95,8 +101,39 @@ app = FastAPI(
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
     openapi_url="/openapi.json" if settings.debug else None,
-    lifespan=lifespan
+    lifespan=lifespan,
 )
+
+
+# Configure OpenAPI security scheme for proper Swagger UI authentication display
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    from fastapi.openapi.utils import get_openapi
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    # Add JWT Bearer security scheme
+    openapi_schema["components"]["securitySchemes"] = {
+        "HTTPBearer": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "JWT token for CMS authentication. Format: Bearer <token>",
+        }
+    }
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
 
 # Add CORS middleware
 app.add_middleware(
@@ -108,10 +145,7 @@ app.add_middleware(
 )
 
 # Add trusted host middleware for security
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=settings.allowed_hosts
-)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 
 
 # Request timing middleware
@@ -135,8 +169,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "statusCode": exc.status_code,
             "message": exc.detail,
             "success": False,
-            "timestamp": time.time()
-        }
+            "timestamp": time.time(),
+        },
     )
 
 
@@ -144,15 +178,15 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def general_exception_handler(request: Request, exc: Exception):
     """Global exception handler for unhandled exceptions"""
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    
+
     return JSONResponse(
         status_code=500,
         content={
             "statusCode": 500,
             "message": "Internal server error" if not settings.debug else str(exc),
             "success": False,
-            "timestamp": time.time()
-        }
+            "timestamp": time.time(),
+        },
     )
 
 
@@ -165,7 +199,7 @@ async def root():
         "version": settings.version,
         "environment": settings.environment,
         "status": "healthy",
-        "timestamp": time.time()
+        "timestamp": time.time(),
     }
 
 
@@ -185,11 +219,7 @@ async def detailed_health_check():
         logger.error(f"Detailed health check failed: {e}")
         return JSONResponse(
             status_code=503,
-            content={
-                "status": "unhealthy",
-                "error": str(e),
-                "timestamp": time.time()
-            }
+            content={"status": "unhealthy", "error": str(e), "timestamp": time.time()},
         )
 
 
@@ -207,24 +237,24 @@ async def app_info():
             "file_upload": True,
             "aws_s3_integration": True,
             "redis_caching": True,
-            "camelcase_api": True
+            "camelcase_api": True,
         },
         "endpoints": {
             "cmsAuth": "/api/cms/auth",
-            "cmsUsers": "/api/cms/users", 
+            "cmsStaff": "/api/cms/staff",
             "cmsDepartments": "/api/cms/departments",
             "fileUpload": "/api/file-upload",
             "health": "/health",
             "healthDetailed": "/health/detailed",
-            "docs": "/docs" if settings.debug else "disabled"
-        }
+            "docs": "/docs" if settings.debug else "disabled",
+        },
     }
 
 
 # Include API routers
 app.include_router(upload.router, prefix="/api")
 app.include_router(cms_auth.router, prefix="/api")
-app.include_router(cms_users.router, prefix="/api")
+app.include_router(cms_staff.router, prefix="/api")
 app.include_router(cms_departments.router, prefix="/api")
 
 # Add pagination to the app
@@ -233,10 +263,12 @@ add_pagination(app)
 
 # Rate limiting endpoint (for testing)
 if settings.debug:
+
     @app.get("/debug/config", include_in_schema=False)
     async def debug_config():
         """Debug endpoint to view configuration (only in debug mode)"""
         from app.config import print_config
+
         print_config()
         return {"message": "Configuration printed to console"}
 
@@ -251,18 +283,18 @@ async def startup_message():
     🔧 Debug mode: {settings.debug}
     🌐 CORS origins: {settings.cors_origins}
     📡 Health checks: /health (simple), /health/detailed (comprehensive)
-    📚 API docs: {'/docs' if settings.debug else 'disabled'}
+    📚 API docs: {"/docs" if settings.debug else "disabled"}
     """)
 
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=8000,
         reload=settings.debug,
         log_level=settings.log_level.lower(),
-        access_log=settings.debug
+        access_log=settings.debug,
     )

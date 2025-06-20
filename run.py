@@ -7,7 +7,6 @@ for the current environment.
 """
 
 import uvicorn
-import os
 import sys
 from pathlib import Path
 
@@ -20,16 +19,16 @@ from app.config import settings
 
 def main():
     """Main entry point for the application"""
-    
+
     print(f"""
 🚀 Starting {settings.project_name} v{settings.version}
 📊 Environment: {settings.environment}
 🔧 Debug mode: {settings.debug}
 🌐 Server: http://0.0.0.0:8000
-📚 API docs: {'http://0.0.0.0:8000/docs' if settings.debug else 'disabled'}
+📚 API docs: {"http://0.0.0.0:8000/docs" if settings.debug else "disabled"}
 📡 Health check: http://0.0.0.0:8000/health
     """)
-    
+
     # Configure uvicorn based on environment
     if settings.environment == "production":
         # Production configuration
@@ -42,7 +41,7 @@ def main():
             log_level="info",
             access_log=False,
             server_header=False,
-            date_header=False
+            date_header=False,
         )
     else:
         # Development configuration
@@ -53,7 +52,7 @@ def main():
             reload=True,
             log_level=settings.log_level.lower(),
             access_log=True,
-            reload_dirs=[str(project_root / "app")]
+            reload_dirs=[str(project_root / "app")],
         )
 
 
