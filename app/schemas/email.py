@@ -1,48 +1,59 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import EmailStr, Field
 from typing import Optional
 from app.core.utils import CamelCaseModel
 
 
 # Email OTP Schemas - exactly matching your existing code structure
 
+
 class SendEmailRequest(CamelCaseModel):
     """Request schema for sending email OTP - matches your existing code"""
+
     email: EmailStr = Field(..., description="Email address to send OTP to")
 
 
 class EmailResponse(CamelCaseModel):
     """Response schema for email operations - matches your existing code"""
+
     message: str = Field(..., description="Response message")
     success: bool = Field(..., description="Operation success status")
 
 
 class VerifyEmailOTPRequest(CamelCaseModel):
     """Request schema for verifying email OTP"""
+
     email: EmailStr = Field(..., description="Email address")
     otp: str = Field(..., min_length=6, max_length=6, description="6-digit OTP code")
 
 
 class VerifyEmailOTPResponse(CamelCaseModel):
     """Response schema for OTP verification"""
+
     message: str = Field(..., description="Response message")
     success: bool = Field(..., description="Verification success status")
-    email_verified: bool = Field(default=False, description="Whether email is now verified")
+    email_verified: bool = Field(
+        default=False, description="Whether email is now verified"
+    )
 
 
 # S3 Upload Schemas - exactly matching your existing code structure
 
+
 class PresignedUrlRequest(CamelCaseModel):
     """Request schema for presigned URL generation - matches your existing code"""
+
     file_name: str = Field(..., description="Name of the file to upload")
 
 
 class PresignedUrlBody(CamelCaseModel):
     """Body schema for presigned URL response"""
+
     presigned_url: str = Field(..., description="Pre-signed URL for upload")
 
 
 class PresignedUrlResponse(CamelCaseModel):
     """Response schema for presigned URL - matches your existing code"""
+
     status_code: int = Field(..., alias="statusCode", description="HTTP status code")
     message: str = Field(..., description="Response message")
     body: Optional[PresignedUrlBody] = Field(None, description="Response body with URL")
@@ -50,8 +61,10 @@ class PresignedUrlResponse(CamelCaseModel):
 
 # Email configuration and status schemas
 
+
 class EmailConfigResponse(CamelCaseModel):
     """Response schema for email configuration status"""
+
     aws_ses_configured: bool = Field(..., description="Whether AWS SES is configured")
     gmail_configured: bool = Field(..., description="Whether Gmail is configured")
     primary_provider: str = Field(..., description="Primary email provider")
@@ -60,6 +73,7 @@ class EmailConfigResponse(CamelCaseModel):
 
 class EmailHealthResponse(CamelCaseModel):
     """Response schema for email service health check"""
+
     status: str = Field(..., description="Overall email service status")
     providers: dict = Field(..., description="Status of each email provider")
     last_check: str = Field(..., description="Timestamp of last health check")
@@ -67,8 +81,10 @@ class EmailHealthResponse(CamelCaseModel):
 
 # General email template schemas
 
+
 class EmailTemplate(CamelCaseModel):
     """Base email template schema"""
+
     subject: str = Field(..., description="Email subject")
     body_text: str = Field(..., description="Plain text email body")
     body_html: Optional[str] = Field(None, description="HTML email body")
@@ -77,12 +93,14 @@ class EmailTemplate(CamelCaseModel):
 
 class SendCustomEmailRequest(CamelCaseModel):
     """Request schema for sending custom emails"""
+
     to_email: EmailStr = Field(..., description="Recipient email address")
     template: EmailTemplate = Field(..., description="Email template")
-    
-    
+
+
 class SendCustomEmailResponse(CamelCaseModel):
     """Response schema for custom email sending"""
+
     message: str = Field(..., description="Response message")
     success: bool = Field(..., description="Send success status")
     message_id: Optional[str] = Field(None, description="Email provider message ID")

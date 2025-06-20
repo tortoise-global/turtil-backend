@@ -14,11 +14,13 @@ NAMING_CONVENTION = {
     "uq": "uq_%(table_name)s_%(column_0_name)s",
     "ck": "ck_%(table_name)s_%(constraint_name)s",
     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-    "pk": "pk_%(table_name)s"
+    "pk": "pk_%(table_name)s",
 }
+
 
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
 
 # Convert PostgreSQL URL to asyncpg format if needed
 def get_asyncpg_url(url: str) -> str:
@@ -28,6 +30,7 @@ def get_asyncpg_url(url: str) -> str:
     elif url.startswith("postgres://"):
         return url.replace("postgres://", "postgresql+asyncpg://", 1)
     return url
+
 
 # Create async engine
 engine = create_async_engine(
@@ -40,7 +43,7 @@ engine = create_async_engine(
         "server_settings": {
             "application_name": f"{settings.project_name}-{settings.environment}",
         }
-    }
+    },
 )
 
 # Create async session factory
@@ -56,10 +59,10 @@ AsyncSessionLocal = async_sessionmaker(
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency to get database session.
-    
+
     Usage in FastAPI:
-        @app.get("/users/")
-        async def get_users(db: AsyncSession = Depends(get_db)):
+        @app.get("/staff/")
+        async def get_staff(db: AsyncSession = Depends(get_db)):
             ...
     """
     async with AsyncSessionLocal() as session:
@@ -80,8 +83,8 @@ async def init_db() -> None:
     try:
         async with engine.begin() as conn:
             # Import all models here to ensure they are registered with Base
-            from app.models import user, email_otp, college, department, cms_permission  # noqa: F401
-            
+            from app.models import staff, email_otp, college, department, cms_permission  # noqa: F401
+
             logger.info("Creating database tables...")
             await conn.run_sync(Base.metadata.create_all)
             logger.info("Database tables created successfully")
@@ -112,6 +115,7 @@ async def check_db_health() -> bool:
         async with AsyncSessionLocal() as session:
             # Simple query to check connection
             from sqlalchemy import text
+
             result = await session.execute(text("SELECT 1"))
             return result.scalar() == 1
     except Exception as e:
@@ -122,12 +126,12 @@ async def check_db_health() -> bool:
 # Utility functions for database operations
 class DatabaseManager:
     """Database management utilities"""
-    
+
     @staticmethod
     async def create_tables():
         """Create all database tables"""
         await init_db()
-    
+
     @staticmethod
     async def health_check() -> dict:
         """Return detailed health check information"""
@@ -136,25 +140,28 @@ class DatabaseManager:
             return {
                 "database": {
                     "status": "healthy" if is_healthy else "unhealthy",
-                    "url": settings.database_url.split("@")[-1] if "@" in settings.database_url else "hidden",
-                    "engine": str(engine.url).split("@")[-1] if "@" in str(engine.url) else "hidden"
+                    "url": settings.database_url.split("@")[-1]
+                    if "@" in settings.database_url
+                    else "hidden",
+                    "engine": str(engine.url).split("@")[-1]
+                    if "@" in str(engine.url)
+                    else "hidden",
                 }
             }
         except Exception as e:
-            return {
-                "database": {
-                    "status": "error",
-                    "error": str(e)
-                }
-            }
-    
+            return {"database": {"status": "error", "error": str(e)}}
+
     @staticmethod
     async def get_connection_info() -> dict:
         """Get database connection information (non-sensitive)"""
         return {
-            "pool_size": engine.pool.size() if hasattr(engine.pool, 'size') else "N/A",
-            "pool_checked_in": engine.pool.checkedin() if hasattr(engine.pool, 'checkedin') else "N/A",
-            "pool_checked_out": engine.pool.checkedout() if hasattr(engine.pool, 'checkedout') else "N/A",
+            "pool_size": engine.pool.size() if hasattr(engine.pool, "size") else "N/A",
+            "pool_checked_in": engine.pool.checkedin()
+            if hasattr(engine.pool, "checkedin")
+            else "N/A",
+            "pool_checked_out": engine.pool.checkedout()
+            if hasattr(engine.pool, "checkedout")
+            else "N/A",
             "echo": engine.echo,
             "dialect": engine.dialect.name,
         }
