@@ -23,7 +23,7 @@ from app.schemas.staff_management import (
 from app.schemas.cms_auth import StaffProfileResponse
 from .auth import get_current_staff
 
-router = APIRouter(prefix="/cms/staff", tags=["Staff Management"])
+router = APIRouter(prefix="/cms/staff", tags=["CMS Staff Management"])
 
 # Security scheme for JWT tokens
 security = HTTPBearer(auto_error=False)
@@ -70,8 +70,7 @@ async def invite_staff(
         # Create new CMS staff with invitation fields
         new_staff = Staff(
             email=request.email,
-            first_name="",  # Will be filled during onboarding
-            last_name="",  # Will be filled during onboarding
+            full_name="",  # Will be filled during onboarding
             hashed_password=hashed_password,
             is_active=True,
             is_verified=False,  # Will be verified during first login
@@ -282,8 +281,6 @@ async def get_staff_by_id(
             cmsStaffId=staff.id,
             uuid=str(staff.uuid),
             email=staff.email,
-            firstName=staff.first_name,
-            lastName=staff.last_name,
             fullName=staff.full_name,
             cmsRole=staff.cms_role,
             collegeId=staff.college_id,

@@ -15,8 +15,7 @@ class Staff(BaseModel):
 
     # Basic staff information
     email = Column(String(255), unique=True, index=True, nullable=False)
-    first_name = Column(String(100), nullable=False)
-    last_name = Column(String(100), nullable=False)
+    full_name = Column(String(200), nullable=False)
 
     # Authentication
     hashed_password = Column(String(255), nullable=False)
@@ -56,10 +55,6 @@ class Staff(BaseModel):
     def __repr__(self):
         return f"<Staff(id={self.id}, email={self.email})>"
 
-    @property
-    def full_name(self) -> str:
-        """Get staff member's full name"""
-        return f"{self.first_name} {self.last_name}"
 
     def verify_email(self):
         """Mark email as verified"""
@@ -81,9 +76,7 @@ class Staff(BaseModel):
             "staffId": base_dict["id"],
             "uuid": str(self.uuid),
             "email": base_dict["email"],
-            "firstName": base_dict["first_name"],
-            "lastName": base_dict["last_name"],
-            "fullName": self.full_name,
+            "fullName": base_dict["full_name"],
             "isActive": base_dict["is_active"],
             "isVerified": base_dict["is_verified"],
             "isSuperstaff": base_dict["is_superstaff"],
@@ -111,11 +104,22 @@ class Staff(BaseModel):
 
     def to_token_payload(self) -> dict:
         """Create payload for JWT token"""
+        # Determine flow control flags
+        requires_password_reset = (
+            self.must_reset_password or 
+            self.temporary_password or
+            (self.invitation_status == "pending" and self.hashed_password)
+        )
+        
+        requires_details = (
+            not self.college_id or 
+            (self.cms_role == "principal" and self.invitation_status == "pending")
+        )
+        
         return {
             "sub": str(self.uuid),  # Subject (staff identifier)
             "email": self.email,
-            "firstName": self.first_name,
-            "lastName": self.last_name,
+            "fullName": self.full_name,
             "isVerified": self.is_verified,
             "isSuperstaff": self.is_superstaff,
             # CMS-specific token data
@@ -123,5 +127,6 @@ class Staff(BaseModel):
             "collegeId": self.college_id,
             "departmentId": self.department_id,
             "invitationStatus": self.invitation_status,
-            "mustResetPassword": self.must_reset_password,
+            "requiresPasswordReset": requires_password_reset,
+            "requiresDetails": requires_details,
         }

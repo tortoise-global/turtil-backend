@@ -35,7 +35,7 @@ class OTPManager:
         Args:
             email: Staff's email address
             otp: Generated OTP
-            signup_data: Staff registration data (first_name, last_name, password)
+            signup_data: Staff registration data (full_name, password)
             signup_token: Unique signup token
             expiry_minutes: OTP expiration time (defaults to config value)
         """
@@ -47,7 +47,7 @@ class OTPManager:
                 "otp": otp,
                 "email": email,
                 "signup_token": signup_token,
-                "signup_data": signup_data,  # Contains: first_name, last_name, password
+                "signup_data": signup_data,  # Contains: full_name, password
                 "created_at": datetime.now().isoformat(),
                 "expires_at": (datetime.now() + timedelta(minutes=expiry)).isoformat(),
             }

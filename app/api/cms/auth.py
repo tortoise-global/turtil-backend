@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Response, Request, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -270,30 +270,51 @@ async def verify_signin(
                 staff.invitation_status = "accepted"
                 staff.is_verified = True  # Email is now verified
                 await db.commit()
+                
+                # Refresh staff data
+                await db.refresh(staff)
 
-                # Return temporary token for password reset
-                temp_token = cms_auth.create_temp_token(staff, "password_reset")
+                # Generate JWT tokens for invited staff (they need password reset)
+                access_token = cms_auth.create_access_token(staff)
+                refresh_token = cms_auth.create_refresh_token(staff)
+                
+                # Create staff session in Redis
+                await cms_auth.create_staff_session(staff, access_token)
+
                 return CMSVerifySigninResponse(
                     success=True,
                     message="Welcome! Please set up your new password to complete registration.",
                     staffExists=True,
-                    accessToken=temp_token,
-                    tokenType="temp",
-                    expiresIn=30 * 60,  # 30 minutes
-                    requiresPasswordReset=True,
+                    accessToken=access_token,
+                    refreshToken=refresh_token,
+                    tokenType="bearer",
+                    expiresIn=cms_auth.access_token_expire_minutes * 60,
                 )
 
             # Case 2: Existing staff who must reset password
             elif staff.must_reset_password:
-                temp_token = cms_auth.create_temp_token(staff, "password_reset")
+                # Update verification status
+                staff.is_verified = True
+                await db.commit()
+                
+                # Refresh staff data
+                await db.refresh(staff)
+
+                # Generate JWT tokens (they will have requiresPasswordReset flag)
+                access_token = cms_auth.create_access_token(staff)
+                refresh_token = cms_auth.create_refresh_token(staff)
+                
+                # Create staff session in Redis
+                await cms_auth.create_staff_session(staff, access_token)
+
                 return CMSVerifySigninResponse(
                     success=True,
                     message="Login successful. Please reset your password.",
                     staffExists=True,
-                    accessToken=temp_token,
-                    tokenType="temp",
-                    expiresIn=30 * 60,  # 30 minutes
-                    requiresPasswordReset=True,
+                    accessToken=access_token,
+                    refreshToken=refresh_token,
+                    tokenType="bearer",
+                    expiresIn=cms_auth.access_token_expire_minutes * 60,
                 )
 
             # Case 3: Regular staff login
@@ -326,47 +347,56 @@ async def verify_signin(
                 # Update staff as verified since OTP was verified
                 staff.is_verified = True
                 await db.commit()
+                
+                # Refresh staff data
+                await db.refresh(staff)
 
-                # Return temp token for registration completion
-                temp_token = cms_auth.create_temp_token(staff, "registration")
+                # Generate JWT tokens for registration flow
+                access_token = cms_auth.create_access_token(staff)
+                refresh_token = cms_auth.create_refresh_token(staff)
+                
+                # Create staff session in Redis
+                await cms_auth.create_staff_session(staff, access_token)
+
                 return CMSVerifySigninResponse(
                     success=True,
                     message="Email verified. Please complete your registration.",
-                    staffExists=False,
-                    nextStep="password_setup",
-                    tempToken=temp_token,
+                    staffExists=True,  # User exists but needs registration
+                    accessToken=access_token,
+                    refreshToken=refresh_token,
+                    tokenType="bearer",
+                    expiresIn=cms_auth.access_token_expire_minutes * 60,
                 )
 
         else:
             # NEW USER REGISTRATION FLOW
-            if not staff:
-                # Create new staff record for registration
-                staff = Staff(
-                    email=request.email.lower(),
-                    first_name="",  # Will be filled in step 3
-                    last_name="",  # Will be filled in step 3
-                    hashed_password="",  # Will be filled in step 2
-                    is_verified=True,  # Email is verified
-                    invitation_status="pending",
-                )
-                db.add(staff)
-                await db.commit()
-                await db.refresh(staff)
-            else:
-                # Update existing staff
-                staff.is_verified = True
-                staff.email_verified_at = datetime.now(timezone.utc)
-                await db.commit()
+            # Create new staff record for registration
+            staff = Staff(
+                email=request.email.lower(),
+                full_name="",  # Will be filled in personal details step
+                hashed_password="",  # Will be filled in password setup step
+                is_verified=True,  # Email is verified
+                invitation_status="pending",
+            )
+            db.add(staff)
+            await db.commit()
+            await db.refresh(staff)
 
-            # Generate temporary token for registration steps
-            temp_token = cms_auth.create_temp_token(staff, "registration")
+            # Generate JWT tokens for new user registration flow
+            access_token = cms_auth.create_access_token(staff)
+            refresh_token = cms_auth.create_refresh_token(staff)
+            
+            # Create staff session in Redis
+            await cms_auth.create_staff_session(staff, access_token)
 
             return CMSVerifySigninResponse(
                 success=True,
                 message="OTP verified successfully. Please complete registration.",
-                staffExists=False,
-                nextStep="password_setup",
-                tempToken=temp_token,
+                staffExists=True,  # User exists but needs complete registration
+                accessToken=access_token,
+                refreshToken=refresh_token,
+                tokenType="bearer",
+                expiresIn=cms_auth.access_token_expire_minutes * 60,
             )
 
     except HTTPException:
@@ -447,8 +477,6 @@ async def refresh_token(
                 cmsStaffId=staff.id,
                 uuid=str(staff.uuid),
                 email=staff.email,
-                firstName=staff.first_name,
-                lastName=staff.last_name,
                 fullName=staff.full_name,
                 cmsRole=staff.cms_role,
                 collegeId=staff.college_id,
@@ -471,21 +499,21 @@ async def refresh_token(
 
 @router.post(
     "/password-setup",
-    response_model=CMSRegistrationStepResponse,
+    response_model=CMSTokenResponse,
     dependencies=[Depends(security)],
 )
 async def password_setup(
     request: CMSPasswordSetupRequest,
-    current_staff: Staff = Depends(get_current_staff_from_temp_token),
+    current_staff: Staff = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Step 2: Set password for the staff
-    - Validate temporary token
+    Set password for the staff during registration
     - Hash and store password
+    Returns updated JWT tokens with new registration state
     """
     try:
-        # Validate staff from temp token matches request email
+        # Validate staff from JWT matches request email
         if current_staff.email.lower() != request.email.lower():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -506,15 +534,18 @@ async def password_setup(
         current_staff.temporary_password = False
         current_staff.must_reset_password = False
         await db.commit()
+        
+        # Refresh staff data to get updated state
+        await db.refresh(current_staff)
 
-        # Generate new temp token for next step
-        temp_token = cms_auth.create_temp_token(current_staff, "registration")
+        # Generate new JWT tokens with updated registration state
+        token_data = await cms_auth.refresh_user_tokens(current_staff)
 
-        return CMSRegistrationStepResponse(
-            success=True,
-            message="Password set successfully.",
-            nextStep="personal_details",
-            tempToken=temp_token,
+        return CMSTokenResponse(
+            accessToken=token_data["accessToken"],
+            refreshToken=token_data["refreshToken"],
+            tokenType=token_data["tokenType"],
+            expiresIn=token_data["expiresIn"],
         )
 
     except HTTPException:
@@ -574,31 +605,34 @@ async def reset_password(
 
 @router.post(
     "/personal-details",
-    response_model=CMSRegistrationStepResponse,
+    response_model=CMSTokenResponse,
     dependencies=[Depends(security)],
 )
 async def personal_details(
     request: CMSPersonalDetailsRequest,
-    current_staff: Staff = Depends(get_current_staff_from_temp_token),
+    current_staff: Staff = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Step 3: Set personal details for registration
+    Step 1: Set personal details for registration
+    Returns updated JWT tokens with new registration state
     """
     try:
         # Update personal details for authenticated staff
-        current_staff.first_name = request.firstName
-        current_staff.last_name = request.lastName
+        current_staff.full_name = request.fullName
         await db.commit()
+        
+        # Refresh staff data to get updated state
+        await db.refresh(current_staff)
 
-        # Generate new temp token for next step
-        temp_token = cms_auth.create_temp_token(current_staff, "registration")
+        # Generate new JWT tokens with updated registration state
+        token_data = await cms_auth.refresh_user_tokens(current_staff)
 
-        return CMSRegistrationStepResponse(
-            success=True,
-            message="Personal details saved successfully.",
-            nextStep="college_details",
-            tempToken=temp_token,
+        return CMSTokenResponse(
+            accessToken=token_data["accessToken"],
+            refreshToken=token_data["refreshToken"],
+            tokenType=token_data["tokenType"],
+            expiresIn=token_data["expiresIn"],
         )
 
     except HTTPException:
@@ -613,18 +647,19 @@ async def personal_details(
 
 @router.post(
     "/college-details",
-    response_model=CMSRegistrationStepResponse,
+    response_model=CMSTokenResponse,
     dependencies=[Depends(security)],
 )
 async def college_details(
     request: CMSCollegeDetailsRequest,
-    current_staff: Staff = Depends(get_current_staff_from_temp_token),
+    current_staff: Staff = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Step 4: Set college details
+    Step 2: Set college details
     - Create new college record
     - Link staff as principal
+    Returns updated JWT tokens with new registration state
     """
     try:
         # Validate staff doesn't already have a college
@@ -634,7 +669,7 @@ async def college_details(
                 detail="Staff already has a college assigned",
             )
 
-        # Create college record
+        # Create college record with placeholder address
         college = College(
             name=request.name,
             short_name=request.shortName,
@@ -657,15 +692,18 @@ async def college_details(
         current_staff.cms_role = "principal"
         current_staff.can_assign_department = True
         await db.commit()
+        
+        # Refresh staff data to get updated state
+        await db.refresh(current_staff)
 
-        # Generate new temp token for final step
-        temp_token = cms_auth.create_temp_token(current_staff, "registration")
+        # Generate new JWT tokens with updated registration state
+        token_data = await cms_auth.refresh_user_tokens(current_staff)
 
-        return CMSRegistrationStepResponse(
-            success=True,
-            message="College details saved successfully.",
-            nextStep="address_details",
-            tempToken=temp_token,
+        return CMSTokenResponse(
+            accessToken=token_data["accessToken"],
+            refreshToken=token_data["refreshToken"],
+            tokenType=token_data["tokenType"],
+            expiresIn=token_data["expiresIn"],
         )
 
     except HTTPException:
@@ -685,13 +723,14 @@ async def college_details(
 )
 async def address_details(
     request: CMSAddressDetailsRequest,
-    current_staff: Staff = Depends(get_current_staff_from_temp_token),
+    current_staff: Staff = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Step 5: Set address details (final registration step)
+    Step 3: Set address details (final registration step)
     - Complete college address
-    - Generate final JWT tokens
+    - Mark registration as complete
+    Returns updated JWT tokens with completed registration state
     """
     try:
         # Validate staff has a college
@@ -721,23 +760,22 @@ async def address_details(
         college.latitude = request.latitude
         college.longitude = request.longitude
 
-        # Mark staff as active
+        # Mark staff registration as complete
         current_staff.invitation_status = "active"
 
         await db.commit()
+        
+        # Refresh staff data to get updated state
+        await db.refresh(current_staff)
 
-        # Generate final JWT tokens
-        access_token = cms_auth.create_access_token(current_staff)
-        refresh_token = cms_auth.create_refresh_token(current_staff)
-
-        # Create staff session in Redis
-        await cms_auth.create_staff_session(current_staff, access_token)
+        # Generate new JWT tokens with completed registration state
+        token_data = await cms_auth.refresh_user_tokens(current_staff)
 
         return CMSTokenResponse(
-            accessToken=access_token,
-            refreshToken=refresh_token,
-            tokenType="bearer",
-            expiresIn=cms_auth.access_token_expire_minutes * 60,
+            accessToken=token_data["accessToken"],
+            refreshToken=token_data["refreshToken"],
+            tokenType=token_data["tokenType"],
+            expiresIn=token_data["expiresIn"],
         )
 
     except HTTPException:
@@ -783,8 +821,6 @@ async def get_current_staff_profile(current_staff: Staff = Depends(get_current_s
         cmsStaffId=current_staff.id,
         uuid=str(current_staff.uuid),
         email=current_staff.email,
-        firstName=current_staff.first_name,
-        lastName=current_staff.last_name,
         fullName=current_staff.full_name,
         cmsRole=current_staff.cms_role,
         collegeId=current_staff.college_id,
@@ -794,3 +830,251 @@ async def get_current_staff_profile(current_staff: Staff = Depends(get_current_s
         isHod=current_staff.is_hod,
         createdAt=current_staff.created_at,
     )
+
+
+# HTTP-only Cookie-based Authentication Endpoints
+
+@router.post("/signin-cookie", response_model=CMSSigninResponse)
+async def signin_cookie(
+    request: CMSSigninRequest, 
+    response: Response,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Cookie-based Sign-in: Send OTP and prepare for cookie authentication
+    Same as regular signin but prepares response for cookie-based flow
+    """
+    # Use the same logic as regular signin
+    return await signin(request, db)
+
+
+@router.post("/verify-signin-cookie", response_model=CMSVerifySigninResponse)
+async def verify_signin_cookie(
+    request: CMSVerifySigninRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Verify Sign-in OTP and set HTTP-only cookies
+    Same as regular verify-signin but sets cookies instead of returning tokens
+    """
+    # Get the regular response first
+    signin_response = await verify_signin(request, db)
+    
+    if signin_response.success and signin_response.accessToken and signin_response.refreshToken:
+        # Set HTTP-only cookies
+        response.set_cookie(
+            key="access_token",
+            value=signin_response.accessToken,
+            httponly=True,
+            secure=True,  # Use HTTPS in production
+            samesite="strict",
+            max_age=signin_response.expiresIn,
+            path="/",
+        )
+        
+        response.set_cookie(
+            key="refresh_token", 
+            value=signin_response.refreshToken,
+            httponly=True,
+            secure=True,
+            samesite="strict",
+            max_age=cms_auth.refresh_token_expire_days * 24 * 60 * 60,  # Convert days to seconds
+            path="/",
+        )
+        
+        # Return response without tokens (they're in cookies now)
+        return CMSVerifySigninResponse(
+            success=signin_response.success,
+            message=signin_response.message,
+            staffExists=signin_response.staffExists,
+            tokenType="bearer",
+            expiresIn=signin_response.expiresIn,
+        )
+    
+    return signin_response
+
+
+@router.get("/token")
+async def get_access_token(
+    access_token: str = Cookie(None, alias="access_token"),
+    refresh_token: str = Cookie(None, alias="refresh_token")
+):
+    """
+    Get current access token from HTTP-only cookie
+    Used by frontend to retrieve token for API calls
+    """
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No access token found in cookies"
+        )
+    
+    try:
+        # Verify token is still valid
+        payload = cms_auth.decode_token(access_token)
+        
+        return {
+            "accessToken": access_token,
+            "tokenType": "bearer",
+            "expiresIn": cms_auth.access_token_expire_minutes * 60,
+        }
+    except HTTPException:
+        # Token is invalid/expired
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token is invalid or expired"
+        )
+
+
+@router.post("/refresh-cookie")
+async def refresh_token_cookie(
+    response: Response,
+    refresh_token: str = Cookie(None, alias="refresh_token"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Refresh access token using refresh token from cookie
+    Sets new access token in HTTP-only cookie
+    """
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No refresh token found in cookies"
+        )
+    
+    # Use existing refresh token logic
+    refresh_request = CMSRefreshTokenRequest(refreshToken=refresh_token)
+    refresh_response = await refresh_token(refresh_request, db)
+    
+    if refresh_response.success and refresh_response.accessToken:
+        # Set new access token in cookie
+        response.set_cookie(
+            key="access_token",
+            value=refresh_response.accessToken,
+            httponly=True,
+            secure=True,
+            samesite="strict", 
+            max_age=refresh_response.expiresIn,
+            path="/",
+        )
+        
+        return {
+            "accessToken": refresh_response.accessToken,
+            "tokenType": refresh_response.tokenType,
+            "expiresIn": refresh_response.expiresIn,
+        }
+    
+    # If refresh failed, clear cookies
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
+    
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Failed to refresh token"
+    )
+
+
+@router.post("/logout-cookie")
+async def logout_cookie(
+    response: Response,
+    access_token: str = Cookie(None, alias="access_token"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Logout and clear HTTP-only cookies
+    """
+    # If we have an access token, perform server-side logout
+    if access_token:
+        try:
+            # Decode token to get staff info
+            payload = cms_auth.decode_token(access_token)
+            staff_uuid = payload.get("sub")
+            
+            if staff_uuid:
+                # Get staff from database
+                result = await db.execute(select(Staff).where(Staff.uuid == staff_uuid))
+                staff = result.scalar_one_or_none()
+                
+                if staff:
+                    # Invalidate session
+                    await cms_auth.invalidate_staff_session(staff.id, access_token)
+        except Exception as e:
+            print(f"Error during cookie logout: {e}")
+    
+    # Clear cookies regardless of server-side logout success
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
+    
+    return {"success": True, "message": "Logged out successfully"}
+
+
+# Helper function to get current staff from cookies
+async def get_current_staff_from_cookie(
+    access_token: str = Cookie(None, alias="access_token"),
+    db: AsyncSession = Depends(get_db)
+) -> Staff:
+    """
+    Get current authenticated staff from HTTP-only cookie
+    Alternative to get_current_staff for cookie-based auth
+    """
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        # Check if token is blacklisted
+        is_blacklisted = await cms_auth.is_token_blacklisted(access_token)
+        if is_blacklisted:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked",
+            )
+
+        # Decode token
+        payload = cms_auth.decode_token(access_token)
+
+        # Validate token type
+        if payload.get("type") != "access":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type"
+            )
+
+        # Get staff UUID from token
+        staff_uuid = payload.get("sub")
+        if not staff_uuid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
+            )
+
+        # Get staff from database
+        result = await db.execute(select(Staff).where(Staff.uuid == staff_uuid))
+        staff = result.scalar_one_or_none()
+
+        if not staff or not staff.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Staff not found or inactive",
+            )
+
+        # Validate session in Redis
+        session_data = await cms_auth.validate_session(staff.id, access_token)
+        if not session_data:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session expired or invalid",
+            )
+
+        return staff
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting current CMS staff from cookie: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+        )

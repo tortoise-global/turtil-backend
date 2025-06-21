@@ -28,6 +28,9 @@ class CMSOTPManager:
     @classmethod
     def generate_otp(cls) -> str:
         """Generate a 6-digit OTP"""
+        # Use fixed OTP in development mode
+        if settings.is_development:
+            return settings.dev_otp
         return "".join([str(secrets.randbelow(10)) for _ in range(cls.OTP_LENGTH)])
 
     @classmethod
@@ -55,7 +58,7 @@ class CMSOTPManager:
     async def verify_otp(cls, email: str, provided_otp: str) -> Dict[str, Any]:
         """
         Verify OTP and track attempts
-        Returns: {"valid": bool, "attempts": int, "exceeded": bool, "expired": bool}
+        Returns: {"valid": bool, "attempts": int, "exceeded": bool, "expired": bool, "verified": bool}
         """
         try:
             key = cls._get_otp_key(email)
@@ -67,6 +70,7 @@ class CMSOTPManager:
                     "attempts": 0,
                     "exceeded": False,
                     "expired": True,
+                    "verified": False,
                 }
 
             otp_data = json.loads(otp_data_str)
@@ -79,6 +83,7 @@ class CMSOTPManager:
                     "attempts": current_attempts,
                     "exceeded": True,
                     "expired": False,
+                    "verified": otp_data.get("verified", False),
                 }
 
             # Increment attempts
@@ -88,13 +93,21 @@ class CMSOTPManager:
             is_valid = otp_data["otp"] == provided_otp
 
             if is_valid:
-                # Clear OTP on successful verification
-                await redis_client.delete(key)
+                # Mark OTP as verified but don't clear it
+                otp_data["verified"] = True
+                otp_data["verified_at"] = datetime.now(timezone.utc).isoformat()
+                
+                # Update OTP in Redis with remaining TTL
+                ttl = await redis_client.ttl(key)
+                if ttl > 0:
+                    await redis_client.setex(key, ttl, json.dumps(otp_data))
+                
                 return {
                     "valid": True,
                     "attempts": otp_data["attempts"],
                     "exceeded": False,
                     "expired": False,
+                    "verified": True,
                 }
             else:
                 # Update attempts in Redis
@@ -107,11 +120,12 @@ class CMSOTPManager:
                     "attempts": otp_data["attempts"],
                     "exceeded": otp_data["attempts"] >= cls.MAX_ATTEMPTS,
                     "expired": False,
+                    "verified": otp_data.get("verified", False),
                 }
 
         except Exception as e:
             print(f"Error verifying OTP: {e}")
-            return {"valid": False, "attempts": 0, "exceeded": False, "expired": True}
+            return {"valid": False, "attempts": 0, "exceeded": False, "expired": True, "verified": False}
 
     @classmethod
     async def clear_otp(cls, email: str) -> bool:
@@ -140,6 +154,91 @@ class CMSOTPManager:
         except Exception as e:
             print(f"Error getting OTP attempts: {e}")
             return 0
+
+    @classmethod
+    async def get_otp_status(cls, email: str) -> Dict[str, Any]:
+        """Get OTP status including verification state"""
+        try:
+            key = cls._get_otp_key(email)
+            otp_data_str = await redis_client.get(key)
+
+            if not otp_data_str:
+                return {
+                    "exists": False,
+                    "verified": False,
+                    "expired": True,
+                    "attempts": 0,
+                    "exceeded": False,
+                }
+
+            otp_data = json.loads(otp_data_str)
+            current_attempts = otp_data.get("attempts", 0)
+
+            return {
+                "exists": True,
+                "verified": otp_data.get("verified", False),
+                "expired": False,
+                "attempts": current_attempts,
+                "exceeded": current_attempts >= cls.MAX_ATTEMPTS,
+                "created_at": otp_data.get("created_at"),
+                "verified_at": otp_data.get("verified_at"),
+            }
+
+        except Exception as e:
+            print(f"Error getting OTP status: {e}")
+            return {
+                "exists": False,
+                "verified": False,
+                "expired": True,
+                "attempts": 0,
+                "exceeded": False,
+            }
+
+    @classmethod
+    async def is_otp_verified(cls, email: str) -> bool:
+        """Check if OTP is verified and still valid"""
+        try:
+            status = await cls.get_otp_status(email)
+            return status["exists"] and status["verified"] and not status["expired"]
+        except Exception as e:
+            print(f"Error checking OTP verification: {e}")
+            return False
+
+    @classmethod
+    async def mark_otp_verified(cls, email: str) -> bool:
+        """Mark OTP as verified without clearing it"""
+        try:
+            key = cls._get_otp_key(email)
+            otp_data_str = await redis_client.get(key)
+
+            if not otp_data_str:
+                return False
+
+            otp_data = json.loads(otp_data_str)
+            otp_data["verified"] = True
+            otp_data["verified_at"] = datetime.now(timezone.utc).isoformat()
+
+            # Update OTP in Redis with remaining TTL
+            ttl = await redis_client.ttl(key)
+            if ttl > 0:
+                await redis_client.setex(key, ttl, json.dumps(otp_data))
+                return True
+            return False
+
+        except Exception as e:
+            print(f"Error marking OTP as verified: {e}")
+            return False
+
+    @classmethod
+    async def expire_otp(cls, email: str) -> bool:
+        """Manually expire OTP (used after password setup)"""
+        try:
+            key = cls._get_otp_key(email)
+            await redis_client.delete(key)
+            return True
+        except Exception as e:
+            print(f"Error expiring OTP: {e}")
+            return False
 
     @classmethod
     async def store_staff_session(

@@ -14,11 +14,8 @@ class SignupInitRequest(CamelCaseModel):
     password: str = Field(
         ..., min_length=8, description="Staff password (min 8 characters)"
     )
-    first_name: str = Field(
-        ..., min_length=1, max_length=100, description="Staff first name"
-    )
-    last_name: str = Field(
-        ..., min_length=1, max_length=100, description="Staff last name"
+    full_name: str = Field(
+        ..., min_length=1, max_length=200, description="Staff full name"
     )
 
     @field_validator("password")
@@ -55,11 +52,8 @@ class StaffRegisterRequest(CamelCaseModel):
     password: str = Field(
         ..., min_length=8, description="Staff password (min 8 characters)"
     )
-    first_name: str = Field(
-        ..., min_length=1, max_length=100, description="Staff first name"
-    )
-    last_name: str = Field(
-        ..., min_length=1, max_length=100, description="Staff last name"
+    full_name: str = Field(
+        ..., min_length=1, max_length=200, description="Staff full name"
     )
 
     @field_validator("password")
@@ -146,8 +140,6 @@ class StaffResponse(CamelCaseModel):
     id: int = Field(..., description="Staff ID")
     uuid: str = Field(..., description="Staff UUID")
     email: str = Field(..., description="Staff email")
-    first_name: str = Field(..., description="Staff first name")
-    last_name: str = Field(..., description="Staff last name")
     full_name: str = Field(..., description="Staff full name")
     is_active: bool = Field(..., description="Staff active status")
     is_verified: bool = Field(..., description="Email verification status")
@@ -210,8 +202,7 @@ class TokenPayload(BaseModel):
 
     sub: str = Field(..., description="Subject (staff UUID)")
     email: str = Field(..., description="Staff email")
-    first_name: str = Field(..., description="Staff first name")
-    last_name: str = Field(..., description="Staff last name")
+    full_name: str = Field(..., description="Staff full name")
     is_verified: bool = Field(..., description="Email verification status")
     is_superstaff: bool = Field(..., description="Superstaff status")
     exp: int = Field(..., description="Token expiration timestamp")
