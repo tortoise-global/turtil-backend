@@ -28,26 +28,73 @@ class CMSAuthManager:
         return self.pwd_context.hash(password)
 
     def create_access_token(self, staff: Staff) -> str:
-        """Create JWT access token with staff permissions"""
+        """Create JWT access token with staff permissions and registration state"""
         now = datetime.now(timezone.utc)
         expire = now + timedelta(minutes=self.access_token_expire_minutes)
+
+        # Determine if user requires password reset
+        requires_password_reset = (
+            staff.must_reset_password or 
+            staff.temporary_password or
+            (staff.invitation_status == "pending" and staff.hashed_password)
+        )
+        
+        # Determine granular registration step completion
+        personal_details_completed = bool(staff.full_name and staff.full_name.strip())
+        college_details_completed = staff.college_id is not None
+        address_details_completed = college_details_completed  # Address is part of college creation
+        
+        # Overall registration completion check
+        requires_details = (
+            not personal_details_completed or
+            not college_details_completed or
+            not address_details_completed or
+            staff.invitation_status == "pending"
+        )
 
         payload = {
             "sub": str(staff.uuid),
             "email": staff.email,
-            "firstName": staff.first_name,
-            "lastName": staff.last_name,
+            "fullName": staff.full_name,
             "cmsRole": staff.cms_role,
             "collegeId": staff.college_id,
             "departmentId": staff.department_id,
             "invitationStatus": staff.invitation_status,
-            "mustResetPassword": staff.must_reset_password,
+            "isHod": staff.is_hod,
+            "requiresPasswordReset": requires_password_reset,
+            "requiresDetails": requires_details,
+            # Granular registration step flags
+            "personalDetailsCompleted": personal_details_completed,
+            "collegeDetailsCompleted": college_details_completed,
+            "addressDetailsCompleted": address_details_completed,
             "exp": expire,
             "iat": now,
             "type": "access",
         }
 
         return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
+
+    async def refresh_user_tokens(self, staff: Staff) -> dict:
+        """
+        Generate new JWT tokens for staff and invalidate old session
+        Used after registration step completion to update JWT flags
+        """
+        # Generate new tokens with updated staff state
+        access_token = self.create_access_token(staff)
+        refresh_token = self.create_refresh_token(staff)
+        
+        # Invalidate old sessions (user will use new tokens)
+        await self.invalidate_staff_sessions(staff.id)
+        
+        # Create new session
+        await self.create_staff_session(staff, access_token)
+        
+        return {
+            "accessToken": access_token,
+            "refreshToken": refresh_token,
+            "tokenType": "bearer",
+            "expiresIn": self.access_token_expire_minutes * 60,
+        }
 
     def create_refresh_token(self, staff: Staff) -> str:
         """Create JWT refresh token"""
@@ -67,11 +114,12 @@ class CMSAuthManager:
     def create_temp_token(self, staff: Staff, purpose: str = "registration") -> str:
         """Create temporary token for multi-step processes"""
         now = datetime.now(timezone.utc)
-        expire = now + timedelta(minutes=30)  # 30 minutes for registration steps
+        expire = now + timedelta(minutes=self.access_token_expire_minutes)  # Normal JWT expiry
 
         payload = {
             "sub": str(staff.uuid),
             "email": staff.email,
+            "staffId": staff.id,
             "purpose": purpose,
             "exp": expire,
             "iat": now,
@@ -100,6 +148,18 @@ class CMSAuthManager:
             # Get staff permissions based on role
             permissions = await self.get_staff_permissions(staff)
 
+            # Determine flow control flags (same logic as JWT)
+            requires_password_reset = (
+                staff.must_reset_password or 
+                staff.temporary_password or
+                (staff.invitation_status == "pending" and staff.hashed_password)
+            )
+            
+            requires_details = (
+                not staff.college_id or 
+                (staff.cms_role == "principal" and staff.invitation_status == "pending")
+            )
+
             session_data = {
                 "refreshToken": refresh_token,
                 "permissions": permissions,
@@ -107,7 +167,8 @@ class CMSAuthManager:
                 "collegeId": staff.college_id,
                 "departmentId": staff.department_id,
                 "invitationStatus": staff.invitation_status,
-                "mustResetPassword": staff.must_reset_password,
+                "requiresPasswordReset": requires_password_reset,
+                "requiresDetails": requires_details,
                 "lastActivity": datetime.now(timezone.utc).isoformat(),
             }
 
@@ -171,6 +232,48 @@ class CMSAuthManager:
         except Exception as e:
             print(f"Error validating session: {e}")
             return None
+
+    async def validate_temp_token(self, token: str, required_purpose: str = None) -> Optional[Dict[str, Any]]:
+        """Validate temporary token and return payload"""
+        try:
+            # Decode temp token
+            payload = self.decode_token(token)
+
+            # Validate token type
+            if payload.get("type") != "temp":
+                return None
+
+            # Validate purpose if specified
+            if required_purpose and payload.get("purpose") != required_purpose:
+                return None
+
+            # For registration temp tokens, we trust they were created after OTP verification
+            # No need to re-check OTP status since the token itself proves OTP was verified
+            # when it was created. OTP verification is handled at the endpoint level if needed.
+
+            return payload
+
+        except Exception as e:
+            print(f"Error validating temp token: {e}")
+            return None
+
+    async def validate_temp_token_with_otp(self, token: str, email: str) -> bool:
+        """Validate temp token and ensure OTP is still verified for the email"""
+        try:
+            payload = await self.validate_temp_token(token, "registration")
+            if not payload:
+                return False
+
+            # Check if token email matches provided email
+            if payload.get("email") != email:
+                return False
+
+            # Check if OTP is still verified
+            return await CMSOTPManager.is_otp_verified(email)
+
+        except Exception as e:
+            print(f"Error validating temp token with OTP: {e}")
+            return False
 
     async def refresh_access_token(
         self, refresh_token: str

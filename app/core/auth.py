@@ -167,8 +167,7 @@ class AuthManager:
         db: AsyncSession,
         email: str,
         password: str,
-        first_name: str,
-        last_name: str,
+        full_name: str,
         is_verified: bool = False,
     ) -> Staff:
         """Create a new staff (hash password only when creating)"""
@@ -187,8 +186,7 @@ class AuthManager:
         staff = Staff(
             email=email,
             hashed_password=hashed_password,
-            first_name=first_name,
-            last_name=last_name,
+            full_name=full_name,
             is_verified=is_verified,
         )
 

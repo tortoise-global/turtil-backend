@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -16,29 +16,32 @@ class CMSVerifySigninRequest(BaseModel):
     otp: str = Field(..., min_length=6, max_length=6, description="6-digit OTP")
 
 
-class CMSPasswordSetupRequest(BaseModel):
-    """Request schema for password setup (step 2)"""
+class CMSProfileSetupRequest(BaseModel):
+    """Request schema for profile setup - password, full name, and contact number (step 2)"""
 
     email: EmailStr = Field(..., description="Email address")
     password: str = Field(..., min_length=8, description="Password")
     confirmPassword: str = Field(..., min_length=8, description="Password confirmation")
+    fullName: str = Field(..., min_length=1, max_length=200, description="Full name (username)")
+    contactNumber: str = Field(..., pattern=r"^(\+91)?[6-9]\d{9}$", description="Contact number in Indian format")
 
-    @validator("confirmPassword")
-    def passwords_match(cls, v, values):
-        if "password" in values and v != values["password"]:
+    @field_validator("confirmPassword")
+    @classmethod
+    def passwords_match(cls, v, info):
+        if "password" in info.data and v != info.data["password"]:
             raise ValueError("Passwords do not match")
         return v
 
 
-class CMSPersonalDetailsRequest(BaseModel):
-    """Request schema for personal details (step 3)"""
+class CMSCollegeLogoRequest(BaseModel):
+    """Request schema for college logo upload (step 2)"""
 
-    firstName: str = Field(..., min_length=1, max_length=100, description="First name")
-    lastName: str = Field(..., min_length=1, max_length=100, description="Last name")
+    logoUrl: Optional[str] = Field(None, description="S3 URL of uploaded college logo")
+    skipLogo: bool = Field(False, description="Skip logo upload")
 
 
 class CMSCollegeDetailsRequest(BaseModel):
-    """Request schema for college details (step 4)"""
+    """Request schema for college details (step 3)"""
 
     name: str = Field(
         ..., min_length=1, max_length=255, description="College/University full name"
@@ -77,9 +80,10 @@ class CMSResetPasswordRequest(BaseModel):
     newPassword: str = Field(..., min_length=8, description="New password")
     confirmPassword: str = Field(..., min_length=8, description="Password confirmation")
 
-    @validator("confirmPassword")
-    def passwords_match(cls, v, values):
-        if "newPassword" in values and v != values["newPassword"]:
+    @field_validator("confirmPassword")
+    @classmethod
+    def passwords_match(cls, v, info):
+        if "newPassword" in info.data and v != info.data["newPassword"]:
             raise ValueError("Passwords do not match")
         return v
 
@@ -158,8 +162,6 @@ class StaffProfileResponse(BaseModel):
     staffId: int
     uuid: str
     email: str
-    firstName: str
-    lastName: str
     fullName: str
     # Note: phoneNumber is now on college, not staff
     cmsRole: str
@@ -211,3 +213,121 @@ class CMSErrorResponse(BaseModel):
         None, description="Additional error details"
     )
     code: Optional[str] = Field(None, description="Error code")
+
+
+class CMSCheckUserRequest(BaseModel):
+    """Request schema for checking user status"""
+
+    email: EmailStr = Field(..., description="Email address to check")
+
+
+class CMSCheckUserResponse(BaseModel):
+    """Response schema for user status check"""
+
+    success: bool = Field(..., description="Response success indicator")
+    exists: bool = Field(..., description="Whether user exists")
+    hasPassword: bool = Field(..., description="Whether user has set a password")
+    requiresOtp: bool = Field(..., description="Whether OTP verification is required")
+    message: str = Field(..., description="Status message")
+
+
+class CMSPasswordLoginRequest(BaseModel):
+    """Request schema for password-based login"""
+
+    email: EmailStr = Field(..., description="Email address")
+    password: str = Field(..., description="Password")
+
+
+class CMSPasswordLoginResponse(BaseModel):
+    """Response schema for password-based login"""
+
+    success: bool = Field(..., description="Login success indicator")
+    message: str = Field(..., description="Response message")
+    accessToken: Optional[str] = Field(None, description="JWT access token")
+    refreshToken: Optional[str] = Field(None, description="JWT refresh token")
+    tokenType: str = Field(default="bearer", description="Token type")
+    expiresIn: int = Field(..., description="Token expiration time in seconds")
+
+
+# New separate flow schemas
+
+class CMSLoginRequest(BaseModel):
+    """Request schema for separate login flow"""
+
+    email: EmailStr = Field(..., description="Email address")
+    password: str = Field(..., description="Password")
+
+
+class CMSLoginResponse(BaseModel):
+    """Response schema for separate login flow"""
+
+    success: bool = Field(..., description="Login success indicator")
+    message: str = Field(..., description="Response message")
+    accessToken: str = Field(..., description="JWT access token")
+    refreshToken: str = Field(..., description="JWT refresh token")
+    tokenType: str = Field(default="bearer", description="Token type")
+    expiresIn: int = Field(..., description="Token expiration time in seconds")
+
+
+class CMSSignupRequest(BaseModel):
+    """Request schema for separate signup flow (initial email)"""
+
+    email: EmailStr = Field(..., description="Email address for registration")
+
+
+class CMSSignupResponse(BaseModel):
+    """Response schema for signup OTP sending"""
+
+    success: bool = Field(..., description="Operation success status")
+    message: str = Field(..., description="Response message")
+    attemptsRemaining: int = Field(..., description="Remaining OTP attempts")
+    canResend: bool = Field(default=True, description="Whether OTP can be resent")
+
+
+class CMSVerifySignupRequest(BaseModel):
+    """Request schema for verifying signup OTP"""
+
+    email: EmailStr = Field(..., description="Email address")
+    otp: str = Field(..., min_length=6, max_length=6, description="6-digit OTP")
+
+
+class CMSVerifySignupResponse(BaseModel):
+    """Response schema for signup OTP verification"""
+
+    success: bool = Field(..., description="Verification success status")
+    message: str = Field(..., description="Response message")
+    nextStep: str = Field(..., description="Next step in registration process")
+    tempToken: Optional[str] = Field(
+        None, description="Temporary token for registration steps"
+    )
+
+
+class CMSSetPasswordRequest(BaseModel):
+    """Request schema for profile setup in signup flow (step 3) - password, full name, and contact number"""
+    
+    email: EmailStr = Field(..., description="Email address")
+    password: str = Field(..., min_length=8, description="Password")
+    fullName: str = Field(..., min_length=1, max_length=200, description="Full name (username)")
+    contactNumber: str = Field(..., pattern=r"^(\+91)?[6-9]\d{9}$", description="Contact number in Indian format")
+
+
+class CMSResetPasswordRequest(BaseModel):
+    """Request schema for resetting password with OTP"""
+    
+    email: EmailStr = Field(..., description="Email address")
+    otp: str = Field(..., min_length=6, max_length=6, description="6-digit OTP")
+    newPassword: str = Field(..., min_length=8, description="New password")
+
+
+class CMSResetPasswordAuthenticatedRequest(BaseModel):
+    """Request schema for authenticated password reset"""
+    
+    newPassword: str = Field(..., min_length=8, description="New password")
+    confirmPassword: str = Field(..., min_length=8, description="Password confirmation")
+
+    @field_validator("confirmPassword")
+    @classmethod
+    def passwords_match(cls, v, info):
+        if "newPassword" in info.data and v != info.data["newPassword"]:
+            raise ValueError("Passwords do not match")
+        return v

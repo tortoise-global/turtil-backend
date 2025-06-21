@@ -176,6 +176,54 @@ class EmailService:
             raise Exception(f"Failed to send email: {e}")
 
     @staticmethod
+    async def send_password_reset_otp_email(email: str, otp: str) -> Dict[str, Any]:
+        """
+        Send password reset OTP email using AWS SES.
+        """
+        try:
+            ses_client = get_ses_client()
+
+            subject = "Reset your Turtil password"
+            body = f"Your Turtil password reset code is {otp}. Please use this to reset your password. It is valid for the next 5 minutes."
+
+            response = ses_client.send_email(
+                Source=settings.aws_ses_from_email,
+                Destination={"ToAddresses": [email]},
+                Message={
+                    "Subject": {"Data": subject},
+                    "Body": {
+                        "Text": {"Data": body},
+                        "Html": {
+                            "Data": f"""
+                            <html>
+                                <body>
+                                    <h2>Password Reset</h2>
+                                    <p>Your Turtil password reset code is <strong>{otp}</strong></p>
+                                    <p>Please use this to reset your password.</p>
+                                    <p>This code is valid for the next 5 minutes.</p>
+                                    <p>If you did not request this password reset, please ignore this email.</p>
+                                </body>
+                            </html>
+                            """
+                        },
+                    },
+                },
+            )
+
+            logger.info(
+                f"Password reset OTP email sent successfully via SES. MessageId: {response['MessageId']}"
+            )
+            return {
+                "success": True,
+                "message_id": response["MessageId"],
+                "provider": "aws_ses",
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to send password reset OTP email via SES: {e}")
+            raise Exception(f"Failed to send password reset OTP email: {e}")
+
+    @staticmethod
     async def send_password_reset_email(email: str, otp: str) -> Dict[str, Any]:
         """
         Send password reset email using AWS SES.

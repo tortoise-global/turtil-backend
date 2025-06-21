@@ -49,8 +49,7 @@ async def signup_init(request: SignupInitRequest, db: AsyncSession = Depends(get
 
         # Store signup data temporarily in Redis (don't hash password yet)
         signup_data = {
-            "first_name": request.first_name,
-            "last_name": request.last_name,
+            "full_name": request.full_name,
             "password": request.password,  # Store plain password temporarily
         }
 
@@ -122,8 +121,7 @@ async def signup_verify(
             db=db,
             email=request.email,
             password=signup_data["password"],  # This will be hashed in create_staff
-            first_name=signup_data["first_name"],
-            last_name=signup_data["last_name"],
+            full_name=signup_data["full_name"],
             is_verified=True,  # Mark as verified since they verified OTP
         )
 

@@ -13,11 +13,8 @@ class StaffCreateRequest(CamelCaseModel):
 
     email: EmailStr = Field(..., description="Staff email address")
     password: str = Field(..., min_length=8, description="Staff password")
-    first_name: str = Field(
-        ..., min_length=1, max_length=100, description="Staff first name"
-    )
-    last_name: str = Field(
-        ..., min_length=1, max_length=100, description="Staff last name"
+    full_name: str = Field(
+        ..., min_length=1, max_length=200, description="Staff full name"
     )
     is_active: bool = Field(default=True, description="Staff active status")
     is_verified: bool = Field(default=False, description="Email verification status")
@@ -27,11 +24,8 @@ class StaffCreateRequest(CamelCaseModel):
 class StaffUpdateRequest(CamelCaseModel):
     """Staff update request schema"""
 
-    first_name: Optional[str] = Field(
-        None, min_length=1, max_length=100, description="Staff first name"
-    )
-    last_name: Optional[str] = Field(
-        None, min_length=1, max_length=100, description="Staff last name"
+    full_name: Optional[str] = Field(
+        None, min_length=1, max_length=200, description="Staff full name"
     )
     is_active: Optional[bool] = Field(None, description="Staff active status")
     is_verified: Optional[bool] = Field(None, description="Email verification status")
@@ -40,11 +34,8 @@ class StaffUpdateRequest(CamelCaseModel):
 class AdminStaffUpdateRequest(CamelCaseModel):
     """Admin staff update request schema (includes more fields)"""
 
-    first_name: Optional[str] = Field(
-        None, min_length=1, max_length=100, description="Staff first name"
-    )
-    last_name: Optional[str] = Field(
-        None, min_length=1, max_length=100, description="Staff last name"
+    full_name: Optional[str] = Field(
+        None, min_length=1, max_length=200, description="Staff full name"
     )
     email: Optional[EmailStr] = Field(None, description="Staff email address")
     is_active: Optional[bool] = Field(None, description="Staff active status")

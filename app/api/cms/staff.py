@@ -19,11 +19,16 @@ from app.schemas.staff_management import (
     StaffResponse,
     AssignDepartmentRequest,
     StaffActionResponse,
+    UpdateUsernameRequest,
+    UpdateUsernameResponse,
+    UpdateContactRequest,
+    UpdateContactResponse,
+    ContactInfoResponse,
 )
 from app.schemas.cms_auth import StaffProfileResponse
 from .auth import get_current_staff
 
-router = APIRouter(prefix="/cms/staff", tags=["Staff Management"])
+router = APIRouter(prefix="/cms/staff", tags=["CMS Staff Management"])
 
 # Security scheme for JWT tokens
 security = HTTPBearer(auto_error=False)
@@ -70,8 +75,7 @@ async def invite_staff(
         # Create new CMS staff with invitation fields
         new_staff = Staff(
             email=request.email,
-            first_name="",  # Will be filled during onboarding
-            last_name="",  # Will be filled during onboarding
+            full_name="",  # Will be filled during onboarding
             hashed_password=hashed_password,
             is_active=True,
             is_verified=False,  # Will be verified during first login
@@ -114,7 +118,7 @@ async def invite_staff(
         return InviteStaffResponse(
             success=True,
             message="CMS staff invitation sent successfully",
-            cmsStaffId=new_staff.id,
+            staffId=new_staff.id,
             email=request.email,
             temporaryPassword=temporary_password,
         )
@@ -202,11 +206,29 @@ async def get_staff(
         # Use SQLAlchemy pagination for efficient database queries
         paginated_result = await sqlalchemy_paginate(db, query)
 
-        # Convert CMS staffs to response format with isHod field
+        # Convert CMS staffs to response format
         staff_responses = []
         for staff in paginated_result.items:
-            staff_dict = staff.to_dict()
-            staff_responses.append(StaffResponse(**staff_dict))
+            staff_responses.append(StaffResponse(
+                staffId=staff.id,
+                uuid=str(staff.uuid),
+                email=staff.email,
+                fullName=staff.full_name,
+                phoneNumber=None,  # Staff model doesn't have phone_number
+                isActive=staff.is_active,
+                isVerified=staff.is_verified,
+                cmsRole=staff.cms_role,
+                collegeId=staff.college_id,
+                departmentId=staff.department_id,
+                invitationStatus=staff.invitation_status,
+                temporaryPassword=staff.temporary_password,
+                mustResetPassword=staff.must_reset_password,
+                invitedByStaffId=staff.invited_by_staff_id,
+                isHod=staff.is_hod,
+                lastLoginAt=staff.last_login_at,
+                createdAt=staff.created_at,
+                updatedAt=staff.updated_at,
+            ))
 
         # Return paginated response
         return Page(
@@ -279,11 +301,9 @@ async def get_staff_by_id(
             )
 
         return StaffProfileResponse(
-            cmsStaffId=staff.id,
+            staffId=staff.id,
             uuid=str(staff.uuid),
             email=staff.email,
-            firstName=staff.first_name,
-            lastName=staff.last_name,
             fullName=staff.full_name,
             cmsRole=staff.cms_role,
             collegeId=staff.college_id,
@@ -362,7 +382,7 @@ async def assign_staff_to_department(
         return StaffActionResponse(
             success=True,
             message=f"Staff assigned to {department.name} department successfully",
-            cmsStaffId=staff_id,
+            staffId=staff_id,
         )
 
     except HTTPException:
@@ -418,7 +438,7 @@ async def remove_staff_from_department(
         return StaffActionResponse(
             success=True,
             message="Staff removed from department successfully",
-            cmsStaffId=staff_id,
+            staffId=staff_id,
         )
 
     except HTTPException:
@@ -429,6 +449,80 @@ async def remove_staff_from_department(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while removing department assignment",
+        )
+
+
+@router.put(
+    "/{staff_id}/update-username",
+    response_model=UpdateUsernameResponse,
+    dependencies=[Depends(security)],
+)
+async def update_staff_username(
+    staff_id: int,
+    request: UpdateUsernameRequest,
+    db: AsyncSession = Depends(get_db),
+    current_staff: Staff = Depends(get_current_staff),
+):
+    """
+    Update staff username (full_name). 
+    
+    Permissions:
+    - Principal/College Admin: Can update any staff in their college
+    - HOD: Can update staff in their department
+    - Staff: Can update their own username only
+    """
+    try:
+        # Build query based on role permissions
+        if current_staff.cms_role in ["principal", "college_admin"]:
+            # Can update any staff in college
+            query = select(Staff).where(
+                and_(Staff.id == staff_id, Staff.college_id == current_staff.college_id)
+            )
+        elif current_staff.cms_role == "hod":
+            # Can only update staffs in same department
+            query = select(Staff).where(
+                and_(
+                    Staff.id == staff_id,
+                    Staff.college_id == current_staff.college_id,
+                    Staff.department_id == current_staff.department_id,
+                )
+            )
+        else:  # staff
+            # Can only update their own username
+            if staff_id != current_staff.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions to update this staff's username",
+                )
+            query = select(Staff).where(Staff.id == staff_id)
+
+        result = await db.execute(query)
+        staff = result.scalar_one_or_none()
+
+        if not staff:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found"
+            )
+
+        # Update staff's full name (username)
+        staff.full_name = request.fullName
+        await db.commit()
+
+        return UpdateUsernameResponse(
+            success=True,
+            message="Staff username updated successfully",
+            staffId=staff_id,
+            fullName=request.fullName,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        print(f"Error updating staff username: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while updating username",
         )
 
 
@@ -480,6 +574,19 @@ async def delete_staff(
                 detail="Cannot delete principal account",
             )
 
+        # Check if staff is the contact person for the college
+        if current_staff.college_id:
+            college_result = await db.execute(
+                select(College).where(College.id == current_staff.college_id)
+            )
+            college = college_result.scalar_one_or_none()
+            
+            if college and college.contact_staff_id == staff_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot delete staff who is the primary contact person. Please update contact information first.",
+                )
+
         # Invalidate all staff sessions before deletion (real-time logout)
         await cms_auth.invalidate_staff_sessions(staff_id)
 
@@ -499,7 +606,7 @@ async def delete_staff(
         return StaffActionResponse(
             success=True,
             message="Staff deleted successfully and all sessions invalidated",
-            cmsStaffId=staff_id,
+            staffId=staff_id,
         )
 
     except HTTPException:
@@ -510,4 +617,131 @@ async def delete_staff(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while deleting staff",
+        )
+
+
+@router.put(
+    "/contact-info", response_model=UpdateContactResponse, dependencies=[Depends(security)]
+)
+async def update_contact_info(
+    request: UpdateContactRequest,
+    db: AsyncSession = Depends(get_db),
+    current_staff: Staff = Depends(get_current_staff),
+):
+    """
+    Update college contact information. Only Principal and College Admin can update contact info.
+    Validates that the contact staff exists and belongs to the same college.
+    """
+    try:
+        # Check permissions
+        if current_staff.cms_role not in ["principal", "college_admin"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only Principal and College Admin can update contact information",
+            )
+
+        # Validate that the contact staff exists and belongs to the same college
+        contact_staff_result = await db.execute(
+            select(Staff).where(
+                and_(
+                    Staff.id == request.contactStaffId,
+                    Staff.college_id == current_staff.college_id,
+                    Staff.is_active == True
+                )
+            )
+        )
+        contact_staff = contact_staff_result.scalar_one_or_none()
+
+        if not contact_staff:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Contact staff not found or not active in this college",
+            )
+
+        # Get the college
+        college_result = await db.execute(
+            select(College).where(College.id == current_staff.college_id)
+        )
+        college = college_result.scalar_one_or_none()
+
+        if not college:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="College not found",
+            )
+
+        # Update contact information
+        college.contact_number = request.contactNumber
+        college.contact_staff_id = request.contactStaffId
+        await db.commit()
+
+        return UpdateContactResponse(
+            success=True,
+            message=f"Contact information updated successfully. {contact_staff.full_name} is now the primary contact.",
+            contactNumber=request.contactNumber,
+            contactStaffId=request.contactStaffId,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        print(f"Error updating contact info: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while updating contact information",
+        )
+
+
+@router.get(
+    "/contact-info", response_model=ContactInfoResponse, dependencies=[Depends(security)]
+)
+async def get_contact_info(
+    db: AsyncSession = Depends(get_db),
+    current_staff: Staff = Depends(get_current_staff),
+):
+    """
+    Get current college contact information. Only staff members of the college can view this.
+    """
+    try:
+        # Get the college
+        college_result = await db.execute(
+            select(College).where(College.id == current_staff.college_id)
+        )
+        college = college_result.scalar_one_or_none()
+
+        if not college:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="College not found",
+            )
+
+        # Get contact staff details if contact_staff_id is set
+        contact_staff_name = None
+        contact_staff_email = None
+        
+        if college.contact_staff_id:
+            contact_staff_result = await db.execute(
+                select(Staff).where(Staff.id == college.contact_staff_id)
+            )
+            contact_staff = contact_staff_result.scalar_one_or_none()
+            
+            if contact_staff:
+                contact_staff_name = contact_staff.full_name
+                contact_staff_email = contact_staff.email
+
+        return ContactInfoResponse(
+            contactNumber=college.contact_number,
+            contactStaffId=college.contact_staff_id,
+            contactStaffName=contact_staff_name,
+            contactStaffEmail=contact_staff_email,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting contact info: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while getting contact information",
         )

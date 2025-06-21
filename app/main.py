@@ -13,11 +13,12 @@ from app.database import init_db, close_db
 from app.redis_client import close_redis
 
 # Import API routers
-from app.api import upload
+from app.api import cms_auth
+from app.api import cms_registration
 from app.api.cms import (
-    auth as cms_auth,
-    staff as cms_staff,
     departments as cms_departments,
+    staff as cms_staff,
+    files as cms_files,
 )
 
 # Import health check dependencies
@@ -128,6 +129,10 @@ def custom_openapi():
             "description": "JWT token for CMS authentication. Format: Bearer <token>",
         }
     }
+
+    # Keep schemas section visible in Swagger UI
+    # if "components" in openapi_schema and "schemas" in openapi_schema["components"]:
+    #     del openapi_schema["components"]["schemas"]
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema
@@ -240,10 +245,11 @@ async def app_info():
             "camelcase_api": True,
         },
         "endpoints": {
-            "cmsAuth": "/api/cms/auth",
-            "cmsStaff": "/api/cms/staff",
+            "auth": "/api/auth",
+            "cmsRegistration": "/api/cms/registration",
             "cmsDepartments": "/api/cms/departments",
-            "fileUpload": "/api/file-upload",
+            "cmsStaff": "/api/cms/staff",
+            "cmsFiles": "/api/cms/files",
             "health": "/health",
             "healthDetailed": "/health/detailed",
             "docs": "/docs" if settings.debug else "disabled",
@@ -252,10 +258,11 @@ async def app_info():
 
 
 # Include API routers
-app.include_router(upload.router, prefix="/api")
 app.include_router(cms_auth.router, prefix="/api")
-app.include_router(cms_staff.router, prefix="/api")
+app.include_router(cms_registration.router, prefix="/api")
 app.include_router(cms_departments.router, prefix="/api")
+app.include_router(cms_staff.router, prefix="/api")
+app.include_router(cms_files.router, prefix="/api")
 
 # Add pagination to the app
 add_pagination(app)

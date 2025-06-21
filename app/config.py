@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     otp_expiry_minutes: int = Field(
         default=5, env="OTP_EXPIRY_MINUTES", description="OTP expiration time"
     )
+    dev_otp: str = Field(
+        default="123456", env="DEV_OTP", description="Fixed OTP for development mode"
+    )
 
     # CMS Authentication Settings
     cms_auto_approve: bool = Field(

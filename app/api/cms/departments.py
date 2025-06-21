@@ -294,7 +294,7 @@ async def assign_hod_to_department(
         staff_result = await db.execute(
             select(Staff).where(
                 and_(
-                    Staff.id == request.cmsStaffId,
+                    Staff.id == request.staffId,
                     Staff.college_id == current_staff.college_id,
                     Staff.is_active,
                 )
@@ -340,7 +340,7 @@ async def assign_hod_to_department(
             success=True,
             message=f"{staff.full_name} assigned as HOD of {department.name} department",
             departmentId=department_id,
-            cmsStaffId=staff.id,
+            staffId=staff.id,
             hodName=staff.full_name,
         )
 
@@ -416,7 +416,7 @@ async def remove_hod_from_department(
             success=True,
             message=f"HOD removed from {department.name} department",
             departmentId=department_id,
-            cmsStaffId=hod_staff.id if hod_staff else None,
+            staffId=hod_staff.id if hod_staff else None,
             hodName=None,
         )
 
