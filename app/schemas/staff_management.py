@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -61,7 +61,8 @@ class UpdateStaffRoleRequest(BaseModel):
 
     role: str = Field(..., description="New CMS role")
 
-    @validator("role")
+    @field_validator("role")
+    @classmethod
     def validate_role(cls, v):
         allowed_roles = ["principal", "college_admin", "hod", "staff"]
         if v not in allowed_roles:
@@ -75,6 +76,21 @@ class StaffActionResponse(BaseModel):
     success: bool = Field(..., description="Action success status")
     message: str = Field(..., description="Action result message")
     staffId: int = Field(..., description="Affected staff ID")
+
+
+class UpdateUsernameRequest(BaseModel):
+    """Request schema for updating staff username (full_name)"""
+
+    fullName: str = Field(..., min_length=1, max_length=200, description="Full name (username)")
+
+
+class UpdateUsernameResponse(BaseModel):
+    """Response schema for username update"""
+
+    success: bool = Field(..., description="Update success status")
+    message: str = Field(..., description="Update result message")
+    staffId: int = Field(..., description="Updated staff ID")
+    fullName: str = Field(..., description="Updated full name")
 
 
 class StaffDetailsResponse(BaseModel):
@@ -106,3 +122,28 @@ class StaffDetailsResponse(BaseModel):
     isHod: bool = Field(..., description="Head of Department status")
     createdAt: datetime = Field(..., description="Creation timestamp")
     updatedAt: datetime = Field(..., description="Update timestamp")
+
+
+class UpdateContactRequest(BaseModel):
+    """Request schema for updating college contact information"""
+
+    contactNumber: str = Field(..., pattern=r"^(\+91)?[6-9]\d{9}$", description="Contact number in Indian format")
+    contactStaffId: int = Field(..., description="Staff ID who will be the primary contact")
+
+
+class UpdateContactResponse(BaseModel):
+    """Response schema for contact information update"""
+
+    success: bool = Field(..., description="Update success status")
+    message: str = Field(..., description="Update status message")
+    contactNumber: str = Field(..., description="Updated contact number")
+    contactStaffId: int = Field(..., description="Updated contact staff ID")
+
+
+class ContactInfoResponse(BaseModel):
+    """Response schema for getting current contact information"""
+
+    contactNumber: Optional[str] = Field(None, description="Current contact number")
+    contactStaffId: Optional[int] = Field(None, description="Current contact staff ID")
+    contactStaffName: Optional[str] = Field(None, description="Contact staff full name")
+    contactStaffEmail: Optional[str] = Field(None, description="Contact staff email")

@@ -9,7 +9,7 @@ from app.models.staff import Staff
 from app.models.college import College
 from app.core.cms_auth import cms_auth
 from app.schemas.cms_auth import (
-    CMSPersonalDetailsRequest,
+    CMSCollegeLogoRequest,
     CMSCollegeDetailsRequest,
     CMSAddressDetailsRequest,
     CMSRegistrationStepResponse,
@@ -77,53 +77,71 @@ async def get_current_staff_from_temp_token(
 
 
 @router.post(
-    "/personal-details",
+    "/college-logo",
     response_model=CMSRegistrationStepResponse,
     dependencies=[Depends(security)],
 )
-async def personal_details(
-    request: CMSPersonalDetailsRequest,
+async def college_logo(
+    request: CMSCollegeLogoRequest,
     current_staff: Staff = Depends(get_current_staff_from_temp_token),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Step 1: Set personal details and college information
-    - Update staff personal information
-    - Create college record with provided details
+    Step 1: Upload college logo (optional)
+    - Handle college logo file upload from S3 URL
+    - Can be skipped
     """
     try:
-        # Update personal details
-        current_staff.full_name = request.fullName
+        # If college doesn't exist yet, create it with minimal info
+        # (This handles the case where user starts with logo upload)
+        if not current_staff.college_id:
+            college = College(
+                name="",  # Will be filled in college-details step
+                short_name="",  # Will be filled in college-details step
+                college_reference_id="",  # Will be filled in college-details step
+                area="",  # Will be filled in college-address step
+                city="",  # Will be filled in college-address step
+                district="",  # Will be filled in college-address step
+                state="",  # Will be filled in college-address step
+                pincode="000000",  # Will be filled in college-address step
+                principal_staff_id=current_staff.id,
+            )
 
-        # Create college record
-        college = College(
-            name=request.name,
-            short_name=request.shortName,
-            college_reference_id=request.collegeReferenceId,
-            area="",  # Will be filled in next step
-            city="",  # Will be filled in next step
-            district="",  # Will be filled in next step
-            state="",  # Will be filled in next step
-            pincode="000000",  # Will be filled in next step
-            principal_staff_id=current_staff.id,
+            db.add(college)
+            await db.commit()
+            await db.refresh(college)
+
+            # Update staff with college and role
+            current_staff.college_id = college.id
+            current_staff.cms_role = "principal"
+            current_staff.can_assign_department = True
+            await db.commit()
+
+        # Get current staff's college
+        result = await db.execute(
+            select(College).where(College.id == current_staff.college_id)
         )
+        college = result.scalar_one_or_none()
 
-        db.add(college)
-        await db.commit()
-        await db.refresh(college)
+        if not college:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="College not found."
+            )
 
-        # Update staff with college and role
-        current_staff.college_id = college.id
-        current_staff.cms_role = "principal"
-        current_staff.can_assign_department = True
-        await db.commit()
+        # Update college logo if provided
+        if request.logoUrl and not request.skipLogo:
+            college.logo_url = request.logoUrl
+            await db.commit()
 
         # Generate new temp token for next step
         temp_token = cms_auth.create_temp_token(current_staff, "registration")
 
         return CMSRegistrationStepResponse(
             success=True,
-            message="Personal details and college information saved successfully.",
+            message="College logo uploaded successfully."
+            if request.logoUrl
+            else "College logo upload skipped.",
             nextStep="college_details",
             tempToken=temp_token,
         )
@@ -131,7 +149,7 @@ async def personal_details(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error saving personal details: {e}")
+        print(f"Error saving college logo: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred. Please try again.",
@@ -149,37 +167,62 @@ async def college_details(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Step 2: Upload college logo (optional)
-    - Handle college logo file upload
-    - Can be skipped
+    Step 2: Set college details and information
+    - Update college record with provided details
+    - Create college if it doesn't exist
     """
     try:
-        # Get current staff's college
-        result = await db.execute(
-            select(College).where(College.id == current_staff.college_id)
-        )
-        college = result.scalar_one_or_none()
-
-        if not college:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail="College not found."
+        # Get or create college
+        if current_staff.college_id:
+            # Get existing college
+            result = await db.execute(
+                select(College).where(College.id == current_staff.college_id)
+            )
+            college = result.scalar_one_or_none()
+            
+            if not college:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, 
+                    detail="College not found."
+                )
+        else:
+            # Create new college if it doesn't exist
+            college = College(
+                name=request.name,
+                short_name=request.shortName,
+                college_reference_id=request.collegeReferenceId,
+                area="",  # Will be filled in college-address step
+                city="",  # Will be filled in college-address step
+                district="",  # Will be filled in college-address step
+                state="",  # Will be filled in college-address step
+                pincode="000000",  # Will be filled in college-address step
+                principal_staff_id=current_staff.id,
             )
 
-        # Update college logo if provided
-        if request.logoFile and not request.skipLogo:
-            college.logo_url = request.logoFile
+            db.add(college)
+            await db.commit()
+            await db.refresh(college)
+
+            # Update staff with college and role
+            current_staff.college_id = college.id
+            current_staff.cms_role = "principal"
+            current_staff.can_assign_department = True
             await db.commit()
 
-        # Generate new temp token for final step
+        # Update college details
+        college.name = request.name
+        college.short_name = request.shortName
+        college.college_reference_id = request.collegeReferenceId
+        college.phone_number = request.phoneNumber
+        await db.commit()
+
+        # Generate new temp token for next step
         temp_token = cms_auth.create_temp_token(current_staff, "registration")
 
         return CMSRegistrationStepResponse(
             success=True,
-            message="College logo uploaded successfully."
-            if request.logoFile
-            else "College logo upload skipped.",
-            nextStep="address_details",
+            message="College details saved successfully.",
+            nextStep="college_address",
             tempToken=temp_token,
         )
 
@@ -194,17 +237,17 @@ async def college_details(
 
 
 @router.post(
-    "/address-details",
+    "/college-address",
     response_model=CMSTokenResponse,
     dependencies=[Depends(security)],
 )
-async def address_details(
+async def college_address(
     request: CMSAddressDetailsRequest,
     current_staff: Staff = Depends(get_current_staff_from_temp_token),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Step 3: Complete registration with address details
+    Step 3: Complete registration with college address details
     - Update college address
     - Generate final JWT tokens
     - Create staff session in Redis

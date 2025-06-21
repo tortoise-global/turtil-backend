@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, Integer, DECIMAL
+from sqlalchemy import Column, String, Boolean, Integer, DECIMAL, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import BaseModel
 import uuid
@@ -34,6 +34,10 @@ class College(BaseModel):
     principal_cms_staff_id = Column(
         Integer, nullable=True
     )  # Will be FK after Staff model update
+
+    # Contact Information for CMS Support
+    contact_number = Column(String(20), nullable=True)  # Contact number for CMS support
+    contact_staff_id = Column(Integer, ForeignKey("staff.id"), nullable=True)  # Staff responsible for contact
 
     # Settings
     auto_approved = Column(Boolean, default=True, nullable=False)  # Development mode
@@ -76,6 +80,8 @@ class College(BaseModel):
             "fullAddress": self.full_address,
             "phoneNumber": base_dict["phone_number"],
             "principalCmsStaffId": base_dict["principal_cms_staff_id"],
+            "contactNumber": base_dict["contact_number"],
+            "contactStaffId": base_dict["contact_staff_id"],
             "autoApproved": base_dict["auto_approved"],
             "createdAt": base_dict["created_at"],
             "updatedAt": base_dict["updated_at"],

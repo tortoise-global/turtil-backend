@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -14,7 +14,8 @@ class CreateDepartmentRequest(BaseModel):
         None, max_length=1000, description="Department description"
     )
 
-    @validator("code")
+    @field_validator("code")
+    @classmethod
     def code_uppercase(cls, v):
         return v.upper()
 
@@ -33,7 +34,8 @@ class UpdateDepartmentRequest(BaseModel):
     )
     hodCmsStaffId: Optional[int] = Field(None, description="Head of Department staff ID")
 
-    @validator("code")
+    @field_validator("code")
+    @classmethod
     def code_uppercase(cls, v):
         if v is not None:
             return v.upper()
@@ -82,7 +84,7 @@ class DepartmentActionResponse(BaseModel):
 class AssignHODRequest(BaseModel):
     """Request schema for assigning HOD to department"""
 
-    cmsStaffId: int = Field(..., description="Staff ID to assign as HOD")
+    staffId: int = Field(..., description="Staff ID to assign as HOD")
 
 
 class HODActionResponse(BaseModel):
@@ -91,5 +93,5 @@ class HODActionResponse(BaseModel):
     success: bool = Field(..., description="Action success status")
     message: str = Field(..., description="Action result message")
     departmentId: int = Field(..., description="Department ID")
-    cmsStaffId: Optional[int] = Field(None, description="HOD staff ID")
+    staffId: Optional[int] = Field(None, description="HOD staff ID")
     hodName: Optional[str] = Field(None, description="HOD name")

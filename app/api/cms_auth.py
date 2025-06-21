@@ -174,9 +174,9 @@ async def verify_otp(request: CMSVerifySignupRequest, db: AsyncSession = Depends
 
         return CMSVerifySignupResponse(
             success=True,
-            message="Email verified successfully. Please set your password to continue.",
-            nextStep="password_setup",
-            tempToken=email  # Simple temp token for password setup
+            message="Email verified successfully. Please set up your profile to continue.",
+            nextStep="profile_setup",
+            tempToken=email  # Simple temp token for profile setup
         )
         
     except HTTPException:
@@ -189,12 +189,13 @@ async def verify_otp(request: CMSVerifySignupRequest, db: AsyncSession = Depends
         )
 
 
-@router.post("/set-password", response_model=CMSSignupResponse)
-async def set_password(request: CMSSetPasswordRequest, db: AsyncSession = Depends(get_db)):
+@router.post("/setup-profile", response_model=CMSSignupResponse)
+async def setup_profile(request: CMSSetPasswordRequest, db: AsyncSession = Depends(get_db)):
     """
-    Signup Step 3: Set password
+    Signup Step 3: Set up profile - password and full name
     - Verify OTP was verified for this email
     - Hash and store password
+    - Update staff's full name (username)
     - Complete registration
     """
     try:
@@ -224,13 +225,51 @@ async def set_password(request: CMSSetPasswordRequest, db: AsyncSession = Depend
         # Hash password
         hashed_password = cms_auth.get_password_hash(password)
 
-        # Update staff with password
+        # Update staff with password and profile
         staff.hashed_password = hashed_password
+        staff.full_name = request.fullName
         staff.temporary_password = False
         staff.must_reset_password = False
+        
+        # For Principal role, also update college contact information
+        if staff.cms_role == "principal":
+            # Get or create college for this staff
+            if not staff.college_id:
+                # Create college if it doesn't exist
+                college = College(
+                    name="",  # Will be filled in college-details step
+                    short_name="",  # Will be filled in college-details step
+                    college_reference_id="",  # Will be filled in college-details step
+                    area="",  # Will be filled in college-address step
+                    city="",  # Will be filled in college-address step
+                    district="",  # Will be filled in college-address step
+                    state="",  # Will be filled in college-address step
+                    pincode="000000",  # Will be filled in college-address step
+                    principal_cms_staff_id=staff.id,
+                    contact_number=request.contactNumber,
+                    contact_staff_id=staff.id,
+                )
+                db.add(college)
+                await db.commit()
+                await db.refresh(college)
+                
+                # Update staff with college
+                staff.college_id = college.id
+                staff.cms_role = "principal"
+                staff.can_assign_department = True
+            else:
+                # Update existing college contact info
+                result = await db.execute(
+                    select(College).where(College.id == staff.college_id)
+                )
+                college = result.scalar_one_or_none()
+                if college:
+                    college.contact_number = request.contactNumber
+                    college.contact_staff_id = staff.id
+        
         await db.commit()
 
-        # Clear OTP after successful password setup
+        # Clear OTP after successful profile setup
         await CMSOTPManager.expire_otp(email)
 
         return CMSSignupResponse(
@@ -242,7 +281,7 @@ async def set_password(request: CMSSetPasswordRequest, db: AsyncSession = Depend
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error setting password: {e}")
+        print(f"Error setting up profile: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred. Please try again."
@@ -539,32 +578,6 @@ async def get_current_staff(
         )
 
 
-@router.get("/me", response_model=StaffProfileResponse, dependencies=[Depends(security)])
-async def get_current_user_profile(current_staff: Staff = Depends(get_current_staff)):
-    """
-    Get current authenticated user profile
-    """
-    try:
-        return StaffProfileResponse(
-            staffId=current_staff.id,
-            uuid=str(current_staff.uuid),
-            email=current_staff.email,
-            fullName=current_staff.full_name,
-            cmsRole=current_staff.cms_role,
-            collegeId=current_staff.college_id,
-            departmentId=current_staff.department_id,
-            invitationStatus=current_staff.invitation_status,
-            mustResetPassword=current_staff.must_reset_password,
-            isHod=current_staff.is_hod,
-            createdAt=current_staff.created_at,
-        )
-
-    except Exception as e:
-        print(f"Error getting user profile: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again."
-        )
 
 
 @router.post("/logout", response_model=CMSSignupResponse, dependencies=[Depends(security)])

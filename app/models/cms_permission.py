@@ -31,7 +31,7 @@ class CMSStaffPermission(BaseModel):
         base_dict = super().to_dict()
         return {
             "id": base_dict["id"],
-            "cmsStaffId": base_dict["cms_staff_id"],
+            "staffId": base_dict["cms_staff_id"],
             "module": base_dict["module"],
             "readAccess": base_dict["read_access"],
             "writeAccess": base_dict["write_access"],

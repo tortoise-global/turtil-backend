@@ -13,8 +13,7 @@ from app.core.aws import EmailService
 from app.schemas.cms_auth import (
     CMSSigninRequest,
     CMSVerifySigninRequest,
-    CMSPasswordSetupRequest,
-    CMSPersonalDetailsRequest,
+    CMSProfileSetupRequest,
     CMSCollegeDetailsRequest,
     CMSAddressDetailsRequest,
     CMSResetPasswordRequest,
@@ -456,7 +455,7 @@ async def refresh_token(
             )
 
         # Optional: Validate staff ID if provided
-        if request.cmsStaffId and request.cmsStaffId != staff.id:
+        if request.staffId and request.staffId != staff.id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Staff ID mismatch"
             )
@@ -474,7 +473,7 @@ async def refresh_token(
             tokenType="bearer",
             expiresIn=cms_auth.access_token_expire_minutes * 60,
             staff=StaffProfileResponse(
-                cmsStaffId=staff.id,
+                staffId=staff.id,
                 uuid=str(staff.uuid),
                 email=staff.email,
                 fullName=staff.full_name,
@@ -498,18 +497,19 @@ async def refresh_token(
 
 
 @router.post(
-    "/password-setup",
+    "/setup-profile",
     response_model=CMSTokenResponse,
     dependencies=[Depends(security)],
 )
-async def password_setup(
-    request: CMSPasswordSetupRequest,
+async def setup_profile(
+    request: CMSProfileSetupRequest,
     current_staff: Staff = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Set password for the staff during registration
+    Set up staff profile during registration - password and full name
     - Hash and store password
+    - Update staff's full name (username)
     Returns updated JWT tokens with new registration state
     """
     try:
@@ -529,10 +529,46 @@ async def password_setup(
         # Hash password
         hashed_password = cms_auth.get_password_hash(request.password)
 
-        # Update staff password
+        # Update staff password and profile
         current_staff.hashed_password = hashed_password
+        current_staff.full_name = request.fullName
         current_staff.temporary_password = False
         current_staff.must_reset_password = False
+        
+        # For Principal role, also update college contact information
+        if current_staff.cms_role == "principal":
+            # Get or create college for this staff
+            if not current_staff.college_id:
+                # Create college if it doesn't exist
+                college = College(
+                    name="",  # Will be filled in college-details step
+                    short_name="",  # Will be filled in college-details step
+                    college_reference_id="",  # Will be filled in college-details step
+                    area="",  # Will be filled in college-address step
+                    city="",  # Will be filled in college-address step
+                    district="",  # Will be filled in college-address step
+                    state="",  # Will be filled in college-address step
+                    pincode="000000",  # Will be filled in college-address step
+                    principal_cms_staff_id=current_staff.id,
+                    contact_number=request.contactNumber,
+                    contact_staff_id=current_staff.id,
+                )
+                db.add(college)
+                await db.commit()
+                await db.refresh(college)
+                
+                # Update staff with college
+                current_staff.college_id = college.id
+            else:
+                # Update existing college contact info
+                result = await db.execute(
+                    select(College).where(College.id == current_staff.college_id)
+                )
+                college = result.scalar_one_or_none()
+                if college:
+                    college.contact_number = request.contactNumber
+                    college.contact_staff_id = current_staff.id
+        
         await db.commit()
         
         # Refresh staff data to get updated state
@@ -551,7 +587,7 @@ async def password_setup(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error setting password: {e}")
+        print(f"Error setting up profile: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred. Please try again.",
@@ -603,191 +639,6 @@ async def reset_password(
         )
 
 
-@router.post(
-    "/personal-details",
-    response_model=CMSTokenResponse,
-    dependencies=[Depends(security)],
-)
-async def personal_details(
-    request: CMSPersonalDetailsRequest,
-    current_staff: Staff = Depends(get_current_staff),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Step 1: Set personal details for registration
-    Returns updated JWT tokens with new registration state
-    """
-    try:
-        # Update personal details for authenticated staff
-        current_staff.full_name = request.fullName
-        await db.commit()
-        
-        # Refresh staff data to get updated state
-        await db.refresh(current_staff)
-
-        # Generate new JWT tokens with updated registration state
-        token_data = await cms_auth.refresh_user_tokens(current_staff)
-
-        return CMSTokenResponse(
-            accessToken=token_data["accessToken"],
-            refreshToken=token_data["refreshToken"],
-            tokenType=token_data["tokenType"],
-            expiresIn=token_data["expiresIn"],
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error saving personal details: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again.",
-        )
-
-
-@router.post(
-    "/college-details",
-    response_model=CMSTokenResponse,
-    dependencies=[Depends(security)],
-)
-async def college_details(
-    request: CMSCollegeDetailsRequest,
-    current_staff: Staff = Depends(get_current_staff),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Step 2: Set college details
-    - Create new college record
-    - Link staff as principal
-    Returns updated JWT tokens with new registration state
-    """
-    try:
-        # Validate staff doesn't already have a college
-        if current_staff.college_id is not None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Staff already has a college assigned",
-            )
-
-        # Create college record with placeholder address
-        college = College(
-            name=request.name,
-            short_name=request.shortName,
-            college_reference_id=request.collegeReferenceId,
-            phone_number=request.phoneNumber,
-            area="",  # Will be filled in next step
-            city="",  # Will be filled in next step
-            district="",  # Will be filled in next step
-            state="",  # Will be filled in next step
-            pincode="000000",  # Will be filled in next step
-            principal_staff_id=current_staff.id,
-        )
-
-        db.add(college)
-        await db.commit()
-        await db.refresh(college)
-
-        # Update staff with college and role
-        current_staff.college_id = college.id
-        current_staff.cms_role = "principal"
-        current_staff.can_assign_department = True
-        await db.commit()
-        
-        # Refresh staff data to get updated state
-        await db.refresh(current_staff)
-
-        # Generate new JWT tokens with updated registration state
-        token_data = await cms_auth.refresh_user_tokens(current_staff)
-
-        return CMSTokenResponse(
-            accessToken=token_data["accessToken"],
-            refreshToken=token_data["refreshToken"],
-            tokenType=token_data["tokenType"],
-            expiresIn=token_data["expiresIn"],
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error saving college details: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again.",
-        )
-
-
-@router.post(
-    "/address-details",
-    response_model=CMSTokenResponse,
-    dependencies=[Depends(security)],
-)
-async def address_details(
-    request: CMSAddressDetailsRequest,
-    current_staff: Staff = Depends(get_current_staff),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Step 3: Set address details (final registration step)
-    - Complete college address
-    - Mark registration as complete
-    Returns updated JWT tokens with completed registration state
-    """
-    try:
-        # Validate staff has a college
-        if current_staff.college_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Staff must have a college before setting address details",
-            )
-
-        # Get college
-        college_result = await db.execute(
-            select(College).where(College.id == current_staff.college_id)
-        )
-        college = college_result.scalar_one_or_none()
-
-        if not college:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="College not found."
-            )
-
-        # Update college address
-        college.area = request.area
-        college.city = request.city
-        college.district = request.district
-        college.state = request.state
-        college.pincode = request.pincode
-        college.latitude = request.latitude
-        college.longitude = request.longitude
-
-        # Mark staff registration as complete
-        current_staff.invitation_status = "active"
-
-        await db.commit()
-        
-        # Refresh staff data to get updated state
-        await db.refresh(current_staff)
-
-        # Generate new JWT tokens with completed registration state
-        token_data = await cms_auth.refresh_user_tokens(current_staff)
-
-        return CMSTokenResponse(
-            accessToken=token_data["accessToken"],
-            refreshToken=token_data["refreshToken"],
-            tokenType=token_data["tokenType"],
-            expiresIn=token_data["expiresIn"],
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error saving address details: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again.",
-        )
-
-
 @router.post("/logout", dependencies=[Depends(security)])
 async def logout(
     current_staff: Staff = Depends(get_current_staff),
@@ -818,7 +669,7 @@ async def get_current_staff_profile(current_staff: Staff = Depends(get_current_s
     Get current authenticated staff's profile
     """
     return StaffProfileResponse(
-        cmsStaffId=current_staff.id,
+        staffId=current_staff.id,
         uuid=str(current_staff.uuid),
         email=current_staff.email,
         fullName=current_staff.full_name,

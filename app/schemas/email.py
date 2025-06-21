@@ -36,29 +36,6 @@ class VerifyEmailOTPResponse(CamelCaseModel):
     )
 
 
-# S3 Upload Schemas - exactly matching your existing code structure
-
-
-class PresignedUrlRequest(CamelCaseModel):
-    """Request schema for presigned URL generation - matches your existing code"""
-
-    file_name: str = Field(..., description="Name of the file to upload")
-
-
-class PresignedUrlBody(CamelCaseModel):
-    """Body schema for presigned URL response"""
-
-    presigned_url: str = Field(..., description="Pre-signed URL for upload")
-
-
-class PresignedUrlResponse(CamelCaseModel):
-    """Response schema for presigned URL - matches your existing code"""
-
-    status_code: int = Field(..., alias="statusCode", description="HTTP status code")
-    message: str = Field(..., description="Response message")
-    body: Optional[PresignedUrlBody] = Field(None, description="Response body with URL")
-
-
 # Email configuration and status schemas
 
 
