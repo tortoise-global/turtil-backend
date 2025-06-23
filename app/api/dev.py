@@ -99,7 +99,7 @@ async def cleanup_account_data(
                 )
             
             college_id = target_staff.college_id
-            staff_id = target_staff.id
+            staff_id = target_staff.staff_id
             cms_role = target_staff.cms_role
             
             details["operations"].append(
@@ -110,7 +110,7 @@ async def cleanup_account_data(
             if college_id:
                 # Get college info for logging
                 college_result = await db.execute(
-                    select(College).where(College.id == college_id)
+                    select(College).where(College.college_id == college_id)
                 )
                 college = college_result.scalar_one_or_none()
                 
@@ -123,7 +123,7 @@ async def cleanup_account_data(
                     other_staff_result = await db.execute(
                         select(Staff).where(
                             Staff.college_id == college_id,
-                            Staff.id != staff_id
+                            Staff.staff_id != staff_id
                         )
                     )
                     other_staff_list = other_staff_result.scalars().all()
@@ -137,7 +137,7 @@ async def cleanup_account_data(
                         # Delete other staff
                         delete_other_staff = delete(Staff).where(
                             Staff.college_id == college_id,
-                            Staff.id != staff_id
+                            Staff.staff_id != staff_id
                         )
                         result = await db.execute(delete_other_staff)
                         deleted_records["staff"] += result.rowcount
@@ -182,7 +182,7 @@ async def cleanup_account_data(
                     details["operations"].append(
                         f"Removing staff reference from college contact_staff_id"
                     )
-                    update_college = update(College).where(College.id == college_id).values(
+                    update_college = update(College).where(College.college_id == college_id).values(
                         contact_staff_id=None
                     )
                     await db.execute(update_college)
@@ -203,7 +203,7 @@ async def cleanup_account_data(
                 await db.execute(update_invited_staff)
             
             # 4. Now safely delete the target staff record (no more FK references)
-            delete_target_staff = delete(Staff).where(Staff.id == staff_id)
+            delete_target_staff = delete(Staff).where(Staff.staff_id == staff_id)
             result = await db.execute(delete_target_staff)
             deleted_records["staff"] += result.rowcount
             
@@ -211,7 +211,7 @@ async def cleanup_account_data(
             
             # 5. Finally delete the college (no more foreign key references)
             if college_id and college:
-                delete_college = delete(College).where(College.id == college_id)
+                delete_college = delete(College).where(College.college_id == college_id)
                 result = await db.execute(delete_college)
                 deleted_records["colleges"] += result.rowcount
                 
@@ -244,7 +244,7 @@ async def cleanup_account_data(
         )
 
 
-async def cleanup_redis_cache(email: str, staff_id: int = None) -> int:
+async def cleanup_redis_cache(email: str, staff_id: str = None) -> int:
     """Clean up Redis cache entries for the given email and staff ID"""
     try:
         keys_deleted = 0

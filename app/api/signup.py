@@ -283,27 +283,27 @@ async def setup_profile(
                 district="",  # Will be filled in college-address step
                 state="",  # Will be filled in college-address step
                 pincode="000000",  # Will be filled in college-address step
-                principal_cms_staff_id=staff.id,
+                principal_staff_id=staff.staff_id,
                 contact_number=request.contact_number,
-                contact_staff_id=staff.id,
+                contact_staff_id=staff.staff_id,
             )
             db.add(college)
             await db.commit()
             await db.refresh(college)
             
             # Update staff with college and role
-            staff.college_id = college.id
+            staff.college_id = college.college_id
             staff.cms_role = "principal"
             staff.can_assign_department = True
         else:
             # Update existing college contact info
             result = await db.execute(
-                select(College).where(College.id == staff.college_id)
+                select(College).where(College.college_id == staff.college_id)
             )
             college = result.scalar_one_or_none()
             if college:
                 college.contact_number = request.contact_number
-                college.contact_staff_id = staff.id
+                college.contact_staff_id = staff.staff_id
         
         await db.commit()
 
@@ -577,7 +577,7 @@ async def reset_password(
 
         # SECURITY: Invalidate all user sessions
         from app.redis_client import CacheManager
-        await CacheManager.invalidate_all_user_sessions(staff.id)
+        await CacheManager.invalidate_all_user_sessions(staff.staff_id)
 
         # Consume OTP after successful password reset (one-time use enforcement)
         await CMSOTPManager.consume_otp(email, "password_reset")

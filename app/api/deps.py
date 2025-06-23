@@ -181,7 +181,7 @@ async def check_rate_limit(
 
     # Determine rate limit key
     if current_staff:
-        rate_limit_key = f"rate_limit:staff:{current_staff.uuid}"
+        rate_limit_key = f"rate_limit:staff:{current_staff.staff_id}"
         max_calls = (
             settings.rate_limit_calls * 2
         )  # Higher limit for authenticated staff

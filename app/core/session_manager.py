@@ -145,7 +145,7 @@ class SessionManager:
             if db:
                 db_session = UserSession(
                     session_id=session_id,
-                    staff_id=staff.id,
+                    staff_id=staff.staff_id,
                     browser=device_info["browser"],
                     os=device_info["os"],
                     device=device_info["device"],
@@ -163,7 +163,7 @@ class SessionManager:
             
             # Store session in Redis
             session_data = {
-                "staff_id": staff.id,
+                "staff_id": staff.staff_id,
                 "refresh_token_hash": self.hash_token(refresh_token),
                 "device_info": device_info,
                 "created_at": current_time,
@@ -173,9 +173,9 @@ class SessionManager:
             }
             
             await CacheManager.create_session(session_id, session_data)
-            await CacheManager.add_user_session(staff.id, session_id)
+            await CacheManager.add_user_session(staff.staff_id, session_id)
             
-            logger.info(f"Created session {session_id} for staff {staff.id} on {device_info['device']}")
+            logger.info(f"Created session {session_id} for staff {staff.staff_id} on {device_info['device']}")
             
             return {
                 "access_token": access_token,
@@ -187,7 +187,7 @@ class SessionManager:
             }
             
         except Exception as e:
-            logger.error(f"Failed to create session for staff {staff.id}: {e}")
+            logger.error(f"Failed to create session for staff {staff.staff_id}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to create session"
@@ -254,7 +254,7 @@ class SessionManager:
             
             # Get staff from database
             if db:
-                result = await db.execute(select(Staff).where(Staff.id == session_data["staff_id"]))
+                result = await db.execute(select(Staff).where(Staff.staff_id == session_data["staff_id"]))
                 staff = result.scalar_one_or_none()
                 if not staff:
                     raise HTTPException(
@@ -299,7 +299,7 @@ class SessionManager:
                 )
                 await db.commit()
             
-            logger.info(f"Refreshed session {session_id} for staff {staff.id}")
+            logger.info(f"Refreshed session {session_id} for staff {staff.staff_id}")
             
             return {
                 "access_token": new_access_token,

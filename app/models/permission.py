@@ -1,37 +1,44 @@
-from sqlalchemy import Column, String, Boolean, Integer, ForeignKey, UniqueConstraint
-from app.models.base import BaseModel
+from sqlalchemy import Column, String, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from app.models.base import UUIDBaseModel
+import uuid
 
 
-class CMSStaffPermission(BaseModel):
-    """CMS Staff Permission model for module-based access control"""
+class CMSStaffPermission(UUIDBaseModel):
+    """CMS Staff Permission model with UUID primary key for module-based access control"""
 
     __tablename__ = "cms_staff_permissions"
 
-    # Foreign Keys
-    cms_staff_id = Column(Integer, ForeignKey("staff.id"), nullable=False)
+    # UUID Primary Key - descriptive and intuitive
+    permission_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+
+    # Foreign Keys using UUIDs
+    staff_id = Column(UUID(as_uuid=True), ForeignKey("staff.staff_id"), nullable=False)
 
     # Permission Details
     module = Column(String(50), nullable=False)  # One of the 12 core modules
     read_access = Column(Boolean, default=False, nullable=False)
     write_access = Column(Boolean, default=False, nullable=False)
-    scope = Column(
-        String(50), default="college", nullable=False
-    )  # 'college', 'department', 'section'
+    scope = Column(String(50), default="college", nullable=False)  # 'college', 'department', 'section'
+
+    # Relationships
+    staff = relationship("Staff")
 
     # Ensure unique permission per staff per module
     __table_args__ = (
-        UniqueConstraint("cms_staff_id", "module", name="unique_staff_module_permission"),
+        UniqueConstraint("staff_id", "module", name="unique_staff_module_permission"),
     )
 
     def __repr__(self):
-        return f"<CMSStaffPermission(cms_staff_id={self.cms_staff_id}, module={self.module}, read={self.read_access}, write={self.write_access})>"
+        return f"<CMSStaffPermission(permission_id={self.permission_id}, staff_id={self.staff_id}, module={self.module}, read={self.read_access}, write={self.write_access})>"
 
     def to_dict(self) -> dict:
         """Convert to dictionary with camelCase for API responses"""
         base_dict = super().to_dict()
         return {
-            "id": base_dict["id"],
-            "staffId": base_dict["cms_staff_id"],
+            "permissionId": base_dict["permission_id"],
+            "staffId": base_dict["staff_id"],
             "module": base_dict["module"],
             "readAccess": base_dict["read_access"],
             "writeAccess": base_dict["write_access"],

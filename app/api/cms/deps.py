@@ -70,7 +70,7 @@ async def get_current_staff(
             )
 
         # Validate session in Redis
-        session_data = await cms_auth.validate_session(staff.id, credentials.credentials)
+        session_data = await cms_auth.validate_session(staff.staff_id, credentials.credentials)
         if not session_data:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -199,7 +199,7 @@ async def get_current_staff_from_cookie(
             )
 
         # Validate session in Redis
-        session_data = await cms_auth.validate_session(staff.id, access_token)
+        session_data = await cms_auth.validate_session(staff.staff_id, access_token)
         if not session_data:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

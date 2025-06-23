@@ -53,7 +53,7 @@ class CMSAuthManager:
         )
 
         payload = {
-            "sub": str(staff.uuid),
+            "sub": str(staff.staff_id),
             "email": staff.email,
             "fullName": staff.full_name,
             "cmsRole": staff.cms_role,
@@ -88,7 +88,7 @@ class CMSAuthManager:
         refresh_token = self.create_refresh_token(staff)
         
         # Invalidate old sessions (user will use new tokens)
-        await self.invalidate_staff_sessions(staff.id)
+        await self.invalidate_staff_sessions(staff.staff_id)
         
         # Create new session
         await self.create_staff_session(staff, access_token)
@@ -106,7 +106,7 @@ class CMSAuthManager:
         expire = now + timedelta(days=self.refresh_token_expire_days)
 
         payload = {
-            "sub": str(staff.uuid),
+            "sub": str(staff.staff_id),
             "email": staff.email,
             "exp": expire,
             "iat": now,
@@ -125,9 +125,9 @@ class CMSAuthManager:
         expire = now + timedelta(minutes=self.access_token_expire_minutes)  # Normal JWT expiry
 
         payload = {
-            "sub": str(staff.uuid),
+            "sub": str(staff.staff_id),
             "email": staff.email,
-            "staffId": staff.id,
+            "staffId": staff.staff_id,
             "purpose": purpose,
             "exp": expire,
             "iat": now,
@@ -180,7 +180,7 @@ class CMSAuthManager:
                 "lastActivity": datetime.now(timezone.utc).isoformat(),
             }
 
-            return await CMSOTPManager.store_staff_session(staff.id, session_data)
+            return await CMSOTPManager.store_staff_session(staff.staff_id, session_data)
 
         except Exception as e:
             print(f"Error creating staff session: {e}")

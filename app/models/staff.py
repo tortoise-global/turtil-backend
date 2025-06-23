@@ -1,17 +1,18 @@
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
-from app.models.base import BaseModel
+from sqlalchemy.orm import relationship
+from app.models.base import UUIDBaseModel
 import uuid
 from datetime import datetime, timezone
 
 
-class Staff(BaseModel):
-    """Staff model for authentication and staff management"""
+class Staff(UUIDBaseModel):
+    """Staff model with UUID primary key for authentication and staff management"""
 
     __tablename__ = "staff"
 
-    # Use UUID as primary key for better security
-    uuid = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True, index=True)
+    # UUID Primary Key - descriptive and intuitive
+    staff_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
 
     # Basic staff information
     email = Column(String(255), unique=True, index=True, nullable=False)
@@ -30,31 +31,27 @@ class Staff(BaseModel):
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     login_count = Column(Integer, default=0, nullable=False)
 
-    # CMS-specific fields
-    college_id = Column(Integer, ForeignKey("colleges.id"), nullable=True)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
-    cms_role = Column(
-        String(50), default="staff", nullable=False
-    )  # 'principal', 'college_admin', 'hod', 'staff'
+    # CMS-specific fields with UUID foreign keys
+    college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.college_id"), nullable=True)
+    department_id = Column(UUID(as_uuid=True), ForeignKey("departments.department_id"), nullable=True)
+    cms_role = Column(String(50), default="staff", nullable=False)  # 'principal', 'college_admin', 'hod', 'staff'
 
     # Invitation & Onboarding System
-    invitation_status = Column(
-        String(50), default="pending", nullable=False
-    )  # 'pending', 'accepted', 'active'
+    invitation_status = Column(String(50), default="pending", nullable=False)  # 'pending', 'accepted', 'active'
     temporary_password = Column(Boolean, default=False, nullable=False)
     must_reset_password = Column(Boolean, default=False, nullable=False)
     can_assign_department = Column(Boolean, default=False, nullable=False)
-    invited_by_staff_id = Column(Integer, ForeignKey("staff.id"), nullable=True)
+    invited_by_staff_id = Column(UUID(as_uuid=True), ForeignKey("staff.staff_id"), nullable=True)
     is_hod = Column(Boolean, default=False, nullable=False)  # Head of Department status
 
     # Relationships
-    # college = relationship("College", back_populates="staff")
-    # department = relationship("Department", back_populates="staff")
-    # invited_by = relationship("Staff", remote_side=[id])
+    college = relationship("College", back_populates="staff_members", foreign_keys=[college_id])
+    department = relationship("Department", back_populates="staff_members", foreign_keys=[department_id])
+    invited_by = relationship("Staff", remote_side=[staff_id])
+    sessions = relationship("UserSession", back_populates="staff")
 
     def __repr__(self):
-        return f"<Staff(id={self.id}, email={self.email})>"
-
+        return f"<Staff(staff_id={self.staff_id}, email={self.email})>"
 
     def verify_email(self):
         """Mark email as verified"""
@@ -73,8 +70,7 @@ class Staff(BaseModel):
         """
         base_dict = super().to_dict()
         result = {
-            "staffId": base_dict["id"],
-            "uuid": str(self.uuid),
+            "staffId": base_dict["staff_id"],
             "email": base_dict["email"],
             "fullName": base_dict["full_name"],
             "isActive": base_dict["is_active"],
@@ -117,15 +113,16 @@ class Staff(BaseModel):
         )
         
         return {
-            "sub": str(self.uuid),  # Subject (staff identifier)
+            "sub": str(self.staff_id),  # Subject (staff identifier)
+            "staffId": str(self.staff_id),  # Explicit staff ID for clarity
             "email": self.email,
             "fullName": self.full_name,
             "isVerified": self.is_verified,
             "isSuperstaff": self.is_superstaff,
             # CMS-specific token data
             "cmsRole": self.cms_role,
-            "collegeId": self.college_id,
-            "departmentId": self.department_id,
+            "collegeId": str(self.college_id) if self.college_id else None,
+            "departmentId": str(self.department_id) if self.department_id else None,
             "invitationStatus": self.invitation_status,
             "requiresPasswordReset": requires_password_reset,
             "requiresDetails": requires_details,

@@ -52,14 +52,14 @@ async def get_departments(
         for department in paginated_result.items:
             # Count total staff in department
             total_staff_result = await db.execute(
-                select(func.count(Staff.id)).where(Staff.department_id == department.id)
+                select(func.count(Staff.staff_id)).where(Staff.department_id == department.department_id)
             )
             total_staff = total_staff_result.scalar() or 0
 
             # Count active staff in department
             active_staff_result = await db.execute(
-                select(func.count(Staff.id)).where(
-                    and_(Staff.department_id == department.id, Staff.is_active)
+                select(func.count(Staff.staff_id)).where(
+                    and_(Staff.department_id == department.department_id, Staff.is_active)
                 )
             )
             active_staff = active_staff_result.scalar() or 0
@@ -68,7 +68,7 @@ async def get_departments(
             hod_name = None
             if department.hod_cms_staff_id:
                 hod_result = await db.execute(
-                    select(Staff).where(Staff.id == department.hod_cms_staff_id)
+                    select(Staff).where(Staff.staff_id == department.hod_cms_staff_id)
                 )
                 hod_staff = hod_result.scalar_one_or_none()
                 if hod_staff:
@@ -153,7 +153,7 @@ async def create_department(
         return DepartmentActionResponse(
             success=True,
             message=f"Department '{request.name}' created successfully",
-            departmentId=new_department.id,
+            departmentId=str(new_department.department_id),
         )
 
     except HTTPException:
@@ -173,7 +173,7 @@ async def create_department(
     dependencies=[Depends(security)],
 )
 async def update_department(
-    departmentId: int,
+    departmentId: str,
     request: UpdateDepartmentRequest,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
@@ -193,7 +193,7 @@ async def update_department(
         result = await db.execute(
             select(Department).where(
                 and_(
-                    Department.id == departmentId,
+                    Department.department_id == departmentId,
                     Department.college_id == current_staff.college_id,
                 )
             )
@@ -212,7 +212,7 @@ async def update_department(
                     and_(
                         Department.code == request.code,
                         Department.college_id == current_staff.college_id,
-                        Department.id != departmentId,
+                        Department.department_id != departmentId,
                     )
                 )
             )
@@ -237,7 +237,7 @@ async def update_department(
         return DepartmentActionResponse(
             success=True,
             message=f"Department '{department.name}' updated successfully",
-            departmentId=departmentId,
+            departmentId=str(departmentId),
         )
 
     except HTTPException:
@@ -257,7 +257,7 @@ async def update_department(
     dependencies=[Depends(security)],
 )
 async def assign_hod_to_department(
-    departmentId: int,
+    departmentId: str,
     request: AssignHODRequest,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
@@ -278,7 +278,7 @@ async def assign_hod_to_department(
         dept_result = await db.execute(
             select(Department).where(
                 and_(
-                    Department.id == departmentId,
+                    Department.department_id == departmentId,
                     Department.college_id == current_staff.college_id,
                 )
             )
@@ -294,7 +294,7 @@ async def assign_hod_to_department(
         staff_result = await db.execute(
             select(Staff).where(
                 and_(
-                    Staff.id == request.staffId,
+                    Staff.staff_id == request.staffId,
                     Staff.college_id == current_staff.college_id,
                     Staff.is_active,
                 )
@@ -311,10 +311,10 @@ async def assign_hod_to_department(
         # Check if staff is already HOD of another department
         if staff.is_hod:
             existing_hod_dept_result = await db.execute(
-                select(Department).where(Department.hod_cms_staff_id == staff.id)
+                select(Department).where(Department.hod_cms_staff_id == staff.staff_id)
             )
             existing_dept = existing_hod_dept_result.scalar_one_or_none()
-            if existing_dept and existing_dept.id != departmentId:
+            if existing_dept and str(existing_dept.department_id) != departmentId:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Staff is already HOD of {existing_dept.name} department",
@@ -323,14 +323,14 @@ async def assign_hod_to_department(
         # Remove current HOD if exists
         if department.hod_cms_staff_id:
             current_hod_result = await db.execute(
-                select(Staff).where(Staff.id == department.hod_cms_staff_id)
+                select(Staff).where(Staff.staff_id == department.hod_cms_staff_id)
             )
             current_hod = current_hod_result.scalar_one_or_none()
             if current_hod:
                 current_hod.is_hod = False
 
         # Assign new HOD
-        department.hod_cms_staff_id = staff.id
+        department.hod_cms_staff_id = staff.staff_id
         staff.is_hod = True
         staff.department_id = departmentId  # Ensure HOD is assigned to the department
 
@@ -339,8 +339,8 @@ async def assign_hod_to_department(
         return HODActionResponse(
             success=True,
             message=f"{staff.full_name} assigned as HOD of {department.name} department",
-            departmentId=departmentId,
-            staffId=staff.id,
+            departmentId=str(departmentId),
+            staffId=str(staff.staff_id),
             hodName=staff.full_name,
         )
 
@@ -361,7 +361,7 @@ async def assign_hod_to_department(
     dependencies=[Depends(security)],
 )
 async def remove_hod_from_department(
-    departmentId: int,
+    departmentId: str,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ):
@@ -381,7 +381,7 @@ async def remove_hod_from_department(
         dept_result = await db.execute(
             select(Department).where(
                 and_(
-                    Department.id == departmentId,
+                    Department.department_id == departmentId,
                     Department.college_id == current_staff.college_id,
                 )
             )
@@ -401,7 +401,7 @@ async def remove_hod_from_department(
 
         # Get current HOD
         hod_result = await db.execute(
-            select(Staff).where(Staff.id == department.hod_cms_staff_id)
+            select(Staff).where(Staff.staff_id == department.hod_cms_staff_id)
         )
         hod_staff = hod_result.scalar_one_or_none()
 
@@ -415,8 +415,8 @@ async def remove_hod_from_department(
         return HODActionResponse(
             success=True,
             message=f"HOD removed from {department.name} department",
-            departmentId=departmentId,
-            staffId=hod_staff.id if hod_staff else None,
+            departmentId=str(departmentId),
+            staffId=str(hod_staff.staff_id) if hod_staff else None,
             hodName=None,
         )
 
@@ -437,7 +437,7 @@ async def remove_hod_from_department(
     dependencies=[Depends(security)],
 )
 async def delete_department(
-    departmentId: int,
+    departmentId: str,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ):
@@ -457,7 +457,7 @@ async def delete_department(
         result = await db.execute(
             select(Department).where(
                 and_(
-                    Department.id == departmentId,
+                    Department.department_id == departmentId,
                     Department.college_id == current_staff.college_id,
                 )
             )
@@ -471,7 +471,7 @@ async def delete_department(
 
         # Check if department has assigned staff
         staff_result = await db.execute(
-            select(func.count(Staff.id)).where(Staff.department_id == departmentId)
+            select(func.count(Staff.staff_id)).where(Staff.department_id == departmentId)
         )
         staff_count = staff_result.scalar() or 0
 
@@ -484,7 +484,7 @@ async def delete_department(
         # Remove HOD assignment if exists
         if department.hod_cms_staff_id:
             hod_result = await db.execute(
-                select(Staff).where(Staff.id == department.hod_cms_staff_id)
+                select(Staff).where(Staff.staff_id == department.hod_cms_staff_id)
             )
             hod_staff = hod_result.scalar_one_or_none()
             if hod_staff:
@@ -498,7 +498,7 @@ async def delete_department(
         return DepartmentActionResponse(
             success=True,
             message=f"Department '{department_name}' deleted successfully",
-            departmentId=departmentId,
+            departmentId=str(departmentId),
         )
 
     except HTTPException:

@@ -46,7 +46,7 @@ async def college_logo(
                 district="",  # Will be filled in college-address step
                 state="",  # Will be filled in college-address step
                 pincode="000000",  # Will be filled in college-address step
-                principal_staff_id=current_staff.id,
+                principal_staff_id=current_staff.staff_id,
             )
 
             db.add(college)
@@ -54,14 +54,14 @@ async def college_logo(
             await db.refresh(college)
 
             # Update staff with college and role
-            current_staff.college_id = college.id
+            current_staff.college_id = college.college_id
             current_staff.cms_role = "principal"
             current_staff.can_assign_department = True
             await db.commit()
 
         # Get current staff's college
         result = await db.execute(
-            select(College).where(College.id == current_staff.college_id)
+            select(College).where(College.college_id == current_staff.college_id)
         )
         college = result.scalar_one_or_none()
 
@@ -117,7 +117,7 @@ async def college_details(
         if current_staff.college_id:
             # Get existing college
             result = await db.execute(
-                select(College).where(College.id == current_staff.college_id)
+                select(College).where(College.college_id == current_staff.college_id)
             )
             college = result.scalar_one_or_none()
             
@@ -137,7 +137,7 @@ async def college_details(
                 district="",  # Will be filled in college-address step
                 state="",  # Will be filled in college-address step
                 pincode="000000",  # Will be filled in college-address step
-                principal_staff_id=current_staff.id,
+                principal_staff_id=current_staff.staff_id,
             )
 
             db.add(college)
@@ -145,7 +145,7 @@ async def college_details(
             await db.refresh(college)
 
             # Update staff with college and role
-            current_staff.college_id = college.id
+            current_staff.college_id = college.college_id
             current_staff.cms_role = "principal"
             current_staff.can_assign_department = True
             await db.commit()
@@ -195,7 +195,7 @@ async def college_address(
     try:
         # Get current staff's college
         result = await db.execute(
-            select(College).where(College.id == current_staff.college_id)
+            select(College).where(College.college_id == current_staff.college_id)
         )
         college = result.scalar_one_or_none()
 

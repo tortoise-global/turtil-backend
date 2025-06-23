@@ -184,16 +184,6 @@ async def signin(
         staff.record_login()
         await db.commit()
         
-        # Prepare user information for response
-        user_info = {
-            "id": staff.id,
-            "uuid": str(staff.uuid),
-            "email": staff.email,
-            "fullName": staff.full_name,
-            "cmsRole": staff.cms_role,
-            "collegeId": staff.college_id,
-            "departmentId": staff.department_id
-        }
         
         logger.info(f"Signin successful for {email} from {ip_address}")
         
@@ -216,7 +206,7 @@ async def signin(
         return SigninResponse(
             refresh_token=session_data["refresh_token"],
             device_info=DeviceInfo(**session_data["device_info"]),
-            user=user_info
+            staff=staff
         )
         
     except HTTPException:
@@ -316,7 +306,7 @@ async def list_sessions(
         current_session_id = current_session["session_id"]
         
         # Get all user sessions
-        sessions_data = await session_manager.get_user_sessions(staff.id, db)
+        sessions_data = await session_manager.get_user_sessions(staff.staff_id, db)
         
         # Format sessions for response
         sessions = []
@@ -338,7 +328,7 @@ async def list_sessions(
         )
         
     except Exception as e:
-        logger.error(f"List sessions error for staff {current_session['staff'].id}: {e}")
+        logger.error(f"List sessions error for staff {current_session['staff'].staff_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list sessions"
@@ -384,7 +374,7 @@ async def signout(
         session_id = current_session["session_id"]
         
         # Invalidate current session
-        success = await session_manager.invalidate_session(session_id, staff.id, db)
+        success = await session_manager.invalidate_session(session_id, staff.staff_id, db)
         
         if not success:
             raise HTTPException(
@@ -423,12 +413,12 @@ async def signout_all_sessions(
         current_session_id = current_session["session_id"]
         
         # Get session count before invalidation
-        user_sessions = await session_manager.get_user_sessions(staff.id, db)
+        user_sessions = await session_manager.get_user_sessions(staff.staff_id, db)
         other_sessions_count = len([s for s in user_sessions if s["session_id"] != current_session_id])
         
         # Invalidate all sessions except current
         success = await session_manager.invalidate_all_user_sessions(
-            staff.id, 
+            staff.staff_id, 
             except_session_id=current_session_id,
             db=db
         )
@@ -470,7 +460,7 @@ async def signout_specific_session(
         staff = current_session["staff"]
         
         # Validate that the session belongs to the current user
-        user_sessions = await session_manager.get_user_sessions(staff.id, db)
+        user_sessions = await session_manager.get_user_sessions(staff.staff_id, db)
         valid_session_ids = [s["session_id"] for s in user_sessions]
         
         if sessionId not in valid_session_ids:
@@ -487,7 +477,7 @@ async def signout_specific_session(
             )
         
         # Invalidate the specific session
-        success = await session_manager.invalidate_session(sessionId, staff.id, db)
+        success = await session_manager.invalidate_session(sessionId, staff.staff_id, db)
         
         if not success:
             raise HTTPException(
