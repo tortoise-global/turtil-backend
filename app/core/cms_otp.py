@@ -2,8 +2,20 @@ import json
 import secrets
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
+from fastapi import Request
 from app.redis_client import redis_client
 from app.config import settings
+
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP address from request"""
+    x_forwarded_for = request.headers.get("X-Forwarded-For")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    x_real_ip = request.headers.get("X-Real-IP")
+    if x_real_ip:
+        return x_real_ip.strip()
+    return request.client.host if request.client else "unknown"
 
 
 class CMSOTPManager:
@@ -34,16 +46,20 @@ class CMSOTPManager:
         return "".join([str(secrets.randbelow(10)) for _ in range(cls.OTP_LENGTH)])
 
     @classmethod
-    async def store_otp(cls, email: str, otp: str) -> bool:
+    async def store_otp(cls, email: str, otp: str, purpose: str = "signup", ip_address: str = None) -> bool:
         """
-        Store OTP in Redis with expiry and attempt tracking
+        Store OTP in Redis with expiry, attempt tracking, purpose, and IP validation
         """
         try:
             key = cls._get_otp_key(email)
             otp_data = {
                 "otp": otp,
                 "attempts": 0,
+                "purpose": purpose,
+                "ip_address": ip_address,
                 "created_at": datetime.now(timezone.utc).isoformat(),
+                "verified": False,
+                "consumed": False,
             }
 
             # Store with TTL
@@ -55,10 +71,10 @@ class CMSOTPManager:
             return False
 
     @classmethod
-    async def verify_otp(cls, email: str, provided_otp: str) -> Dict[str, Any]:
+    async def verify_otp(cls, email: str, provided_otp: str, purpose: str = "signup", ip_address: str = None) -> Dict[str, Any]:
         """
-        Verify OTP and track attempts
-        Returns: {"valid": bool, "attempts": int, "exceeded": bool, "expired": bool, "verified": bool}
+        Verify OTP and track attempts with purpose and IP validation
+        Returns: {"valid": bool, "attempts": int, "exceeded": bool, "expired": bool, "verified": bool, "purpose_mismatch": bool}
         """
         try:
             key = cls._get_otp_key(email)
@@ -71,10 +87,23 @@ class CMSOTPManager:
                     "exceeded": False,
                     "expired": True,
                     "verified": False,
+                    "purpose_mismatch": False,
                 }
 
             otp_data = json.loads(otp_data_str)
             current_attempts = otp_data.get("attempts", 0)
+
+            # Check purpose mismatch (security validation)
+            otp_purpose = otp_data.get("purpose", "signup")
+            if otp_purpose != purpose:
+                return {
+                    "valid": False,
+                    "attempts": current_attempts,
+                    "exceeded": False,
+                    "expired": False,
+                    "verified": otp_data.get("verified", False),
+                    "purpose_mismatch": True,
+                }
 
             # Check if max attempts exceeded
             if current_attempts >= cls.MAX_ATTEMPTS:
@@ -84,6 +113,7 @@ class CMSOTPManager:
                     "exceeded": True,
                     "expired": False,
                     "verified": otp_data.get("verified", False),
+                    "purpose_mismatch": False,
                 }
 
             # Increment attempts
@@ -108,6 +138,7 @@ class CMSOTPManager:
                     "exceeded": False,
                     "expired": False,
                     "verified": True,
+                    "purpose_mismatch": False,
                 }
             else:
                 # Update attempts in Redis
@@ -121,11 +152,12 @@ class CMSOTPManager:
                     "exceeded": otp_data["attempts"] >= cls.MAX_ATTEMPTS,
                     "expired": False,
                     "verified": otp_data.get("verified", False),
+                    "purpose_mismatch": False,
                 }
 
         except Exception as e:
             print(f"Error verifying OTP: {e}")
-            return {"valid": False, "attempts": 0, "exceeded": False, "expired": True, "verified": False}
+            return {"valid": False, "attempts": 0, "exceeded": False, "expired": True, "verified": False, "purpose_mismatch": False}
 
     @classmethod
     async def clear_otp(cls, email: str) -> bool:
@@ -349,3 +381,123 @@ class CMSOTPManager:
         except Exception as e:
             print(f"Error checking blacklist: {e}")
             return False
+
+    @classmethod
+    def generate_secure_temp_token(cls) -> str:
+        """Generate cryptographically secure temporary token"""
+        return secrets.token_urlsafe(32)
+    
+    @classmethod
+    async def store_temp_token(cls, temp_token: str, email: str, ttl: int = 300) -> bool:
+        """Store temporary token mapping in Redis"""
+        try:
+            key = f"temp_token:{temp_token}"
+            token_data = {
+                "email": email,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await redis_client.setex(key, ttl, json.dumps(token_data))
+            return True
+        except Exception as e:
+            print(f"Error storing temp token: {e}")
+            return False
+    
+    @classmethod
+    async def validate_temp_token(cls, temp_token: str) -> Optional[str]:
+        """Validate temporary token and return associated email"""
+        try:
+            key = f"temp_token:{temp_token}"
+            token_data_str = await redis_client.get(key)
+            
+            if not token_data_str:
+                return None
+            
+            token_data = json.loads(token_data_str)
+            return token_data.get("email")
+        except Exception as e:
+            print(f"Error validating temp token: {e}")
+            return None
+    
+    @classmethod
+    async def clear_temp_token(cls, temp_token: str) -> bool:
+        """Clear temporary token from Redis"""
+        try:
+            key = f"temp_token:{temp_token}"
+            await redis_client.delete(key)
+            return True
+        except Exception as e:
+            print(f"Error clearing temp token: {e}")
+            return False
+
+    @classmethod
+    async def consume_otp(cls, email: str, purpose: str = "signup") -> bool:
+        """Mark OTP as consumed and delete from Redis (one-time use enforcement)"""
+        try:
+            key = cls._get_otp_key(email)
+            otp_data_str = await redis_client.get(key)
+            
+            if not otp_data_str:
+                return False
+            
+            otp_data = json.loads(otp_data_str)
+            
+            # Verify purpose matches
+            if otp_data.get("purpose", "signup") != purpose:
+                return False
+                
+            # Mark as consumed and delete
+            await redis_client.delete(key)
+            return True
+            
+        except Exception as e:
+            print(f"Error consuming OTP: {e}")
+            return False
+
+    @classmethod
+    async def validate_otp_for_action(cls, email: str, purpose: str = "signup", ip_address: str = None) -> Dict[str, Any]:
+        """Comprehensive OTP validation for consumption - checks if OTP was verified and ready for action"""
+        try:
+            key = cls._get_otp_key(email)
+            otp_data_str = await redis_client.get(key)
+            
+            if not otp_data_str:
+                return {
+                    "valid": False,
+                    "reason": "OTP not found or expired. Please verify your email again."
+                }
+            
+            otp_data = json.loads(otp_data_str)
+            
+            # Check if OTP was verified
+            if not otp_data.get("verified", False):
+                return {
+                    "valid": False,
+                    "reason": "OTP not verified. Please verify your email first."
+                }
+            
+            # Check purpose
+            if otp_data.get("purpose", "signup") != purpose:
+                return {
+                    "valid": False,
+                    "reason": f"Invalid verification flow. Please request a new OTP for {purpose}."
+                }
+            
+            # Check if already consumed
+            if otp_data.get("consumed", False):
+                return {
+                    "valid": False,
+                    "reason": "OTP already used. Please request a new verification."
+                }
+            
+            # All checks passed
+            return {
+                "valid": True,
+                "reason": "OTP validation successful"
+            }
+            
+        except Exception as e:
+            print(f"Error validating OTP for action: {e}")
+            return {
+                "valid": False,
+                "reason": "Validation error. Please try again."
+            }

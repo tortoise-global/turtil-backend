@@ -3,7 +3,7 @@ Simplified Signup API
 Account creation with OTP verification and profile setup
 """
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timezone
@@ -12,7 +12,7 @@ from app.database import get_db
 from app.models.staff import Staff
 from app.models.college import College
 from app.core.cms_auth import cms_auth
-from app.core.cms_otp import CMSOTPManager
+from app.core.cms_otp import CMSOTPManager, get_client_ip
 from app.config import settings
 from app.core.aws import EmailService
 from app.schemas.signup_schemas import (
@@ -21,6 +21,7 @@ from app.schemas.signup_schemas import (
     VerifyOTPRequest,
     VerifySignupResponse,
     SetupProfileRequest,
+    VerifyPasswordResetOTPRequest,
     ResetPasswordRequest,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
@@ -33,7 +34,8 @@ logger = logging.getLogger(__name__)
 
 @router.post("/", response_model=SignupResponse)
 async def send_signup_otp(
-    request: SignupRequest, 
+    request: SignupRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -57,8 +59,11 @@ async def send_signup_otp(
         # Generate OTP
         otp = CMSOTPManager.generate_otp()
         
-        # Store OTP in Redis
-        otp_stored = await CMSOTPManager.store_otp(email, otp)
+        # Get client IP address
+        ip_address = get_client_ip(http_request)
+        
+        # Store OTP in Redis with purpose and IP tracking
+        otp_stored = await CMSOTPManager.store_otp(email, otp, purpose="signup", ip_address=ip_address)
         
         if not otp_stored:
             raise HTTPException(
@@ -102,7 +107,8 @@ async def send_signup_otp(
 
 @router.post("/verify-otp", response_model=VerifySignupResponse)
 async def verify_signup_otp(
-    request: VerifyOTPRequest, 
+    request: VerifyOTPRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -115,13 +121,22 @@ async def verify_signup_otp(
         email = request.email.lower().strip()
         otp = request.otp.strip()
 
-        # Verify OTP
-        verification_result = await CMSOTPManager.verify_otp(email, otp)
+        # Get client IP address
+        ip_address = get_client_ip(http_request)
+        
+        # Verify OTP with purpose and IP validation
+        verification_result = await CMSOTPManager.verify_otp(email, otp, purpose="signup", ip_address=ip_address)
         
         if verification_result["expired"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="OTP has expired. Please request a new one."
+            )
+        
+        if verification_result["purpose_mismatch"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification flow. Please request a new OTP for signup."
             )
         
         if verification_result["exceeded"]:
@@ -169,13 +184,17 @@ async def verify_signup_otp(
         # Mark OTP as verified in Redis
         await CMSOTPManager.mark_otp_verified(email)
 
+        # Generate secure temporary token for profile setup
+        temp_token = CMSOTPManager.generate_secure_temp_token()
+        await CMSOTPManager.store_temp_token(temp_token, email, ttl=300)  # 5 minutes
+
         logger.info(f"OTP verified for {email}, staff record created/updated")
 
         return VerifySignupResponse(
             success=True,
             message="Email verified successfully. Please set up your profile to continue.",
             nextStep="profile_setup",
-            tempToken=email  # Simple temp token for profile setup
+            tempToken=temp_token  # Secure cryptographic token
         )
         
     except HTTPException:
@@ -190,7 +209,8 @@ async def verify_signup_otp(
 
 @router.post("/setup-profile", response_model=SignupResponse)
 async def setup_profile(
-    request: SetupProfileRequest, 
+    request: SetupProfileRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -201,8 +221,28 @@ async def setup_profile(
     - Complete signup process
     """
     try:
-        email = request.email.lower().strip()
+        temp_token = request.temp_token.strip() if hasattr(request, 'temp_token') else None
         password = request.password.strip()
+
+        # Validate temporary token and get email
+        if temp_token:
+            email = await CMSOTPManager.validate_temp_token(temp_token)
+            if not email:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid or expired temporary token. Please verify your email again."
+                )
+        else:
+            # Fallback to email-based validation for backward compatibility
+            email = request.email.lower().strip() if hasattr(request, 'email') else None
+            if not email:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Missing authentication token. Please verify your email first."
+                )
+
+        # Get client IP address
+        ip_address = get_client_ip(http_request)
 
         # Get staff from database
         result = await db.execute(select(Staff).where(Staff.email == email))
@@ -214,12 +254,12 @@ async def setup_profile(
                 detail="Account not found. Please complete email verification first."
             )
 
-        # Verify OTP was verified for this email (check Redis)
-        otp_status = await CMSOTPManager.get_otp_status(email)
-        if not otp_status["verified"]:
+        # Comprehensive OTP validation for consumption
+        otp_validation = await CMSOTPManager.validate_otp_for_action(email, "signup", ip_address)
+        if not otp_validation["valid"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email not verified. Please verify your email with OTP first."
+                detail=otp_validation["reason"]
             )
 
         # Hash password
@@ -267,10 +307,26 @@ async def setup_profile(
         
         await db.commit()
 
-        # Clear OTP after successful profile setup
-        await CMSOTPManager.expire_otp(email)
+        # Consume OTP after successful profile setup (one-time use enforcement)
+        await CMSOTPManager.consume_otp(email, "signup")
+        
+        # Clear temporary token
+        if temp_token:
+            await CMSOTPManager.clear_temp_token(temp_token)
 
         logger.info(f"Profile setup completed for {email}")
+
+        # Send signup confirmation email
+        try:
+            college_name = college.name if college and college.name else None
+            await EmailService.send_signup_confirmation_email(
+                email=email,
+                full_name=staff.full_name,
+                college_name=college_name
+            )
+        except Exception as e:
+            # Don't fail signup if confirmation email fails
+            logger.warning(f"Failed to send signup confirmation email to {email}: {e}")
 
         return SignupResponse(
             success=True,
@@ -290,7 +346,8 @@ async def setup_profile(
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 async def send_forgot_password_otp(
-    request: ForgotPasswordRequest, 
+    request: ForgotPasswordRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -314,8 +371,11 @@ async def send_forgot_password_otp(
         # Generate OTP
         otp = CMSOTPManager.generate_otp()
         
-        # Store OTP in Redis
-        otp_stored = await CMSOTPManager.store_otp(email, otp)
+        # Get client IP address
+        ip_address = get_client_ip(http_request)
+        
+        # Store OTP in Redis with password reset purpose and IP tracking
+        otp_stored = await CMSOTPManager.store_otp(email, otp, purpose="password_reset", ip_address=ip_address)
         
         if not otp_stored:
             raise HTTPException(
@@ -358,29 +418,37 @@ async def send_forgot_password_otp(
         )
 
 
-@router.post("/reset-password", response_model=SignupResponse)
-async def reset_password(
-    request: ResetPasswordRequest, 
+@router.post("/verify-forgot-password", response_model=VerifySignupResponse)
+async def verify_password_reset_otp(
+    request: VerifyPasswordResetOTPRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Reset password with OTP verification
-    - Verify OTP for password reset
-    - Update password and clear temporary flags
-    - Invalidate all user sessions for security
+    Verify OTP for password reset (shared with signup verification)
+    - This reuses the same OTP verification logic as signup
+    - Returns temporary token for password reset completion
     """
     try:
         email = request.email.lower().strip()
         otp = request.otp.strip()
-        new_password = request.new_password.strip()
 
-        # Verify OTP
-        verification_result = await CMSOTPManager.verify_otp(email, otp)
+        # Get client IP address
+        ip_address = get_client_ip(http_request)
+        
+        # Verify OTP with password reset purpose and IP validation
+        verification_result = await CMSOTPManager.verify_otp(email, otp, purpose="password_reset", ip_address=ip_address)
         
         if verification_result["expired"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="OTP has expired. Please request a new one."
+            )
+        
+        if verification_result["purpose_mismatch"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification flow. Please request a new OTP for password reset."
             )
         
         if verification_result["exceeded"]:
@@ -396,6 +464,89 @@ async def reset_password(
                 detail=f"Invalid OTP. {attempts_remaining} attempts remaining."
             )
 
+        # Check if staff exists and is verified
+        result = await db.execute(select(Staff).where(Staff.email == email))
+        staff = result.scalar_one_or_none()
+        
+        if not staff or not staff.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Account not found or not verified"
+            )
+
+        # Mark OTP as verified in Redis
+        await CMSOTPManager.mark_otp_verified(email)
+
+        # Generate secure temporary token for password reset
+        temp_token = CMSOTPManager.generate_secure_temp_token()
+        await CMSOTPManager.store_temp_token(temp_token, email, ttl=300)  # 5 minutes
+
+        logger.info(f"Password reset OTP verified for {email}")
+
+        return VerifySignupResponse(
+            success=True,
+            message="OTP verified successfully. You can now reset your password.",
+            nextStep="password_reset",
+            tempToken=temp_token  # Secure cryptographic token
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Password reset OTP verification error for {request.email}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred. Please try again."
+        )
+
+
+@router.post("/reset-password", response_model=SignupResponse)
+async def reset_password(
+    request: ResetPasswordRequest,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Reset password with OTP verification
+    - Verify OTP for password reset
+    - Update password and clear temporary flags
+    - Invalidate all user sessions for security
+    """
+    try:
+        temp_token = request.temp_token.strip() if request.temp_token else None
+        new_password = request.new_password.strip()
+
+        # Validate temporary token and get email
+        if temp_token:
+            email = await CMSOTPManager.validate_temp_token(temp_token)
+            if not email:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid or expired temporary token. Please verify your OTP again."
+                )
+        else:
+            # Fallback to legacy approach for backward compatibility
+            email = request.email.lower().strip() if request.email else None
+            otp = request.otp.strip() if request.otp else None
+            
+            if not email or not otp:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Missing authentication token. Please verify your OTP first."
+                )
+            
+            # Legacy OTP verification (deprecated)
+            verification_result = await CMSOTPManager.verify_otp(email, otp, purpose="password_reset")
+            
+            if not verification_result["valid"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid or expired OTP. Please request a new one."
+                )
+
+        # Get client IP address
+        ip_address = get_client_ip(http_request)
+
         # Get staff from database
         result = await db.execute(select(Staff).where(Staff.email == email))
         staff = result.scalar_one_or_none()
@@ -405,6 +556,15 @@ async def reset_password(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Account not found"
             )
+
+        # For new approach: Comprehensive OTP validation for consumption
+        if temp_token:
+            otp_validation = await CMSOTPManager.validate_otp_for_action(email, "password_reset", ip_address)
+            if not otp_validation["valid"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=otp_validation["reason"]
+                )
 
         # Hash new password
         hashed_password = cms_auth.get_password_hash(new_password)
@@ -419,10 +579,28 @@ async def reset_password(
         from app.redis_client import CacheManager
         await CacheManager.invalidate_all_user_sessions(staff.id)
 
-        # Clear OTP after successful password reset
-        await CMSOTPManager.expire_otp(email)
+        # Consume OTP after successful password reset (one-time use enforcement)
+        await CMSOTPManager.consume_otp(email, "password_reset")
+        
+        # Clear temporary token
+        if temp_token:
+            await CMSOTPManager.clear_temp_token(temp_token)
 
         logger.info(f"Password reset completed for {email}, all sessions invalidated")
+
+        # Send password reset confirmation email
+        try:
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+            await EmailService.send_password_reset_confirmation_email(
+                email=email,
+                full_name=staff.full_name,
+                timestamp=timestamp,
+                ip_address=ip_address
+            )
+        except Exception as e:
+            # Don't fail password reset if confirmation email fails
+            logger.warning(f"Failed to send password reset confirmation email to {email}: {e}")
 
         return SignupResponse(
             success=True,

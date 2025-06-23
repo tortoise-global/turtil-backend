@@ -23,11 +23,13 @@ class VerifyOTPRequest(CamelCaseModel):
 
 class SetupProfileRequest(CamelCaseModel):
     """Request schema for profile setup after OTP verification"""
-    email: EmailStr = Field(..., description="Email address")
+    temp_token: str = Field(..., description="Temporary token from OTP verification")
     password: str = Field(..., min_length=8, description="Password")
     confirm_password: str = Field(..., min_length=8, description="Password confirmation")
     full_name: str = Field(..., min_length=1, max_length=200, description="Full name")
     contact_number: str = Field(..., pattern=r"^(\+91)?[6-9]\d{9}$", description="Contact number in Indian format")
+    # Keep email for backward compatibility
+    email: Optional[EmailStr] = Field(None, description="Email address (optional for backward compatibility)")
 
     @field_validator("confirm_password")
     @classmethod
@@ -42,12 +44,20 @@ class ForgotPasswordRequest(CamelCaseModel):
     email: EmailStr = Field(..., description="Email address")
 
 
-class ResetPasswordRequest(CamelCaseModel):
-    """Request schema for password reset with OTP verification"""
+class VerifyPasswordResetOTPRequest(CamelCaseModel):
+    """Request schema for verifying password reset OTP (step 1)"""
     email: EmailStr = Field(..., description="Email address")
     otp: str = Field(..., min_length=6, max_length=6, description="6-digit OTP")
+
+
+class ResetPasswordRequest(CamelCaseModel):
+    """Request schema for password reset with verified token (step 2)"""
+    temp_token: str = Field(..., description="Temporary token from OTP verification")
     new_password: str = Field(..., min_length=8, description="New password")
     confirm_password: str = Field(..., min_length=8, description="Password confirmation")
+    # Keep email for backward compatibility
+    email: Optional[EmailStr] = Field(None, description="Email address (optional for backward compatibility)")
+    otp: Optional[str] = Field(None, description="OTP (optional for backward compatibility)")
 
     @field_validator("confirm_password")
     @classmethod

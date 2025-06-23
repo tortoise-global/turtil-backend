@@ -362,6 +362,363 @@ class EmailService:
             logger.error(f"Failed to send staff invitation email via SES: {e}")
             raise Exception(f"Failed to send staff invitation email: {e}")
 
+    @staticmethod
+    async def send_signup_confirmation_email(
+        email: str, full_name: str, college_name: str = None
+    ) -> Dict[str, Any]:
+        """
+        Send confirmation email after successful signup
+        """
+        try:
+            ses_client = get_ses_client()
+            
+            subject = "Welcome to Turtil - Account Created Successfully! 🎉"
+            
+            # Use college name if provided, otherwise generic message
+            college_msg = f"for {college_name}" if college_name else ""
+            
+            body = f"""
+            Welcome {full_name}!
+            
+            Your Turtil account has been created successfully {college_msg}.
+            
+            You can now sign in to your account using your email address and the password you set during registration.
+            
+            If you have any questions or need support, please don't hesitate to contact us.
+            
+            Welcome aboard!
+            The Turtil Team
+            """
+
+            response = ses_client.send_email(
+                Source=settings.aws_ses_from_email,
+                Destination={"ToAddresses": [email]},
+                Message={
+                    "Subject": {"Data": subject},
+                    "Body": {
+                        "Text": {"Data": body},
+                        "Html": {
+                            "Data": f"""
+                            <html>
+                                <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                                    <div style="background-color: #f0f9ff; padding: 30px; border-radius: 8px; border-left: 4px solid #0ea5e9;">
+                                        <h2 style="color: #0369a1; margin-bottom: 20px;">🎉 Welcome to Turtil!</h2>
+                                        
+                                        <p style="font-size: 16px; line-height: 1.5; color: #374151;">
+                                            Hi <strong>{full_name}</strong>,
+                                        </p>
+                                        
+                                        <p style="font-size: 16px; line-height: 1.5; color: #374151;">
+                                            Congratulations! Your Turtil account has been created successfully {college_msg}.
+                                        </p>
+                                        
+                                        <div style="background-color: white; padding: 20px; border-radius: 6px; margin: 20px 0;">
+                                            <h3 style="margin-top: 0; color: #1f2937;">What's Next?</h3>
+                                            <ul style="color: #374151; line-height: 1.6;">
+                                                <li>You can now sign in using your email address and password</li>
+                                                <li>Complete your college setup if you're a Principal</li>
+                                                <li>Explore all the features Turtil has to offer</li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <div style="background-color: #ecfdf5; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #10b981;">
+                                            <h4 style="margin-top: 0; color: #047857;">🔒 Account Security</h4>
+                                            <p style="margin: 5px 0; color: #065f46; font-size: 14px;">
+                                                Your account is secure. If you notice any suspicious activity, please contact us immediately.
+                                            </p>
+                                        </div>
+                                        
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <a href="#" style="background-color: #0ea5e9; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                                                Sign In to Your Account
+                                            </a>
+                                        </div>
+                                        
+                                        <p style="font-size: 14px; color: #6b7280; text-align: center; margin-top: 30px;">
+                                            If you have any questions, feel free to reach out to our support team.
+                                        </p>
+                                        
+                                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+                                        
+                                        <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+                                            This is an automated confirmation email from Turtil CMS
+                                        </p>
+                                    </div>
+                                </body>
+                            </html>
+                            """
+                        },
+                    },
+                },
+            )
+
+            logger.info(
+                f"Signup confirmation email sent successfully to {email}. MessageId: {response['MessageId']}"
+            )
+            return {
+                "success": True,
+                "message_id": response["MessageId"],
+                "provider": "aws_ses",
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to send signup confirmation email to {email}: {e}")
+            return {"success": False, "error": str(e)}
+
+    @staticmethod
+    async def send_login_notification_email(
+        email: str, full_name: str, device_info: Dict[str, str], ip_address: str, timestamp: str
+    ) -> Dict[str, Any]:
+        """
+        Send notification email after successful login
+        """
+        try:
+            ses_client = get_ses_client()
+            
+            subject = "New Sign-in to Your Turtil Account"
+            
+            # Format device info nicely
+            device_details = f"{device_info.get('browser', 'Unknown')} on {device_info.get('os', 'Unknown')}"
+            device_type = device_info.get('device', 'Unknown')
+            
+            body = f"""
+            Hello {full_name},
+            
+            We detected a new sign-in to your Turtil account:
+            
+            Device: {device_details} ({device_type})
+            IP Address: {ip_address}
+            Time: {timestamp}
+            
+            If this was you, no action is needed.
+            
+            If you don't recognize this activity, please:
+            1. Change your password immediately
+            2. Review your account security settings
+            3. Contact our support team if needed
+            
+            Best regards,
+            The Turtil Security Team
+            """
+
+            response = ses_client.send_email(
+                Source=settings.aws_ses_from_email,
+                Destination={"ToAddresses": [email]},
+                Message={
+                    "Subject": {"Data": subject},
+                    "Body": {
+                        "Text": {"Data": body},
+                        "Html": {
+                            "Data": f"""
+                            <html>
+                                <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                                    <div style="background-color: #fefce8; padding: 30px; border-radius: 8px; border-left: 4px solid #eab308;">
+                                        <h2 style="color: #a16207; margin-bottom: 20px;">🔐 New Sign-in Detected</h2>
+                                        
+                                        <p style="font-size: 16px; line-height: 1.5; color: #374151;">
+                                            Hello <strong>{full_name}</strong>,
+                                        </p>
+                                        
+                                        <p style="font-size: 16px; line-height: 1.5; color: #374151;">
+                                            We detected a new sign-in to your Turtil account:
+                                        </p>
+                                        
+                                        <div style="background-color: white; padding: 20px; border-radius: 6px; margin: 20px 0;">
+                                            <h3 style="margin-top: 0; color: #1f2937;">Sign-in Details</h3>
+                                            <table style="width: 100%; border-collapse: collapse;">
+                                                <tr>
+                                                    <td style="padding: 8px 0; color: #6b7280; font-weight: bold;">Device:</td>
+                                                    <td style="padding: 8px 0; color: #374151;">{device_details}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding: 8px 0; color: #6b7280; font-weight: bold;">Type:</td>
+                                                    <td style="padding: 8px 0; color: #374151;">{device_type}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding: 8px 0; color: #6b7280; font-weight: bold;">IP Address:</td>
+                                                    <td style="padding: 8px 0; color: #374151;">{ip_address}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding: 8px 0; color: #6b7280; font-weight: bold;">Time:</td>
+                                                    <td style="padding: 8px 0; color: #374151;">{timestamp}</td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                        
+                                        <div style="background-color: #dcfce7; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #16a34a;">
+                                            <p style="margin: 0; color: #166534; font-size: 14px;">
+                                                ✅ <strong>If this was you:</strong> No action needed. You're all set!
+                                            </p>
+                                        </div>
+                                        
+                                        <div style="background-color: #fef2f2; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #ef4444;">
+                                            <h4 style="margin-top: 0; color: #dc2626;">🚨 If this wasn't you:</h4>
+                                            <ol style="margin: 10px 0; color: #dc2626; font-size: 14px;">
+                                                <li>Change your password immediately</li>
+                                                <li>Review your account security settings</li>
+                                                <li>Sign out all other devices</li>
+                                                <li>Contact our support team</li>
+                                            </ol>
+                                        </div>
+                                        
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <a href="#" style="background-color: #dc2626; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; margin-right: 10px;">
+                                                Secure My Account
+                                            </a>
+                                            <a href="#" style="background-color: #6b7280; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                                                Contact Support
+                                            </a>
+                                        </div>
+                                        
+                                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+                                        
+                                        <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+                                            This is an automated security notification from Turtil CMS
+                                        </p>
+                                    </div>
+                                </body>
+                            </html>
+                            """
+                        },
+                    },
+                },
+            )
+
+            logger.info(
+                f"Login notification email sent successfully to {email}. MessageId: {response['MessageId']}"
+            )
+            return {
+                "success": True,
+                "message_id": response["MessageId"],
+                "provider": "aws_ses",
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to send login notification email to {email}: {e}")
+            return {"success": False, "error": str(e)}
+
+    @staticmethod
+    async def send_password_reset_confirmation_email(
+        email: str, full_name: str, timestamp: str, ip_address: str
+    ) -> Dict[str, Any]:
+        """
+        Send confirmation email after successful password reset
+        """
+        try:
+            ses_client = get_ses_client()
+            
+            subject = "Password Reset Successful - Turtil Account"
+            
+            body = f"""
+            Hello {full_name},
+            
+            Your Turtil account password has been successfully reset.
+            
+            Reset Details:
+            - Time: {timestamp}
+            - IP Address: {ip_address}
+            
+            If you made this change, no further action is required.
+            
+            If you did not reset your password, please contact our support team immediately as your account may be compromised.
+            
+            For your security:
+            - All active sessions have been logged out
+            - You'll need to sign in again with your new password
+            
+            Best regards,
+            The Turtil Security Team
+            """
+
+            response = ses_client.send_email(
+                Source=settings.aws_ses_from_email,
+                Destination={"ToAddresses": [email]},
+                Message={
+                    "Subject": {"Data": subject},
+                    "Body": {
+                        "Text": {"Data": body},
+                        "Html": {
+                            "Data": f"""
+                            <html>
+                                <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                                    <div style="background-color: #f0fdf4; padding: 30px; border-radius: 8px; border-left: 4px solid #16a34a;">
+                                        <h2 style="color: #166534; margin-bottom: 20px;">🔒 Password Reset Successful</h2>
+                                        
+                                        <p style="font-size: 16px; line-height: 1.5; color: #374151;">
+                                            Hello <strong>{full_name}</strong>,
+                                        </p>
+                                        
+                                        <p style="font-size: 16px; line-height: 1.5; color: #374151;">
+                                            Your Turtil account password has been successfully reset.
+                                        </p>
+                                        
+                                        <div style="background-color: white; padding: 20px; border-radius: 6px; margin: 20px 0;">
+                                            <h3 style="margin-top: 0; color: #1f2937;">Reset Details</h3>
+                                            <table style="width: 100%; border-collapse: collapse;">
+                                                <tr>
+                                                    <td style="padding: 8px 0; color: #6b7280; font-weight: bold;">Time:</td>
+                                                    <td style="padding: 8px 0; color: #374151;">{timestamp}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding: 8px 0; color: #6b7280; font-weight: bold;">IP Address:</td>
+                                                    <td style="padding: 8px 0; color: #374151;">{ip_address}</td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                        
+                                        <div style="background-color: #dcfce7; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #16a34a;">
+                                            <h4 style="margin-top: 0; color: #166534;">✅ Security Measures Taken</h4>
+                                            <ul style="margin: 10px 0; color: #166534; font-size: 14px;">
+                                                <li>All active sessions have been logged out</li>
+                                                <li>You'll need to sign in again with your new password</li>
+                                                <li>Your account security has been enhanced</li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <div style="background-color: #fef2f2; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #ef4444;">
+                                            <h4 style="margin-top: 0; color: #dc2626;">🚨 Didn't Reset Your Password?</h4>
+                                            <p style="margin: 5px 0; color: #dc2626; font-size: 14px;">
+                                                If you did not reset your password, your account may be compromised. 
+                                                <strong>Contact our support team immediately.</strong>
+                                            </p>
+                                        </div>
+                                        
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <a href="#" style="background-color: #16a34a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; margin-right: 10px;">
+                                                Sign In with New Password
+                                            </a>
+                                            <a href="#" style="background-color: #ef4444; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                                                Report Issue
+                                            </a>
+                                        </div>
+                                        
+                                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+                                        
+                                        <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+                                            This is an automated security notification from Turtil CMS
+                                        </p>
+                                    </div>
+                                </body>
+                            </html>
+                            """
+                        },
+                    },
+                },
+            )
+
+            logger.info(
+                f"Password reset confirmation email sent successfully to {email}. MessageId: {response['MessageId']}"
+            )
+            return {
+                "success": True,
+                "message_id": response["MessageId"],
+                "provider": "aws_ses",
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to send password reset confirmation email to {email}: {e}")
+            return {"success": False, "error": str(e)}
+
 
 class S3Service:
     """S3 service for file uploads"""

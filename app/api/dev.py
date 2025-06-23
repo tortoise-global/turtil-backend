@@ -5,7 +5,7 @@ Only available in development mode (debug=True).
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from pydantic import BaseModel
 import logging
 from typing import Dict, Any
@@ -16,6 +16,7 @@ from app.redis_client import redis_client
 from app.models.staff import Staff
 from app.models.college import College
 from app.models.department import Department
+from app.models.session import UserSession
 
 # Only create router if in development mode
 if not settings.debug:
@@ -68,6 +69,7 @@ async def cleanup_account_data(
         "staff": 0,
         "colleges": 0,
         "departments": 0,
+        "user_sessions": 0,
         "redis_keys": 0
     }
     
@@ -158,14 +160,56 @@ async def cleanup_account_data(
                         result = await db.execute(delete_departments)
                         deleted_records["departments"] += result.rowcount
                     
-            # 3. Delete the target staff record BEFORE deleting college (foreign key constraint)
+            # 3. Clean up foreign key references before deleting target staff
+            
+            # 3a. Delete all user sessions for the target staff
+            user_sessions_result = await db.execute(
+                select(UserSession).where(UserSession.staff_id == staff_id)
+            )
+            user_sessions = user_sessions_result.scalars().all()
+            
+            if user_sessions:
+                details["operations"].append(
+                    f"Deleting {len(user_sessions)} user sessions for staff"
+                )
+                delete_user_sessions = delete(UserSession).where(UserSession.staff_id == staff_id)
+                result = await db.execute(delete_user_sessions)
+                deleted_records["user_sessions"] += result.rowcount
+            
+            # 3b. Update college to remove staff reference (if this staff is contact)
+            if college_id and college:
+                if college.contact_staff_id == staff_id:
+                    details["operations"].append(
+                        f"Removing staff reference from college contact_staff_id"
+                    )
+                    update_college = update(College).where(College.id == college_id).values(
+                        contact_staff_id=None
+                    )
+                    await db.execute(update_college)
+            
+            # 3c. Update any staff records that reference target staff as inviter
+            invited_staff_result = await db.execute(
+                select(Staff).where(Staff.invited_by_staff_id == staff_id)
+            )
+            invited_staff = invited_staff_result.scalars().all()
+            
+            if invited_staff:
+                details["operations"].append(
+                    f"Removing inviter reference from {len(invited_staff)} staff records"
+                )
+                update_invited_staff = update(Staff).where(
+                    Staff.invited_by_staff_id == staff_id
+                ).values(invited_by_staff_id=None)
+                await db.execute(update_invited_staff)
+            
+            # 4. Now safely delete the target staff record (no more FK references)
             delete_target_staff = delete(Staff).where(Staff.id == staff_id)
             result = await db.execute(delete_target_staff)
             deleted_records["staff"] += result.rowcount
             
             details["operations"].append(f"Deleted target staff: {target_staff.full_name}")
             
-            # 4. Now safely delete the college (no more foreign key references)
+            # 5. Finally delete the college (no more foreign key references)
             if college_id and college:
                 delete_college = delete(College).where(College.id == college_id)
                 result = await db.execute(delete_college)
@@ -173,8 +217,8 @@ async def cleanup_account_data(
                 
                 details["operations"].append(f"Deleted college: {college.name}")
             
-            # 5. Clean up Redis cache entries
-            redis_keys_deleted = await cleanup_redis_cache(email)
+            # 6. Clean up Redis cache entries
+            redis_keys_deleted = await cleanup_redis_cache(email, staff_id)
             deleted_records["redis_keys"] = redis_keys_deleted
             
             if redis_keys_deleted > 0:
@@ -200,8 +244,8 @@ async def cleanup_account_data(
         )
 
 
-async def cleanup_redis_cache(email: str) -> int:
-    """Clean up Redis cache entries for the given email"""
+async def cleanup_redis_cache(email: str, staff_id: int = None) -> int:
+    """Clean up Redis cache entries for the given email and staff ID"""
     try:
         keys_deleted = 0
         
@@ -216,6 +260,16 @@ async def cleanup_redis_cache(email: str) -> int:
             f"user_session:{email}",
             f"user_session:{email}:*",
         ]
+        
+        # Add staff-specific session patterns if staff_id is provided
+        if staff_id:
+            patterns.extend([
+                f"session:*:{staff_id}",
+                f"user_sessions:{staff_id}",
+                f"user_sessions:{staff_id}:*",
+                f"blacklist:*:{staff_id}",
+                f"blacklist:*:{staff_id}:*",
+            ])
         
         for pattern in patterns:
             # Get keys matching pattern

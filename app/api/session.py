@@ -116,18 +116,23 @@ async def signin(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Sign in with email and password
-    Creates a new session with device tracking and token management
+    Sign in with email and password - Simplified and Secure Flow
+    Creates a new session with device tracking and returns only essential data
     
-    **Important for Swagger Testing:**
-    - Use this endpoint first to get `access_token`
-    - Copy the `access_token` and use it in the 'Authorize' button for other endpoints
+    **Optimal Authentication Flow:**
+    1. Use this endpoint to get `refreshToken` and `deviceInfo`
+    2. Immediately call `/refresh` endpoint to get `accessToken`
+    3. Use the `accessToken` in Authorization header for subsequent requests
     
-    **Response includes:**
-    - `access_token`: Use this in Authorization header as `Bearer TOKEN`
-    - `session_id`: Session identifier (embedded in JWT token)
-    - `refresh_token`: For refreshing expired tokens
-    - Device information and user details
+    **Response includes only:**
+    - `refreshToken`: For getting access tokens via `/refresh` endpoint  
+    - `deviceInfo`: Browser, OS, and device type information
+    - `user`: Optional user profile information
+    
+    **Security Benefits:**
+    - No short-lived access token in signin response
+    - Mandatory token rotation enforced via refresh endpoint
+    - Reduced token exposure in network/logs
     """
     try:
         email = request.email.lower().strip()
@@ -192,12 +197,24 @@ async def signin(
         
         logger.info(f"Signin successful for {email} from {ip_address}")
         
+        # Send login notification email (non-blocking)
+        try:
+            from app.core.aws import EmailService
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+            await EmailService.send_login_notification_email(
+                email=email,
+                full_name=staff.full_name,
+                device_info=session_data["device_info"],
+                ip_address=ip_address,
+                timestamp=timestamp
+            )
+        except Exception as e:
+            # Don't fail login if notification email fails
+            logger.warning(f"Failed to send login notification email to {email}: {e}")
+        
         return SigninResponse(
-            access_token=session_data["access_token"],
             refresh_token=session_data["refresh_token"],
-            session_id=session_data["session_id"],
-            token_type=session_data["token_type"],
-            expires_in=session_data["expires_in"],
             device_info=DeviceInfo(**session_data["device_info"]),
             user=user_info
         )

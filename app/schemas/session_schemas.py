@@ -45,14 +45,10 @@ class SessionInfo(CamelCaseModel):
 # Response Schemas
 
 class SigninResponse(CamelCaseModel):
-    """Response schema for successful sign-in"""
-    access_token: str = Field(..., description="JWT access token")
-    refresh_token: str = Field(..., description="JWT refresh token")
-    session_id: str = Field(..., description="Session ID")
-    token_type: str = Field(..., description="Token type (bearer)")
-    expires_in: int = Field(..., description="Token expiry time in seconds")
+    """Response schema for successful sign-in - simplified for optimal flow"""
+    refresh_token: str = Field(..., description="JWT refresh token for token rotation")
     device_info: DeviceInfo = Field(..., description="Device information")
-    user: Dict[str, Any] = Field(..., description="User information")
+    user: Optional[Dict[str, Any]] = Field(None, description="User information (optional)")
 
 
 class RefreshTokenResponse(CamelCaseModel):
