@@ -13,13 +13,18 @@ from app.database import init_db, close_db
 from app.redis_client import close_redis
 
 # Import API routers
-from app.api import cms_auth
-from app.api import cms_registration
+from app.api import signup
+from app.api import session
+from app.api import registration
 from app.api.cms import (
     departments as cms_departments,
     staff as cms_staff,
     files as cms_files,
 )
+
+# Import dev router conditionally
+if settings.debug:
+    from app.api import dev as dev_api
 
 # Import health check dependencies
 from app.api.deps import check_system_health
@@ -237,15 +242,16 @@ async def app_info():
         "environment": settings.environment,
         "debug": settings.debug,
         "features": {
-            "cms_authentication": True,
-            "combined_signin_flow": True,
+            "simplified_authentication": True,
+            "multi_device_sessions": True,
             "file_upload": True,
             "aws_s3_integration": True,
             "redis_caching": True,
             "camelcase_api": True,
         },
         "endpoints": {
-            "auth": "/api/auth",
+            "signup": "/api/auth/signup",
+            "session": "/api/auth/session", 
             "cmsRegistration": "/api/cms/registration",
             "cmsDepartments": "/api/cms/departments",
             "cmsStaff": "/api/cms/staff",
@@ -253,16 +259,25 @@ async def app_info():
             "health": "/health",
             "healthDetailed": "/health/detailed",
             "docs": "/docs" if settings.debug else "disabled",
+            "devApi": "/api/dev" if settings.debug else "disabled",
         },
     }
 
 
 # Include API routers
-app.include_router(cms_auth.router, prefix="/api")
-app.include_router(cms_registration.router, prefix="/api")
+# Simplified authentication and session management
+app.include_router(signup.router, prefix="/api")
+app.include_router(session.router, prefix="/api")
+
+# CMS specific routers
+app.include_router(registration.router, prefix="/api/cms")
 app.include_router(cms_departments.router, prefix="/api")
 app.include_router(cms_staff.router, prefix="/api")
 app.include_router(cms_files.router, prefix="/api")
+
+# Include dev router conditionally
+if settings.debug:
+    app.include_router(dev_api.router, prefix="/api")
 
 # Add pagination to the app
 add_pagination(app)

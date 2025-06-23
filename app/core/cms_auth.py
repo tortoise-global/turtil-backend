@@ -6,7 +6,7 @@ from passlib.context import CryptContext
 from app.config import settings
 from app.core.cms_otp import CMSOTPManager
 from app.models.staff import Staff
-from app.models.cms_permission import CMSModules, CMSRoles
+from app.models.permission import CMSModules, CMSRoles
 
 
 class CMSAuthManager:
@@ -27,7 +27,7 @@ class CMSAuthManager:
         """Get password hash"""
         return self.pwd_context.hash(password)
 
-    def create_access_token(self, staff: Staff) -> str:
+    def create_access_token(self, staff: Staff, session_id: str = None) -> str:
         """Create JWT access token with staff permissions and registration state"""
         now = datetime.now(timezone.utc)
         expire = now + timedelta(minutes=self.access_token_expire_minutes)
@@ -71,6 +71,10 @@ class CMSAuthManager:
             "iat": now,
             "type": "access",
         }
+        
+        # Add session_id if provided (for multi-device sessions)
+        if session_id:
+            payload["session_id"] = session_id
 
         return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
 
@@ -96,7 +100,7 @@ class CMSAuthManager:
             "expiresIn": self.access_token_expire_minutes * 60,
         }
 
-    def create_refresh_token(self, staff: Staff) -> str:
+    def create_refresh_token(self, staff: Staff, session_id: str = None) -> str:
         """Create JWT refresh token"""
         now = datetime.now(timezone.utc)
         expire = now + timedelta(days=self.refresh_token_expire_days)
@@ -108,6 +112,10 @@ class CMSAuthManager:
             "iat": now,
             "type": "refresh",
         }
+        
+        # Add session_id if provided (for multi-device sessions)
+        if session_id:
+            payload["session_id"] = session_id
 
         return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
 

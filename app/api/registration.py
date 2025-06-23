@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, status, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timezone
@@ -8,81 +7,24 @@ from app.database import get_db
 from app.models.staff import Staff
 from app.models.college import College
 from app.core.cms_auth import cms_auth
-from app.schemas.cms_auth import (
-    CMSCollegeLogoRequest,
-    CMSCollegeDetailsRequest,
-    CMSAddressDetailsRequest,
-    CMSRegistrationStepResponse,
-    CMSTokenResponse,
+from app.schemas.registration_schemas import (
+    CollegeLogoRequest,
+    CollegeDetailsRequest,
+    AddressDetailsRequest,
+    RegistrationStepResponse,
+    TokenResponse,
 )
+from app.api.cms.deps import get_current_staff_from_temp_token
 
 router = APIRouter(prefix="/cms/registration", tags=["CMS Registration Details"])
-
-# Security scheme for JWT tokens
-security = HTTPBearer(auto_error=False)
-
-
-async def get_current_staff_from_temp_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db),
-) -> Staff:
-    """
-    Get current CMS staff from temporary token (for registration flow)
-    """
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    try:
-        # Validate temp token
-        payload = await cms_auth.validate_temp_token(credentials.credentials, "registration")
-        
-        if not payload:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired temporary token",
-            )
-
-        # Get staff UUID from token
-        staff_uuid = payload.get("sub")
-        if not staff_uuid:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, 
-                detail="Invalid token payload"
-            )
-
-        # Get staff from database
-        result = await db.execute(select(Staff).where(Staff.uuid == staff_uuid))
-        staff = result.scalar_one_or_none()
-
-        if not staff:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Staff not found",
-            )
-
-        return staff
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error getting current CMS staff from temp token: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-        )
 
 
 @router.post(
     "/college-logo",
-    response_model=CMSRegistrationStepResponse,
-    dependencies=[Depends(security)],
+    response_model=RegistrationStepResponse,
 )
 async def college_logo(
-    request: CMSCollegeLogoRequest,
+    request: CollegeLogoRequest,
     current_staff: Staff = Depends(get_current_staff_from_temp_token),
     db: AsyncSession = Depends(get_db),
 ):
@@ -137,7 +79,7 @@ async def college_logo(
         # Generate new temp token for next step
         temp_token = cms_auth.create_temp_token(current_staff, "registration")
 
-        return CMSRegistrationStepResponse(
+        return RegistrationStepResponse(
             success=True,
             message="College logo uploaded successfully."
             if request.logoUrl
@@ -158,11 +100,10 @@ async def college_logo(
 
 @router.post(
     "/college-details",
-    response_model=CMSRegistrationStepResponse,
-    dependencies=[Depends(security)],
+    response_model=RegistrationStepResponse,
 )
 async def college_details(
-    request: CMSCollegeDetailsRequest,
+    request: CollegeDetailsRequest,
     current_staff: Staff = Depends(get_current_staff_from_temp_token),
     db: AsyncSession = Depends(get_db),
 ):
@@ -219,7 +160,7 @@ async def college_details(
         # Generate new temp token for next step
         temp_token = cms_auth.create_temp_token(current_staff, "registration")
 
-        return CMSRegistrationStepResponse(
+        return RegistrationStepResponse(
             success=True,
             message="College details saved successfully.",
             nextStep="college_address",
@@ -238,11 +179,10 @@ async def college_details(
 
 @router.post(
     "/college-address",
-    response_model=CMSTokenResponse,
-    dependencies=[Depends(security)],
+    response_model=TokenResponse,
 )
 async def college_address(
-    request: CMSAddressDetailsRequest,
+    request: AddressDetailsRequest,
     current_staff: Staff = Depends(get_current_staff_from_temp_token),
     db: AsyncSession = Depends(get_db),
 ):
@@ -292,7 +232,7 @@ async def college_address(
         if not session_created:
             print("Warning: Failed to create staff session in Redis")
 
-        return CMSTokenResponse(
+        return TokenResponse(
             accessToken=access_token,
             refreshToken=refresh_token,
             tokenType="bearer",

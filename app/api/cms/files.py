@@ -2,9 +2,9 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.staff import Staff
-from app.api.cms.auth import get_current_staff
+from app.api.cms.deps import get_current_staff
 from app.core.aws import get_s3_client
-from app.schemas.cms_files import (
+from app.schemas.file_schemas import (
     CMSGeneratePresignedUrlRequest,
     CMSGeneratePresignedUrlResponse,
     CMSDeleteFileRequest,

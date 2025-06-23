@@ -1,9 +1,10 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
+from app.core.utils import CamelCaseModel
 
 
-class CreateDepartmentRequest(BaseModel):
+class CreateDepartmentRequest(CamelCaseModel):
     """Request schema for creating a new department"""
 
     name: str = Field(..., min_length=1, max_length=255, description="Department name")
@@ -20,7 +21,7 @@ class CreateDepartmentRequest(BaseModel):
         return v.upper()
 
 
-class UpdateDepartmentRequest(BaseModel):
+class UpdateDepartmentRequest(CamelCaseModel):
     """Request schema for updating a department"""
 
     name: Optional[str] = Field(
@@ -32,7 +33,7 @@ class UpdateDepartmentRequest(BaseModel):
     description: Optional[str] = Field(
         None, max_length=1000, description="Department description"
     )
-    hodCmsStaffId: Optional[int] = Field(None, description="Head of Department staff ID")
+    hod_cms_staff_id: Optional[int] = Field(None, description="Head of Department staff ID")
 
     @field_validator("code")
     @classmethod
@@ -42,7 +43,7 @@ class UpdateDepartmentRequest(BaseModel):
         return v
 
 
-class DepartmentResponse(BaseModel):
+class DepartmentResponse(CamelCaseModel):
     """Response schema for department information"""
 
     id: int = Field(..., description="Department ID")
@@ -50,13 +51,13 @@ class DepartmentResponse(BaseModel):
     name: str = Field(..., description="Department name")
     code: str = Field(..., description="Department code")
     description: Optional[str] = Field(None, description="Department description")
-    collegeId: int = Field(..., description="College ID")
-    hodCmsStaffId: Optional[int] = Field(None, description="Head of Department staff ID")
-    createdAt: datetime = Field(..., description="Creation timestamp")
-    updatedAt: datetime = Field(..., description="Update timestamp")
+    college_id: int = Field(..., description="College ID")
+    hod_cms_staff_id: Optional[int] = Field(None, description="Head of Department staff ID")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: datetime = Field(..., description="Update timestamp")
 
 
-class DepartmentWithStatsResponse(BaseModel):
+class DepartmentWithStatsResponse(CamelCaseModel):
     """Department response with staff statistics"""
 
     id: int = Field(..., description="Department ID")
@@ -64,34 +65,34 @@ class DepartmentWithStatsResponse(BaseModel):
     name: str = Field(..., description="Department name")
     code: str = Field(..., description="Department code")
     description: Optional[str] = Field(None, description="Department description")
-    collegeId: int = Field(..., description="College ID")
-    hodCmsStaffId: Optional[int] = Field(None, description="Head of Department staff ID")
-    hodName: Optional[str] = Field(None, description="Head of Department name")
-    totalStaffs: int = Field(..., description="Total staff in department")
-    activeStaffs: int = Field(..., description="Active staff in department")
-    createdAt: datetime = Field(..., description="Creation timestamp")
-    updatedAt: datetime = Field(..., description="Update timestamp")
+    college_id: int = Field(..., description="College ID")
+    hod_cms_staff_id: Optional[int] = Field(None, description="Head of Department staff ID")
+    hod_name: Optional[str] = Field(None, description="Head of Department name")
+    total_staffs: int = Field(..., description="Total staff in department")
+    active_staffs: int = Field(..., description="Active staff in department")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: datetime = Field(..., description="Update timestamp")
 
 
-class DepartmentActionResponse(BaseModel):
+class DepartmentActionResponse(CamelCaseModel):
     """Generic response schema for department management actions"""
 
     success: bool = Field(..., description="Action success status")
     message: str = Field(..., description="Action result message")
-    departmentId: Optional[int] = Field(None, description="Affected department ID")
+    department_id: Optional[int] = Field(None, description="Affected department ID")
 
 
-class AssignHODRequest(BaseModel):
+class AssignHODRequest(CamelCaseModel):
     """Request schema for assigning HOD to department"""
 
-    staffId: int = Field(..., description="Staff ID to assign as HOD")
+    staff_id: int = Field(..., description="Staff ID to assign as HOD")
 
 
-class HODActionResponse(BaseModel):
+class HODActionResponse(CamelCaseModel):
     """Response schema for HOD assignment/removal actions"""
 
     success: bool = Field(..., description="Action success status")
     message: str = Field(..., description="Action result message")
-    departmentId: int = Field(..., description="Department ID")
-    staffId: Optional[int] = Field(None, description="HOD staff ID")
-    hodName: Optional[str] = Field(None, description="HOD name")
+    department_id: int = Field(..., description="Department ID")
+    staff_id: Optional[int] = Field(None, description="HOD staff ID")
+    hod_name: Optional[str] = Field(None, description="HOD name")

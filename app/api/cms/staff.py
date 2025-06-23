@@ -13,7 +13,7 @@ from app.models.department import Department
 from app.core.cms_auth import cms_auth
 from app.core.aws import EmailService
 from app.core.utils import generate_temporary_password
-from app.schemas.staff_management import (
+from app.schemas.staff_schemas import (
     InviteStaffRequest,
     InviteStaffResponse,
     StaffResponse,
@@ -25,8 +25,8 @@ from app.schemas.staff_management import (
     UpdateContactResponse,
     ContactInfoResponse,
 )
-from app.schemas.cms_auth import StaffProfileResponse
-from .auth import get_current_staff
+from app.schemas.staff_schemas import StaffDetailsResponse
+from .deps import get_current_staff
 
 router = APIRouter(prefix="/cms/staff", tags=["CMS Staff Management"])
 
@@ -250,12 +250,12 @@ async def get_staff(
 
 
 @router.get(
-    "/{staff_id}",
-    response_model=StaffProfileResponse,
+    "/{staffId}",
+    response_model=StaffDetailsResponse,
     dependencies=[Depends(security)],
 )
 async def get_staff_by_id(
-    staff_id: int,
+    staffId: int,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ):
@@ -272,25 +272,25 @@ async def get_staff_by_id(
         if current_staff.cms_role in ["principal", "college_admin"]:
             # Can view any staff in college
             query = select(Staff).where(
-                and_(Staff.id == staff_id, Staff.college_id == current_staff.college_id)
+                and_(Staff.id == staffId, Staff.college_id == current_staff.college_id)
             )
         elif current_staff.cms_role == "hod":
             # Can only view staffs in same department
             query = select(Staff).where(
                 and_(
-                    Staff.id == staff_id,
+                    Staff.id == staffId,
                     Staff.college_id == current_staff.college_id,
                     Staff.department_id == current_staff.department_id,
                 )
             )
         else:  # staff
             # Can only view their own profile
-            if staff_id != current_staff.id:
+            if staffId != current_staff.id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Insufficient permissions to view this staff",
                 )
-            query = select(Staff).where(Staff.id == staff_id)
+            query = select(Staff).where(Staff.id == staffId)
 
         result = await db.execute(query)
         staff = result.scalar_one_or_none()
@@ -300,7 +300,7 @@ async def get_staff_by_id(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found"
             )
 
-        return StaffProfileResponse(
+        return StaffDetailsResponse(
             staffId=staff.id,
             uuid=str(staff.uuid),
             email=staff.email,
@@ -325,12 +325,12 @@ async def get_staff_by_id(
 
 
 @router.put(
-    "/{staff_id}/assign-department",
+    "/{staffId}/assign-department",
     response_model=StaffActionResponse,
     dependencies=[Depends(security)],
 )
 async def assign_staff_to_department(
-    staff_id: int,
+    staffId: int,
     request: AssignDepartmentRequest,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
@@ -349,7 +349,7 @@ async def assign_staff_to_department(
         # Get staff
         result = await db.execute(
             select(Staff).where(
-                and_(Staff.id == staff_id, Staff.college_id == current_staff.college_id)
+                and_(Staff.id == staffId, Staff.college_id == current_staff.college_id)
             )
         )
         staff = result.scalar_one_or_none()
@@ -382,7 +382,7 @@ async def assign_staff_to_department(
         return StaffActionResponse(
             success=True,
             message=f"Staff assigned to {department.name} department successfully",
-            staffId=staff_id,
+            staffId=staffId,
         )
 
     except HTTPException:
@@ -397,12 +397,12 @@ async def assign_staff_to_department(
 
 
 @router.put(
-    "/{staff_id}/remove-department",
+    "/{staffId}/remove-department",
     response_model=StaffActionResponse,
     dependencies=[Depends(security)],
 )
 async def remove_staff_from_department(
-    staff_id: int,
+    staffId: int,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ):
@@ -420,7 +420,7 @@ async def remove_staff_from_department(
         # Get staff
         result = await db.execute(
             select(Staff).where(
-                and_(Staff.id == staff_id, Staff.college_id == current_staff.college_id)
+                and_(Staff.id == staffId, Staff.college_id == current_staff.college_id)
             )
         )
         staff = result.scalar_one_or_none()
@@ -438,7 +438,7 @@ async def remove_staff_from_department(
         return StaffActionResponse(
             success=True,
             message="Staff removed from department successfully",
-            staffId=staff_id,
+            staffId=staffId,
         )
 
     except HTTPException:
@@ -453,12 +453,12 @@ async def remove_staff_from_department(
 
 
 @router.put(
-    "/{staff_id}/update-username",
+    "/{staffId}/update-username",
     response_model=UpdateUsernameResponse,
     dependencies=[Depends(security)],
 )
 async def update_staff_username(
-    staff_id: int,
+    staffId: int,
     request: UpdateUsernameRequest,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
@@ -476,25 +476,25 @@ async def update_staff_username(
         if current_staff.cms_role in ["principal", "college_admin"]:
             # Can update any staff in college
             query = select(Staff).where(
-                and_(Staff.id == staff_id, Staff.college_id == current_staff.college_id)
+                and_(Staff.id == staffId, Staff.college_id == current_staff.college_id)
             )
         elif current_staff.cms_role == "hod":
             # Can only update staffs in same department
             query = select(Staff).where(
                 and_(
-                    Staff.id == staff_id,
+                    Staff.id == staffId,
                     Staff.college_id == current_staff.college_id,
                     Staff.department_id == current_staff.department_id,
                 )
             )
         else:  # staff
             # Can only update their own username
-            if staff_id != current_staff.id:
+            if staffId != current_staff.id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Insufficient permissions to update this staff's username",
                 )
-            query = select(Staff).where(Staff.id == staff_id)
+            query = select(Staff).where(Staff.id == staffId)
 
         result = await db.execute(query)
         staff = result.scalar_one_or_none()
@@ -511,7 +511,7 @@ async def update_staff_username(
         return UpdateUsernameResponse(
             success=True,
             message="Staff username updated successfully",
-            staffId=staff_id,
+            staffId=staffId,
             fullName=request.fullName,
         )
 
@@ -527,10 +527,10 @@ async def update_staff_username(
 
 
 @router.delete(
-    "/{staff_id}", response_model=StaffActionResponse, dependencies=[Depends(security)]
+    "/{staffId}", response_model=StaffActionResponse, dependencies=[Depends(security)]
 )
 async def delete_staff(
-    staff_id: int,
+    staffId: int,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ):
@@ -548,7 +548,7 @@ async def delete_staff(
             )
 
         # Prevent self-deletion
-        if staff_id == current_staff.id:
+        if staffId == current_staff.id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot delete your own account",
@@ -557,7 +557,7 @@ async def delete_staff(
         # Get staff
         result = await db.execute(
             select(Staff).where(
-                and_(Staff.id == staff_id, Staff.college_id == current_staff.college_id)
+                and_(Staff.id == staffId, Staff.college_id == current_staff.college_id)
             )
         )
         staff = result.scalar_one_or_none()
@@ -581,19 +581,19 @@ async def delete_staff(
             )
             college = college_result.scalar_one_or_none()
             
-            if college and college.contact_staff_id == staff_id:
+            if college and college.contact_staff_id == staffId:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Cannot delete staff who is the primary contact person. Please update contact information first.",
                 )
 
         # Invalidate all staff sessions before deletion (real-time logout)
-        await cms_auth.invalidate_staff_sessions(staff_id)
+        await cms_auth.invalidate_staff_sessions(staffId)
 
         # Remove HOD assignment from any departments they may be heading
         if staff.is_hod:
             dept_result = await db.execute(
-                select(Department).where(Department.hod_staff_id == staff_id)
+                select(Department).where(Department.hod_staff_id == staffId)
             )
             departments = dept_result.scalars().all()
             for dept in departments:
@@ -606,7 +606,7 @@ async def delete_staff(
         return StaffActionResponse(
             success=True,
             message="Staff deleted successfully and all sessions invalidated",
-            staffId=staff_id,
+            staffId=staffId,
         )
 
     except HTTPException:
@@ -671,8 +671,8 @@ async def update_contact_info(
             )
 
         # Update contact information
-        college.contact_number = request.contactNumber
-        college.contact_staff_id = request.contactStaffId
+        college.contact_number = request.contact_number
+        college.contact_staff_id = request.contact_staff_id
         await db.commit()
 
         return UpdateContactResponse(
