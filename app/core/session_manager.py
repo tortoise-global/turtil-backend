@@ -33,7 +33,7 @@ class SessionManager:
         """Calculate remaining TTL for a JWT token based on its expiration"""
         try:
             # Decode token without verification to get expiration (we just need the timestamp)
-            payload = jwt.decode(token, options={"verify_signature": False})
+            payload = jwt.decode(token, key="", options={"verify_signature": False})
             token_exp = payload.get("exp")
             
             if not token_exp:

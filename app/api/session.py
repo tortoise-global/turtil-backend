@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
 from jose import jwt
+from jose.exceptions import JWTError
 
 from app.database import get_db
 from app.models.staff import Staff
@@ -226,7 +227,7 @@ async def refresh_tokens(
         # Extract session_id from refresh token JWT payload
         try:
             # Decode without verification to extract session_id (we'll verify in refresh_session)
-            payload = jwt.decode(request.refresh_token, options={"verify_signature": False})
+            payload = jwt.decode(request.refresh_token, key="", options={"verify_signature": False})
             session_id = payload.get("session_id")
             
             # Handle legacy tokens without session_id (from CMS auth system)
@@ -235,7 +236,7 @@ async def refresh_tokens(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="This token was created with the legacy authentication system. Please sign in again to use the new session management features."
                 )
-        except jwt.DecodeError:
+        except JWTError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid refresh token format"
