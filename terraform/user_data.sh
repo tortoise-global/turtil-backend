@@ -8,13 +8,13 @@
 set -e
 
 # Update system
-yum update -y
+apt update -y
 
 # Install Docker and nginx
-yum install -y docker nginx
+apt install -y docker.io nginx unzip
 systemctl start docker
 systemctl enable docker
-usermod -a -G docker ec2-user
+usermod -a -G docker ubuntu
 
 # Configure nginx as reverse proxy
 cat > /etc/nginx/nginx.conf << 'EOF'
@@ -89,7 +89,7 @@ aws ecr get-login-password --region $REGION | docker login --username AWS --pass
 docker pull ${ecr_repository_url}:latest
 
 # Create environment file for the container
-cat > /home/ec2-user/app.env << 'EOF'
+cat > /home/ubuntu/app.env << 'EOF'
 ENVIRONMENT=${environment}
 DEBUG=true
 LOG_LEVEL=INFO
@@ -101,7 +101,7 @@ docker run -d \
   --name turtil-backend \
   --restart unless-stopped \
   -p 8000:8000 \
-  --env-file /home/ec2-user/app.env \
+  --env-file /home/ubuntu/app.env \
   ${ecr_repository_url}:latest
 
 # Set up log rotation for application logs
@@ -114,17 +114,17 @@ cat > /etc/logrotate.d/turtil-backend << 'EOF'
     delaycompress
     missingok
     notifempty
-    create 644 ec2-user ec2-user
+    create 644 ubuntu ubuntu
 }
 EOF
 
 # Create health check script
-cat > /home/ec2-user/health-check.sh << 'EOF'
+cat > /home/ubuntu/health-check.sh << 'EOF'
 #!/bin/bash
 # Check both nginx (port 80) and FastAPI (port 8000)
 curl -f http://localhost/health && curl -f http://localhost:8000/health || exit 1
 EOF
-chmod +x /home/ec2-user/health-check.sh
+chmod +x /home/ubuntu/health-check.sh
 
 # Log deployment completion
 echo "$(date): Turtil Backend deployment completed" >> /var/log/user-data.log
