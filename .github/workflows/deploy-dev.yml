@@ -162,6 +162,13 @@ jobs:
             terraform import aws_db_subnet_group.main "$DB_SUBNET_GROUP_NAME" || echo "⚠️ DB subnet group import failed or already imported"
           fi
           
+          # Import RDS database instance if it exists
+          DB_INSTANCE_NAME="${{ secrets.PROJECT_NAME }}-dev"
+          if aws rds describe-db-instances --db-instance-identifier "$DB_INSTANCE_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            echo "✅ RDS database exists, importing..."
+            terraform import aws_db_instance.dev_database "$DB_INSTANCE_NAME" || echo "⚠️ RDS database import failed or already imported"
+          fi
+          
           # Skip ALB import for development environment (no ALB in dev)
           echo "⚠️ Skipping ALB import for development environment (no load balancer)"
           

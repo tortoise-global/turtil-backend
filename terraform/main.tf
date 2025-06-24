@@ -202,7 +202,7 @@ resource "aws_security_group" "dev_ec2" {
 
 # EC2 Instance for the application
 resource "aws_instance" "dev_app" {
-  ami           = "ami-0dee22c13ea7a9a67" # Amazon Linux 2023 ARM64
+  ami           = "ami-0ad21ae1d0696ad58" # Ubuntu 22.04 LTS ARM64
   instance_type = "t4g.micro"
   
   vpc_security_group_ids = [aws_security_group.dev_ec2.id]
