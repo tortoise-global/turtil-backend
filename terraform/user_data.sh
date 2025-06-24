@@ -7,14 +7,25 @@
 
 set -e
 
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a /var/log/user-data.log
+}
+
+log "Starting user data script execution..."
+
 # Update system
+log "Updating system packages..."
 apt update -y
 
 # Install Docker and nginx
+log "Installing Docker, nginx, and unzip..."
 apt install -y docker.io nginx unzip
+log "Starting and enabling Docker service..."
 systemctl start docker
 systemctl enable docker
 usermod -a -G docker ubuntu
+log "Docker installation completed"
 
 # Configure nginx as reverse proxy
 cat > /etc/nginx/nginx.conf << 'EOF'
@@ -70,39 +81,64 @@ http {
 EOF
 
 # Start and enable nginx
+log "Starting and enabling nginx..."
 systemctl start nginx
 systemctl enable nginx
+log "Nginx configuration completed"
 
 # Install AWS CLI v2
+log "Installing AWS CLI v2..."
 curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
 ./aws/install
+log "AWS CLI installation completed"
 
 # Get instance metadata
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 REGION="${aws_region}"
 
 # Configure Docker to use ECR
-aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin ${ecr_repository_url}
+log "Configuring ECR login..."
+if ECR_PASSWORD=$(aws ecr get-login-password --region $REGION 2>&1); then
+    echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin ${ecr_repository_url}
+    log "ECR login successful"
+else
+    log "ERROR: ECR login failed: $ECR_PASSWORD"
+    exit 1
+fi
 
 # Pull and run the application
-docker pull ${ecr_repository_url}:latest
+log "Pulling Docker image from ECR..."
+if docker pull ${ecr_repository_url}:latest; then
+    log "Docker image pull successful"
+else
+    log "ERROR: Failed to pull Docker image"
+    exit 1
+fi
 
 # Create environment file for the container
+log "Creating environment file..."
 cat > /home/ubuntu/app.env << 'EOF'
 ENVIRONMENT=${environment}
 DEBUG=true
 LOG_LEVEL=INFO
 PORT=8000
 EOF
+chown ubuntu:ubuntu /home/ubuntu/app.env
 
 # Run the container
-docker run -d \
+log "Starting Docker container..."
+if docker run -d \
   --name turtil-backend \
   --restart unless-stopped \
   -p 8000:8000 \
   --env-file /home/ubuntu/app.env \
-  ${ecr_repository_url}:latest
+  ${ecr_repository_url}:latest; then
+    log "Docker container started successfully"
+else
+    log "ERROR: Failed to start Docker container"
+    exit 1
+fi
 
 # Set up log rotation for application logs
 echo "Setting up log management..."
@@ -126,7 +162,23 @@ curl -f http://localhost/health && curl -f http://localhost:8000/health || exit 
 EOF
 chmod +x /home/ubuntu/health-check.sh
 
+# Final verification
+log "Verifying deployment..."
+sleep 10
+if curl -f http://localhost:8000/health > /dev/null 2>&1; then
+    log "✅ FastAPI health check passed"
+else
+    log "⚠️ FastAPI health check failed"
+fi
+
+if curl -f http://localhost/health > /dev/null 2>&1; then
+    log "✅ Nginx health check passed"
+else
+    log "⚠️ Nginx health check failed"
+fi
+
 # Log deployment completion
-echo "$(date): Turtil Backend deployment completed" >> /var/log/user-data.log
-echo "Instance ID: $INSTANCE_ID" >> /var/log/user-data.log
-echo "Application URL: http://dev.api.turtil.co" >> /var/log/user-data.log
+log "Turtil Backend deployment completed"
+log "Instance ID: $INSTANCE_ID"
+log "Application URL: http://dev.api.turtil.co"
+log "Direct URL: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8000"
