@@ -256,9 +256,9 @@ async def refresh_token(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type"
             )
 
-        # Get staff UUID from token
-        staff_uuid = payload.get("sub")
-        if not staff_uuid:
+        # Get staff ID from token
+        staff_id = payload.get("sub")
+        if not staff_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
             )

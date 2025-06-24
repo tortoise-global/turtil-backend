@@ -28,7 +28,7 @@ class UpstashRedisClient:
             result = await self.client.setex(key, ex, value)
         else:
             result = await self.client.set(key, value)
-        return result == "OK"
+        return result == "OK" or result is True
 
     async def delete(self, key: str) -> int:
         """Delete a key, returns number of deleted keys"""
@@ -63,7 +63,7 @@ class UpstashRedisClient:
     async def setex(self, key: str, seconds: int, value: str) -> bool:
         """Set key with expiration"""
         result = await self.client.setex(key, seconds, value)
-        return result == "OK"
+        return result == "OK" or result is True
 
     async def hset(self, key: str, field: str, value: str) -> int:
         """Set field in hash"""

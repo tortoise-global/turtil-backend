@@ -391,9 +391,9 @@ class CMSAuthManager:
                 payload = jwt.decode(
                     token, self.secret_key, algorithms=[self.algorithm]
                 )
-                staff_uuid = payload.get("sub")
+                staff_id = payload.get("sub")
 
-                if staff_uuid:
+                if staff_id:
                     # Extract staff ID from token (would need database lookup in real scenario)
                     # For now, check if we can find staff blacklist by pattern
                     # This is a simplified check - in production, you'd do a proper lookup

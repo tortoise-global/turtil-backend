@@ -59,17 +59,17 @@ async def get_current_session(
     try:
         # Decode JWT token to get session information
         payload = session_manager.decode_access_token(credentials.credentials)
-        staff_uuid = payload.get("sub")
+        staff_id = payload.get("sub")
         session_id = payload.get("session_id")  # Session ID embedded in JWT
         
-        if not staff_uuid:
+        if not staff_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token payload"
             )
         
         # Get staff information
-        result = await db.execute(select(Staff).where(Staff.uuid == staff_uuid))
+        result = await db.execute(select(Staff).where(Staff.staff_id == staff_id))
         staff = result.scalar_one_or_none()
         if not staff:
             raise HTTPException(

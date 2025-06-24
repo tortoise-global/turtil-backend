@@ -128,7 +128,8 @@ class SessionManager:
         """Create new session with device tracking"""
         try:
             # Generate session ID first
-            session_id = str(uuid.uuid4())
+            session_id_uuid = uuid.uuid4()
+            session_id = str(session_id_uuid)
             
             # Generate tokens with session_id embedded
             access_token = self.auth_manager.create_access_token(staff, session_id=session_id)
@@ -144,7 +145,7 @@ class SessionManager:
             # Store session in database
             if db:
                 db_session = UserSession(
-                    session_id=session_id,
+                    session_id=session_id_uuid,
                     staff_id=staff.staff_id,
                     browser=device_info["browser"],
                     os=device_info["os"],
@@ -163,7 +164,7 @@ class SessionManager:
             
             # Store session in Redis
             session_data = {
-                "staff_id": staff.staff_id,
+                "staff_id": str(staff.staff_id),  # Convert UUID to string for JSON serialization
                 "refresh_token_hash": self.hash_token(refresh_token),
                 "device_info": device_info,
                 "created_at": current_time,
@@ -173,7 +174,7 @@ class SessionManager:
             }
             
             await CacheManager.create_session(session_id, session_data)
-            await CacheManager.add_user_session(staff.staff_id, session_id)
+            await CacheManager.add_user_session(str(staff.staff_id), session_id)
             
             logger.info(f"Created session {session_id} for staff {staff.staff_id} on {device_info['device']}")
             

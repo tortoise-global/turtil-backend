@@ -51,16 +51,16 @@ async def get_current_staff(
                 detail="Invalid token type"
             )
 
-        # Get staff UUID from token
-        staff_uuid = payload.get("sub")
-        if not staff_uuid:
+        # Get staff ID from token
+        staff_id = payload.get("sub")
+        if not staff_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, 
                 detail="Invalid token payload"
             )
 
         # Get staff from database
-        result = await db.execute(select(Staff).where(Staff.uuid == staff_uuid))
+        result = await db.execute(select(Staff).where(Staff.staff_id == staff_id))
         staff = result.scalar_one_or_none()
 
         if not staff or not staff.is_active:
@@ -115,16 +115,16 @@ async def get_current_staff_from_temp_token(
                 detail="Invalid token type for registration"
             )
 
-        # Get staff UUID from token
-        staff_uuid = payload.get("sub")
-        if not staff_uuid:
+        # Get staff ID from token
+        staff_id = payload.get("sub")
+        if not staff_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, 
                 detail="Invalid token payload"
             )
 
         # Get staff from database
-        result = await db.execute(select(Staff).where(Staff.uuid == staff_uuid))
+        result = await db.execute(select(Staff).where(Staff.staff_id == staff_id))
         staff = result.scalar_one_or_none()
 
         if not staff:
@@ -180,16 +180,16 @@ async def get_current_staff_from_cookie(
                 detail="Invalid token type"
             )
 
-        # Get staff UUID from token
-        staff_uuid = payload.get("sub")
-        if not staff_uuid:
+        # Get staff ID from token
+        staff_id = payload.get("sub")
+        if not staff_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, 
                 detail="Invalid token payload"
             )
 
         # Get staff from database
-        result = await db.execute(select(Staff).where(Staff.uuid == staff_uuid))
+        result = await db.execute(select(Staff).where(Staff.staff_id == staff_id))
         staff = result.scalar_one_or_none()
 
         if not staff or not staff.is_active:
