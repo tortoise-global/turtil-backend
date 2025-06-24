@@ -152,11 +152,16 @@ jobs:
           ECR_REPO_NAME="${{ secrets.PROJECT_NAME }}-dev"
           if aws ecr describe-repositories --repository-names "$ECR_REPO_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
             echo "✅ ECR repository exists, importing..."
-            terraform import module.ecr_repo.aws_ecr_repository.this "$ECR_REPO_NAME" || echo "⚠️ ECR import failed or already imported"
+            terraform import aws_ecr_repository.dev_app "$ECR_REPO_NAME" || echo "⚠️ ECR import failed or already imported"
           fi
           
-          # Import ALB if it exists (skip for dev environment)
-          # ALB_NAME="${{ secrets.PROJECT_NAME }}-dev-alb"
+          # Import DB subnet group if it exists
+          DB_SUBNET_GROUP_NAME="${{ secrets.PROJECT_NAME }}-dev-db-subnet-group"
+          if aws rds describe-db-subnet-groups --db-subnet-group-name "$DB_SUBNET_GROUP_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            echo "✅ DB subnet group exists, importing..."
+            terraform import aws_db_subnet_group.main "$DB_SUBNET_GROUP_NAME" || echo "⚠️ DB subnet group import failed or already imported"
+          fi
+          
           # Skip ALB import for development environment (no ALB in dev)
           echo "⚠️ Skipping ALB import for development environment (no load balancer)"
           
