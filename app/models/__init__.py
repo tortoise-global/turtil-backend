@@ -2,7 +2,8 @@ from .staff import Staff
 from .college import College
 from .department import Department
 from .email_otp import CmsEmailOTP
-from .cms_permission import CMSStaffPermission, CMSModules, CMSRoles
+from .permission import CMSStaffPermission, CMSModules, CMSRoles
+from .session import UserSession
 
 __all__ = [
     "Staff",
@@ -12,4 +13,5 @@ __all__ = [
     "CMSStaffPermission",
     "CMSModules",
     "CMSRoles",
+    "UserSession",
 ]

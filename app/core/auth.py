@@ -140,14 +140,14 @@ class AuthManager:
         """Get staff from JWT token"""
         try:
             payload = AuthManager.verify_token(token)
-            staff_uuid: str = payload.get("sub")
+            staff_id: str = payload.get("sub")
 
-            if staff_uuid is None:
+            if staff_id is None:
                 return None
 
-            # Get staff by UUID
+            # Get staff by ID
             result = await db.execute(
-                select(Staff).where(Staff.uuid == staff_uuid, Staff.is_active == True)
+                select(Staff).where(Staff.staff_id == staff_id, Staff.is_active == True)
             )
             staff = result.scalar_one_or_none()
 

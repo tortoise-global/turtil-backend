@@ -1,18 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.schemas.auth import (
-    SignupInitRequest,
-    SignupVerifyRequest,
-    StaffLoginRequest,
-    LoginResponse,
-    LogoutResponse,
-    AuthResponse,
-    TokenResponse,
-    PasswordResetRequest,
-    PasswordResetConfirm,
+from app.schemas.signup_schemas import (
+    SignupRequest as SignupInitRequest,
+    VerifyOTPRequest as SignupVerifyRequest,
+    ForgotPasswordRequest as PasswordResetRequest,
+    ResetPasswordRequest as PasswordResetConfirm,
     ChangePasswordRequest,
+)
+from app.schemas.session_schemas import (
+    SigninRequest as StaffLoginRequest,
+    SigninResponse as LoginResponse,
     RefreshTokenRequest,
+    LogoutResponse,
+)
+from app.schemas.signup_schemas import (
+    SignupResponse as AuthResponse,
+    TokenResponse,
     SignupInitResponse,
     SignupVerifyResponse,
 )
@@ -252,9 +256,9 @@ async def refresh_token(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type"
             )
 
-        # Get staff UUID from token
-        staff_uuid = payload.get("sub")
-        if not staff_uuid:
+        # Get staff ID from token
+        staff_id = payload.get("sub")
+        if not staff_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
             )

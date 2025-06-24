@@ -30,7 +30,7 @@ def main():
     """)
 
     # Configure uvicorn based on environment
-    if settings.environment == "production":
+    if settings.environment == "prod":
         # Production configuration
         uvicorn.run(
             "app.main:app",

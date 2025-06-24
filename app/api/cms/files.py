@@ -2,9 +2,9 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.staff import Staff
-from app.api.cms.auth import get_current_staff
+from app.api.cms.deps import get_current_staff
 from app.core.aws import get_s3_client
-from app.schemas.cms_files import (
+from app.schemas.file_schemas import (
     CMSGeneratePresignedUrlRequest,
     CMSGeneratePresignedUrlResponse,
     CMSDeleteFileRequest,
@@ -18,8 +18,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/cms/files", tags=["CMS File Management"])
 
-# File configuration
-BUCKET_NAME = "my-cms-file-upload"
+# File configuration - now using environment-aware bucket
+from app.config import settings
+BUCKET_NAME = settings.environment_s3_bucket_name
 
 # Common MIME types for reference (not restrictive)
 COMMON_MIME_TYPES = {

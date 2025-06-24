@@ -1,9 +1,27 @@
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from typing import List, Optional
+import os
 
 
 class Settings(BaseSettings):
+    # ============================================================================
+    # PYTHON APPLICATION CONFIGURATION
+    # ============================================================================
+    
+    # Application Configuration
+    project_name: str = Field(
+        default="turtil-backend", env="PROJECT_NAME", description="Project name"
+    )
+    version: str = Field(
+        default="1.0.0", env="VERSION", description="Application version"
+    )
+    environment: str = Field(
+        default="dev", env="ENVIRONMENT", description="Environment"
+    )
+    debug: bool = Field(default=True, env="DEBUG", description="Debug mode")
+    log_level: str = Field(default="INFO", env="LOG_LEVEL", description="Log level")
+
     # Database Configuration
     database_url: str = Field(
         ...,
@@ -19,25 +37,21 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(
         default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES", description="JWT expiration time"
     )
-
-    # Application Configuration
-    project_name: str = Field(
-        default="Turtil Backend", env="PROJECT_NAME", description="Project name"
+    refresh_token_expire_minutes: int = Field(
+        default=43200, env="REFRESH_TOKEN_EXPIRE_MINUTES", description="Refresh token expiration time (30 days default)"
     )
-    version: str = Field(
-        default="1.0.0", env="VERSION", description="Application version"
+    cms_access_token_expire_minutes: int = Field(
+        default=30, env="CMS_ACCESS_TOKEN_EXPIRE_MINUTES", description="CMS access token expiration time"
     )
-    environment: str = Field(
-        default="development", env="ENVIRONMENT", description="Environment"
+    cms_refresh_token_expire_days: int = Field(
+        default=30, env="CMS_REFRESH_TOKEN_EXPIRE_DAYS", description="CMS refresh token expiration time in days"
     )
-    debug: bool = Field(default=True, env="DEBUG", description="Debug mode")
-    log_level: str = Field(default="INFO", env="LOG_LEVEL", description="Log level")
 
     # CORS and Host Configuration
     cors_origins: List[str] = Field(
-        default=["*", "http://localhost:3000", "http://localhost:8080"],
+        default=["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"],
         env="CORS_ORIGINS",
-        description="CORS origins",
+        description="CORS origins - no wildcards when using credentials",
     )
     allowed_hosts: List[str] = Field(
         default=["*", "localhost", "127.0.0.1", "0.0.0.0"],
@@ -54,9 +68,6 @@ class Settings(BaseSettings):
     )
 
     # OTP Configuration
-    otp_secret: str = Field(
-        default="123456", env="OTP_SECRET", description="OTP secret key"
-    )
     otp_expiry_minutes: int = Field(
         default=5, env="OTP_EXPIRY_MINUTES", description="OTP expiration time"
     )
@@ -64,44 +75,17 @@ class Settings(BaseSettings):
         default="123456", env="DEV_OTP", description="Fixed OTP for development mode"
     )
 
+    # OTP Configuration (Unified)
+    otp_max_attempts: int = Field(
+        default=3, env="OTP_MAX_ATTEMPTS", description="Maximum OTP attempts"
+    )
+    
     # CMS Authentication Settings
     cms_auto_approve: bool = Field(
         default=True,
         env="CMS_AUTO_APPROVE",
         description="Auto-approve college registrations (development mode)",
     )
-    cms_otp_max_attempts: int = Field(
-        default=3, env="CMS_OTP_MAX_ATTEMPTS", description="Maximum OTP attempts"
-    )
-    cms_otp_expiry_seconds: int = Field(
-        default=300,
-        env="CMS_OTP_EXPIRY_SECONDS",
-        description="CMS OTP expiry in seconds",
-    )
-    cms_access_token_expire_minutes: int = Field(
-        default=15,
-        env="CMS_ACCESS_TOKEN_EXPIRE_MINUTES",
-        description="CMS access token expiry",
-    )
-    cms_refresh_token_expire_days: int = Field(
-        default=30,
-        env="CMS_REFRESH_TOKEN_EXPIRE_DAYS",
-        description="CMS refresh token expiry",
-    )
-
-    # AWS Configuration
-    aws_access_key_id: str = Field(
-        ..., env="AWS_ACCESS_KEY_ID", description="AWS access key ID"
-    )
-    aws_secret_access_key: str = Field(
-        ..., env="AWS_SECRET_ACCESS_KEY", description="AWS secret access key"
-    )
-    aws_region: str = Field(
-        default="ap-south-1", env="AWS_REGION", description="AWS region"
-    )
-
-    # S3 Configuration
-    s3_bucket_name: str = Field(..., env="S3_BUCKET_NAME", description="S3 bucket name")
 
     # Upstash Redis Configuration
     upstash_redis_url: str = Field(
@@ -117,6 +101,22 @@ class Settings(BaseSettings):
         default=86400, env="REDIS_BLACKLIST_TTL", description="Redis blacklist TTL"
     )
 
+    # ============================================================================
+    # AWS SERVICES CONFIGURATION
+    # ============================================================================
+
+    # AWS Core Configuration
+    aws_access_key_id: str = Field(
+        ..., env="AWS_ACCESS_KEY_ID", description="AWS access key ID"
+    )
+    aws_secret_access_key: str = Field(
+        ..., env="AWS_SECRET_ACCESS_KEY", description="AWS secret access key"
+    )
+    aws_region: str = Field(
+        default="ap-south-1", env="AWS_REGION", description="AWS region"
+    )
+
+
     # Email Configuration (AWS SES)
     aws_ses_from_email: str = Field(
         default="support@turtil.co",
@@ -127,25 +127,42 @@ class Settings(BaseSettings):
         default="ap-south-1", env="AWS_SES_REGION", description="AWS SES region"
     )
 
-    # Additional AWS Configuration
-    aws_default_region: str = Field(
-        default="ap-south-1", env="AWS_DEFAULT_REGION", description="AWS default region"
-    )
-
     # ECR Configuration
     ecr_account_id: Optional[str] = Field(
         default=None, env="ECR_ACCOUNT_ID", description="ECR account ID"
     )
-    ecr_repository_name: Optional[str] = Field(
-        default=None, env="ECR_REPOSITORY_NAME", description="ECR repository name"
+
+    # S3 Storage Configuration
+    s3_bucket_name: Optional[str] = Field(
+        default=None, env="S3_BUCKET_NAME", description="S3 bucket name for file storage"
     )
 
     @property
     def is_development(self) -> bool:
-        return self.environment.lower() in ["development", "dev", "local"]
+        return self.environment.lower() in ["dev", "local"]
+    
+    @property
+    def environment_s3_bucket_name(self) -> str:
+        """Get environment-specific S3 bucket name"""
+        return f"{self.project_name}-{self.environment}-storage"
+    
+    @property
+    def logs_s3_bucket_name(self) -> str:
+        """Get environment-specific logs S3 bucket name"""
+        return f"{self.project_name}-{self.environment}-logs"
+    
+    @property
+    def terraform_state_bucket_name(self) -> str:
+        """Get environment-specific Terraform state S3 bucket name"""
+        return f"{self.project_name}-{self.environment}-terraform-state"
+    
+    @property
+    def ecr_repository_name(self) -> str:
+        """Get environment-specific ECR repository name"""
+        return f"{self.project_name}-{self.environment}"
 
     class Config:
-        env_file = ".env"
+        env_file = os.getenv("ENV_FILE", ".env")
         env_file_encoding = "utf-8"
         case_sensitive = False
 
@@ -164,7 +181,6 @@ def print_config():
         "aws_access_key_id",
         "aws_secret_access_key",
         "upstash_redis_token",
-        "otp_secret",
     }
 
     safe_config = {

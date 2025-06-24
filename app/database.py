@@ -83,7 +83,7 @@ async def init_db() -> None:
     try:
         async with engine.begin() as conn:
             # Import all models here to ensure they are registered with Base
-            from app.models import staff, email_otp, college, department, cms_permission  # noqa: F401
+            from app.models import staff, email_otp, college, department, permission, session  # noqa: F401
 
             logger.info("Creating database tables...")
             await conn.run_sync(Base.metadata.create_all)

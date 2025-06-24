@@ -28,7 +28,7 @@ class UpstashRedisClient:
             result = await self.client.setex(key, ex, value)
         else:
             result = await self.client.set(key, value)
-        return result == "OK"
+        return result == "OK" or result is True
 
     async def delete(self, key: str) -> int:
         """Delete a key, returns number of deleted keys"""
@@ -63,7 +63,7 @@ class UpstashRedisClient:
     async def setex(self, key: str, seconds: int, value: str) -> bool:
         """Set key with expiration"""
         result = await self.client.setex(key, seconds, value)
-        return result == "OK"
+        return result == "OK" or result is True
 
     async def hset(self, key: str, field: str, value: str) -> int:
         """Set field in hash"""
@@ -106,6 +106,56 @@ class UpstashRedisClient:
             return result == "PONG"
         except Exception:
             return False
+
+    async def scan_keys(self, pattern: str) -> list:
+        """Scan for keys matching pattern"""
+        try:
+            result = await self.client.keys(pattern)
+            return result or []
+        except Exception as e:
+            logger.error(f"Failed to scan keys with pattern {pattern}: {e}")
+            return []
+
+    async def delete_keys(self, keys: list) -> int:
+        """Delete multiple keys"""
+        if not keys:
+            return 0
+        try:
+            result = await self.client.delete(*keys)
+            return result or 0
+        except Exception as e:
+            logger.error(f"Failed to delete keys {keys}: {e}")
+            return 0
+
+    async def smembers(self, key: str) -> list:
+        """Get all members of a set"""
+        try:
+            result = await self.client.smembers(key)
+            return result or []
+        except Exception as e:
+            logger.error(f"Failed to get set members for {key}: {e}")
+            return []
+
+    async def spop(self, key: str, count: int = 1) -> list:
+        """Remove and return random members from set"""
+        try:
+            if count == 1:
+                result = await self.client.spop(key)
+                return [result] if result else []
+            else:
+                result = await self.client.spop(key, count)
+                return result or []
+        except Exception as e:
+            logger.error(f"Failed to pop from set {key}: {e}")
+            return []
+
+    async def pipeline(self):
+        """Create Redis pipeline for batch operations"""
+        try:
+            return self.client.pipeline()
+        except Exception as e:
+            logger.error(f"Failed to create pipeline: {e}")
+            return None
 
     async def close(self):
         """Close the Redis client"""
@@ -197,6 +247,160 @@ class CacheManager:
             return result > 0
         except Exception as e:
             logger.error(f"Failed to invalidate OTP for {email}: {e}")
+            return False
+
+    @staticmethod
+    async def create_session(session_id: str, session_data: dict, ttl: int = None) -> bool:
+        """Create session in Redis"""
+        ttl = ttl or (30 * 24 * 3600)  # 30 days default
+        try:
+            data = json.dumps(session_data)
+            return await redis_client.setex(f"session:{session_id}", ttl, data)
+        except Exception as e:
+            logger.error(f"Failed to create session {session_id}: {e}")
+            return False
+
+    @staticmethod
+    async def get_session(session_id: str) -> Optional[dict]:
+        """Get session data from Redis"""
+        try:
+            data = await redis_client.get(f"session:{session_id}")
+            return json.loads(data) if data else None
+        except Exception as e:
+            logger.error(f"Failed to get session {session_id}: {e}")
+            return None
+
+    @staticmethod
+    async def update_session(session_id: str, session_data: dict, ttl: int = None) -> bool:
+        """Update session data in Redis"""
+        ttl = ttl or (30 * 24 * 3600)  # 30 days default
+        try:
+            data = json.dumps(session_data)
+            return await redis_client.setex(f"session:{session_id}", ttl, data)
+        except Exception as e:
+            logger.error(f"Failed to update session {session_id}: {e}")
+            return False
+
+    @staticmethod
+    async def delete_session(session_id: str) -> bool:
+        """Delete session from Redis"""
+        try:
+            result = await redis_client.delete(f"session:{session_id}")
+            return result > 0
+        except Exception as e:
+            logger.error(f"Failed to delete session {session_id}: {e}")
+            return False
+
+    @staticmethod
+    async def add_user_session(staff_id: int, session_id: str) -> bool:
+        """Add session to user's session set"""
+        try:
+            result = await redis_client.sadd(f"user_sessions:{staff_id}", session_id)
+            return result > 0
+        except Exception as e:
+            logger.error(f"Failed to add session to user {staff_id}: {e}")
+            return False
+
+    @staticmethod
+    async def remove_user_session(staff_id: int, session_id: str) -> bool:
+        """Remove session from user's session set"""
+        try:
+            result = await redis_client.srem(f"user_sessions:{staff_id}", session_id)
+            return result > 0
+        except Exception as e:
+            logger.error(f"Failed to remove session from user {staff_id}: {e}")
+            return False
+
+    @staticmethod
+    async def get_user_sessions(staff_id: int) -> list:
+        """Get all session IDs for a user"""
+        try:
+            return await redis_client.smembers(f"user_sessions:{staff_id}")
+        except Exception as e:
+            logger.error(f"Failed to get user sessions for {staff_id}: {e}")
+            return []
+
+    @staticmethod
+    async def invalidate_all_user_sessions(staff_id: int) -> bool:
+        """Invalidate all sessions for a user (password reset)"""
+        try:
+            # Get all session IDs for user
+            session_ids = await redis_client.smembers(f"user_sessions:{staff_id}")
+            
+            # Delete all session data
+            for session_id in session_ids:
+                await redis_client.delete(f"session:{session_id}")
+            
+            # Clear user's session index
+            await redis_client.delete(f"user_sessions:{staff_id}")
+            
+            logger.info(f"Invalidated {len(session_ids)} sessions for staff {staff_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to invalidate all sessions for staff {staff_id}: {e}")
+            return False
+
+    @staticmethod
+    async def blacklist_refresh_token(token_hash: str, reason: str = "rotated", ttl: int = 3600) -> bool:
+        """Add refresh token to blacklist"""
+        try:
+            import time
+            blacklist_data = {
+                "invalidated_at": time.time(),
+                "reason": reason
+            }
+            data = json.dumps(blacklist_data)
+            return await redis_client.setex(f"blacklist:token:{token_hash}", ttl, data)
+        except Exception as e:
+            logger.error(f"Failed to blacklist token: {e}")
+            return False
+
+    @staticmethod
+    async def is_refresh_token_blacklisted(token_hash: str) -> bool:
+        """Check if refresh token is blacklisted"""
+        try:
+            return await redis_client.exists(f"blacklist:token:{token_hash}")
+        except Exception as e:
+            logger.error(f"Failed to check token blacklist: {e}")
+            return False
+
+    @staticmethod
+    async def store_password_reset_token(email: str, temp_token: str, ttl: int = 600) -> bool:
+        """Store temporary token for password reset (10 minutes)"""
+        try:
+            import time
+            token_data = {
+                "temp_token": temp_token,
+                "created_at": time.time(),
+                "expires_at": time.time() + ttl
+            }
+            data = json.dumps(token_data)
+            return await redis_client.setex(f"reset_token:{email}", ttl, data)
+        except Exception as e:
+            logger.error(f"Failed to store reset token for {email}: {e}")
+            return False
+
+    @staticmethod
+    async def get_password_reset_token(email: str) -> Optional[str]:
+        """Get temporary token for password reset"""
+        try:
+            data = await redis_client.get(f"reset_token:{email}")
+            if data:
+                token_data = json.loads(data)
+                return token_data.get("temp_token")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get reset token for {email}: {e}")
+            return None
+
+    @staticmethod
+    async def invalidate_password_reset_token(email: str) -> bool:
+        """Remove password reset token"""
+        try:
+            result = await redis_client.delete(f"reset_token:{email}")
+            return result > 0
+        except Exception as e:
+            logger.error(f"Failed to invalidate reset token for {email}: {e}")
             return False
 
 

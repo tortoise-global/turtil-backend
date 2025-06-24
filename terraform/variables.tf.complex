@@ -1,0 +1,345 @@
+# ============================================================================
+# MULTI-ENVIRONMENT TERRAFORM VARIABLES
+# ============================================================================
+# Variables for managing infrastructure across development, testing, and production
+
+# Environment Configuration
+variable "environment" {
+  description = "Environment name (dev, test, prod)"
+  type        = string
+  validation {
+    condition = contains(["dev", "test", "prod"], var.environment)
+    error_message = "Environment must be one of: dev, test, prod."
+  }
+}
+
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+  default     = "turtil-backend"
+}
+
+variable "aws_region" {
+  description = "AWS region for resource deployment"
+  type        = string
+  default     = "ap-south-1"
+}
+
+# Compute Configuration
+variable "instance_type" {
+  description = "EC2 instance type for the environment"
+  type        = string
+  default     = "t4g.micro"
+}
+
+variable "min_size" {
+  description = "Minimum number of instances in Auto Scaling Group"
+  type        = number
+  default     = 1
+}
+
+variable "max_size" {
+  description = "Maximum number of instances in Auto Scaling Group"
+  type        = number
+  default     = 3
+}
+
+variable "desired_capacity" {
+  description = "Desired number of instances in Auto Scaling Group"
+  type        = number
+  default     = 1
+}
+
+variable "enable_spot_instances" {
+  description = "Whether to use spot instances for cost optimization"
+  type        = bool
+  default     = false
+}
+
+variable "enable_single_instance" {
+  description = "Whether to use single EC2 instance instead of Auto Scaling Group (for dev)"
+  type        = bool
+  default     = false
+}
+
+variable "enable_load_balancer" {
+  description = "Whether to enable load balancer (disabled for dev environment)"
+  type        = bool
+  default     = true
+}
+
+# Database Configuration
+variable "database_type" {
+  description = "Database type (rds or aurora-serverless-v2)"
+  type        = string
+  default     = "rds"
+  validation {
+    condition = contains(["rds", "aurora-serverless-v2"], var.database_type)
+    error_message = "Database type must be either 'rds' or 'aurora-serverless-v2'."
+  }
+}
+
+variable "database_instance_class" {
+  description = "Database instance class"
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "database_allocated_storage" {
+  description = "Allocated storage for RDS instance (GB)"
+  type        = number
+  default     = 20
+}
+
+variable "database_backup_retention" {
+  description = "Number of days to retain database backups"
+  type        = number
+  default     = 7
+}
+
+variable "database_multi_az" {
+  description = "Whether to enable Multi-AZ deployment"
+  type        = bool
+  default     = false
+}
+
+variable "enable_deletion_protection" {
+  description = "Whether to enable deletion protection"
+  type        = bool
+  default     = false
+}
+
+variable "database_name" {
+  description = "Name of the database"
+  type        = string
+}
+
+# Aurora Serverless v2 Configuration
+variable "aurora_min_capacity" {
+  description = "Minimum Aurora Serverless v2 capacity (ACU)"
+  type        = number
+  default     = 0.5
+}
+
+variable "aurora_max_capacity" {
+  description = "Maximum Aurora Serverless v2 capacity (ACU)"
+  type        = number
+  default     = 16
+}
+
+variable "enable_aurora_backtrack" {
+  description = "Whether to enable Aurora Backtrack"
+  type        = bool
+  default     = false
+}
+
+variable "aurora_backtrack_window" {
+  description = "Aurora Backtrack window in hours"
+  type        = number
+  default     = 24
+}
+
+# Storage Configuration
+variable "s3_bucket_prefix" {
+  description = "Prefix for S3 bucket names"
+  type        = string
+}
+
+variable "enable_s3_versioning" {
+  description = "Whether to enable S3 versioning"
+  type        = bool
+  default     = true
+}
+
+variable "s3_lifecycle_enabled" {
+  description = "Whether to enable S3 lifecycle policies"
+  type        = bool
+  default     = true
+}
+
+variable "enable_s3_intelligent_tiering" {
+  description = "Whether to enable S3 Intelligent Tiering"
+  type        = bool
+  default     = false
+}
+
+variable "s3_transition_to_ia_days" {
+  description = "Days after which to transition to Infrequent Access"
+  type        = number
+  default     = 30
+}
+
+variable "s3_transition_to_glacier_days" {
+  description = "Days after which to transition to Glacier"
+  type        = number
+  default     = 90
+}
+
+variable "s3_expiration_days" {
+  description = "Days after which to expire objects"
+  type        = number
+  default     = 365
+}
+
+variable "enable_s3_cross_region_replication" {
+  description = "Whether to enable cross-region replication for S3"
+  type        = bool
+  default     = false
+}
+
+variable "s3_replication_region" {
+  description = "Target region for S3 cross-region replication"
+  type        = string
+  default     = "ap-southeast-1"
+}
+
+# Container Registry Configuration
+variable "ecr_account_id" {
+  description = "AWS Account ID for ECR registry"
+  type        = string
+  sensitive   = true
+}
+
+variable "ecr_repository_name" {
+  description = "ECR repository name (will be prefixed with environment)"
+  type        = string
+}
+
+variable "ecr_image_tag_mutability" {
+  description = "Image tag mutability setting"
+  type        = string
+  default     = "MUTABLE"
+  validation {
+    condition = contains(["MUTABLE", "IMMUTABLE"], var.ecr_image_tag_mutability)
+    error_message = "Image tag mutability must be either MUTABLE or IMMUTABLE."
+  }
+}
+
+variable "ecr_max_image_count" {
+  description = "Maximum number of images to keep in ECR"
+  type        = number
+  default     = 10
+}
+
+variable "enable_ecr_vulnerability_scanning" {
+  description = "Whether to enable ECR vulnerability scanning"
+  type        = bool
+  default     = false
+}
+
+# Monitoring Configuration
+variable "enable_detailed_monitoring" {
+  description = "Whether to enable detailed CloudWatch monitoring"
+  type        = bool
+  default     = false
+}
+
+variable "cloudwatch_log_retention" {
+  description = "CloudWatch log retention in days"
+  type        = number
+  default     = 14
+}
+
+variable "enable_performance_insights" {
+  description = "Whether to enable Performance Insights for RDS"
+  type        = bool
+  default     = false
+}
+
+# Security Configuration
+variable "enable_waf" {
+  description = "Whether to enable AWS WAF"
+  type        = bool
+  default     = false
+}
+
+variable "ssl_certificate_arn" {
+  description = "ARN of SSL certificate for HTTPS"
+  type        = string
+  default     = ""
+}
+
+variable "enable_backup_encryption" {
+  description = "Whether to enable backup encryption"
+  type        = bool
+  default     = true
+}
+
+variable "enable_aurora_encryption" {
+  description = "Whether to enable Aurora encryption at rest"
+  type        = bool
+  default     = true
+}
+
+# Network Configuration
+variable "vpc_cidr" {
+  description = "CIDR block for VPC"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "availability_zones" {
+  description = "List of availability zones"
+  type        = list(string)
+  default     = ["ap-south-1a", "ap-south-1b"]
+}
+
+# Auto Scaling Configuration
+variable "scale_up_threshold" {
+  description = "CPU threshold for scaling up"
+  type        = number
+  default     = 70
+}
+
+variable "scale_down_threshold" {
+  description = "CPU threshold for scaling down"
+  type        = number
+  default     = 30
+}
+
+variable "scale_up_adjustment" {
+  description = "Number of instances to add when scaling up"
+  type        = number
+  default     = 1
+}
+
+variable "scale_down_adjustment" {
+  description = "Number of instances to remove when scaling down"
+  type        = number
+  default     = -1
+}
+
+# Application Configuration
+variable "debug_mode" {
+  description = "Whether to enable debug mode"
+  type        = bool
+  default     = false
+}
+
+variable "log_level" {
+  description = "Application log level"
+  type        = string
+  default     = "INFO"
+  validation {
+    condition = contains(["DEBUG", "INFO", "WARNING", "ERROR"], var.log_level)
+    error_message = "Log level must be one of: DEBUG, INFO, WARNING, ERROR."
+  }
+}
+
+# Tags
+variable "tags" {
+  description = "Common tags to apply to all resources"
+  type        = map(string)
+  default     = {}
+}
+
+# Legacy variables for backward compatibility
+variable "ecr_env_tags" {
+  description = "Legacy environment tags mapping (deprecated)"
+  type        = map(string)
+  default = {
+    "development" = "dev"
+    "testing"     = "test"
+    "production"  = "prod"
+  }
+}

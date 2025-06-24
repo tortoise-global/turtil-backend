@@ -15,6 +15,10 @@ from app.config import settings
 from app.models.base import BaseModel
 
 # Import all models to ensure they're registered with SQLAlchemy
+from app.models.staff import Staff
+from app.models.college import College
+from app.models.department import Department
+from app.models.session import UserSession
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

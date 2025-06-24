@@ -6,7 +6,7 @@ from passlib.context import CryptContext
 from app.config import settings
 from app.core.cms_otp import CMSOTPManager
 from app.models.staff import Staff
-from app.models.cms_permission import CMSModules, CMSRoles
+from app.models.permission import CMSModules, CMSRoles
 
 
 class CMSAuthManager:
@@ -27,7 +27,7 @@ class CMSAuthManager:
         """Get password hash"""
         return self.pwd_context.hash(password)
 
-    def create_access_token(self, staff: Staff) -> str:
+    def create_access_token(self, staff: Staff, session_id: str = None) -> str:
         """Create JWT access token with staff permissions and registration state"""
         now = datetime.now(timezone.utc)
         expire = now + timedelta(minutes=self.access_token_expire_minutes)
@@ -53,7 +53,7 @@ class CMSAuthManager:
         )
 
         payload = {
-            "sub": str(staff.uuid),
+            "sub": str(staff.staff_id),
             "email": staff.email,
             "fullName": staff.full_name,
             "cmsRole": staff.cms_role,
@@ -71,6 +71,10 @@ class CMSAuthManager:
             "iat": now,
             "type": "access",
         }
+        
+        # Add session_id if provided (for multi-device sessions)
+        if session_id:
+            payload["session_id"] = session_id
 
         return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
 
@@ -84,7 +88,7 @@ class CMSAuthManager:
         refresh_token = self.create_refresh_token(staff)
         
         # Invalidate old sessions (user will use new tokens)
-        await self.invalidate_staff_sessions(staff.id)
+        await self.invalidate_staff_sessions(staff.staff_id)
         
         # Create new session
         await self.create_staff_session(staff, access_token)
@@ -96,18 +100,22 @@ class CMSAuthManager:
             "expiresIn": self.access_token_expire_minutes * 60,
         }
 
-    def create_refresh_token(self, staff: Staff) -> str:
+    def create_refresh_token(self, staff: Staff, session_id: str = None) -> str:
         """Create JWT refresh token"""
         now = datetime.now(timezone.utc)
         expire = now + timedelta(days=self.refresh_token_expire_days)
 
         payload = {
-            "sub": str(staff.uuid),
+            "sub": str(staff.staff_id),
             "email": staff.email,
             "exp": expire,
             "iat": now,
             "type": "refresh",
         }
+        
+        # Add session_id if provided (for multi-device sessions)
+        if session_id:
+            payload["session_id"] = session_id
 
         return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
 
@@ -117,9 +125,9 @@ class CMSAuthManager:
         expire = now + timedelta(minutes=self.access_token_expire_minutes)  # Normal JWT expiry
 
         payload = {
-            "sub": str(staff.uuid),
+            "sub": str(staff.staff_id),
             "email": staff.email,
-            "staffId": staff.id,
+            "staffId": staff.staff_id,
             "purpose": purpose,
             "exp": expire,
             "iat": now,
@@ -172,7 +180,7 @@ class CMSAuthManager:
                 "lastActivity": datetime.now(timezone.utc).isoformat(),
             }
 
-            return await CMSOTPManager.store_staff_session(staff.id, session_data)
+            return await CMSOTPManager.store_staff_session(staff.staff_id, session_data)
 
         except Exception as e:
             print(f"Error creating staff session: {e}")
@@ -383,9 +391,9 @@ class CMSAuthManager:
                 payload = jwt.decode(
                     token, self.secret_key, algorithms=[self.algorithm]
                 )
-                staff_uuid = payload.get("sub")
+                staff_id = payload.get("sub")
 
-                if staff_uuid:
+                if staff_id:
                     # Extract staff ID from token (would need database lookup in real scenario)
                     # For now, check if we can find staff blacklist by pattern
                     # This is a simplified check - in production, you'd do a proper lookup
