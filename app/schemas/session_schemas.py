@@ -48,7 +48,7 @@ class SigninResponse(CamelCaseModel):
     """Response schema for successful sign-in - simplified for optimal flow"""
     refresh_token: str = Field(..., description="JWT refresh token for token rotation")
     device_info: DeviceInfo = Field(..., description="Device information")
-    user: Optional[Dict[str, Any]] = Field(None, description="User information (optional)")
+    staff: Dict[str, Any] = Field(..., description="Staff information")
 
 
 class RefreshTokenResponse(CamelCaseModel):

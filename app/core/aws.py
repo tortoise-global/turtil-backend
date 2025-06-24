@@ -721,14 +721,88 @@ class EmailService:
 
 
 class S3Service:
-    """S3 service for file uploads"""
+    """Enhanced S3 service for file uploads with environment-aware configuration"""
+
+    @staticmethod
+    def get_environment_bucket_name(bucket_type: str = "storage") -> str:
+        """
+        Get environment-specific bucket name
+        
+        Args:
+            bucket_type: Type of bucket (storage, logs, terraform-state)
+            
+        Returns:
+            Environment-specific bucket name
+        """
+        if bucket_type == "logs":
+            return settings.logs_s3_bucket_name
+        elif bucket_type == "terraform-state":
+            return settings.terraform_state_bucket_name
+        else:
+            return settings.environment_s3_bucket_name
 
     @staticmethod
     def generate_presigned_url(
+        object_name: str, 
+        bucket_type: str = "storage",
+        expiration: int = 3600,
+        conditions: list = None
+    ) -> dict:
+        """
+        Generate a presigned URL for S3 object upload with enhanced security
+
+        Args:
+            object_name: Name of the object to upload
+            bucket_type: Type of bucket to use (storage, logs, terraform-state)
+            expiration: Time in seconds for the presigned URL to remain valid
+            conditions: List of conditions for the presigned POST
+
+        Returns:
+            Dictionary with presigned URL information
+        """
+        try:
+            s3_client = get_s3_client()
+            bucket_name = S3Service.get_environment_bucket_name(bucket_type)
+
+            # Default conditions for security
+            if not conditions:
+                conditions = [
+                    ["content-length-range", 1, 10 * 1024 * 1024],  # Max 10MB
+                    {"bucket": bucket_name}
+                ]
+
+            # Use presigned POST for better security and control
+            response = s3_client.generate_presigned_post(
+                Bucket=bucket_name,
+                Key=object_name,
+                Fields={"Content-Type": S3Service.get_content_type(object_name)},
+                Conditions=conditions,
+                ExpiresIn=expiration
+            )
+
+            logger.info(
+                f"Generated presigned URL for {object_name} in {bucket_type} bucket ({bucket_name})"
+            )
+            
+            return {
+                "url": response["url"],
+                "fields": response["fields"],
+                "bucket_name": bucket_name,
+                "object_name": object_name,
+                "expires_in": expiration,
+                "environment": settings.environment
+            }
+
+        except Exception as e:
+            logger.error(f"Error generating presigned URL: {e}")
+            raise Exception(f"Failed to generate presigned URL: {e}")
+
+    @staticmethod
+    def generate_presigned_url_simple(
         bucket_name: str, object_name: str, expiration: int = 3600
     ) -> str:
         """
-        Generate a presigned URL for S3 object upload
+        Generate a simple presigned URL for S3 object upload (legacy method)
 
         Args:
             bucket_name: Name of the S3 bucket
@@ -757,9 +831,64 @@ class S3Service:
             raise Exception(f"Failed to generate presigned URL: {e}")
 
     @staticmethod
-    def get_object_url(bucket_name: str, object_name: str) -> str:
+    def get_content_type(filename: str) -> str:
+        """
+        Get content type for a file based on extension
+        
+        Args:
+            filename: Name of the file
+            
+        Returns:
+            MIME content type
+        """
+        if '.' not in filename:
+            return "application/octet-stream"
+        
+        extension = filename.split('.')[-1].lower()
+        
+        # Common MIME types
+        mime_types = {
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg", 
+            "png": "image/png",
+            "gif": "image/gif",
+            "webp": "image/webp",
+            "pdf": "application/pdf",
+            "doc": "application/msword",
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "txt": "text/plain",
+            "csv": "text/csv",
+            "json": "application/json",
+            "xml": "application/xml",
+            "zip": "application/zip",
+            "mp4": "video/mp4",
+            "mp3": "audio/mpeg",
+            "wav": "audio/wav",
+            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        }
+        
+        return mime_types.get(extension, "application/octet-stream")
+
+    @staticmethod
+    def get_object_url(object_name: str, bucket_type: str = "storage") -> str:
         """
         Get the public URL for an S3 object
+
+        Args:
+            object_name: Name of the object
+            bucket_type: Type of bucket (storage, logs, terraform-state)
+
+        Returns:
+            Public URL string
+        """
+        bucket_name = S3Service.get_environment_bucket_name(bucket_type)
+        return f"https://{bucket_name}.s3.{settings.aws_region}.amazonaws.com/{object_name}"
+
+    @staticmethod
+    def get_object_url_legacy(bucket_name: str, object_name: str) -> str:
+        """
+        Get the public URL for an S3 object (legacy method)
 
         Args:
             bucket_name: Name of the S3 bucket

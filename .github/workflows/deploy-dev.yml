@@ -1,0 +1,154 @@
+name: Deploy to Development
+
+on:
+  push:
+    branches:
+      - dev
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+env:
+  AWS_REGION: ap-south-1
+  ENVIRONMENT: dev
+  TF_WORKSPACE: dev
+
+jobs:
+  deploy-dev:
+    name: Deploy to Development Environment
+    runs-on: ubuntu-latest
+    environment: dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: Select Terraform Workspace
+        working-directory: ./terraform
+        run: |
+          terraform workspace select ${{ env.TF_WORKSPACE }} || terraform workspace new ${{ env.TF_WORKSPACE }}
+
+      - name: Terraform Plan
+        working-directory: ./terraform
+        run: terraform plan -var-file="environments/dev.tfvars" -out=tfplan
+        env:
+          TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_app_algorithm: ${{ secrets.ALGORITHM }}
+          TF_VAR_app_access_token_expire_minutes: ${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
+          TF_VAR_app_version: ${{ secrets.VERSION }}
+          TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
+          TF_VAR_app_rate_limit_calls: ${{ secrets.RATE_LIMIT_CALLS }}
+          TF_VAR_app_rate_limit_period: ${{ secrets.RATE_LIMIT_PERIOD }}
+          TF_VAR_app_otp_expiry_minutes: ${{ secrets.OTP_EXPIRY_MINUTES }}
+          TF_VAR_app_redis_user_cache_ttl: ${{ secrets.REDIS_USER_CACHE_TTL }}
+          TF_VAR_app_redis_blacklist_ttl: ${{ secrets.REDIS_BLACKLIST_TTL }}
+          TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_project_name: ${{ secrets.PROJECT_NAME }}
+          TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
+          TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
+          TF_VAR_app_aws_ses_from_email: ${{ secrets.AWS_SES_FROM_EMAIL }}
+          TF_VAR_app_aws_ses_region: ${{ secrets.AWS_SES_REGION }}
+          TF_VAR_ecr_account_id: ${{ secrets.ECR_ACCOUNT_ID }}
+          TF_VAR_app_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_app_debug: "true"
+
+      - name: Import Existing Resources
+        working-directory: ./terraform
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking for existing development resources to import..."
+          
+          # Import ECR repository if it exists
+          ECR_REPO_NAME="${{ secrets.PROJECT_NAME }}-dev"
+          if aws ecr describe-repositories --repository-names "$ECR_REPO_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            echo "✅ ECR repository exists, importing..."
+            terraform import module.ecr_repo.aws_ecr_repository.this "$ECR_REPO_NAME" || echo "⚠️ ECR import failed or already imported"
+          fi
+          
+          # Import ALB if it exists (skip for dev environment)
+          # ALB_NAME="${{ secrets.PROJECT_NAME }}-dev-alb"
+          # Skip ALB import for development environment (no ALB in dev)
+          echo "⚠️ Skipping ALB import for development environment (no load balancer)"
+          
+          echo "🔧 Development import phase completed"
+
+      - name: Terraform Apply
+        working-directory: ./terraform
+        run: terraform apply -auto-approve tfplan
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} \
+            | docker login --username AWS --password-stdin ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+      - name: Build Docker Image
+        run: |
+          ECR_REPO_NAME="${{ secrets.PROJECT_NAME }}-dev"
+          docker build --platform linux/arm64 -t $ECR_REPO_NAME .
+
+      - name: Tag Docker Image
+        run: |
+          ECR_REPO_NAME="${{ secrets.PROJECT_NAME }}-dev"
+          docker tag $ECR_REPO_NAME:latest ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:latest
+          docker tag $ECR_REPO_NAME:latest ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:dev
+          docker tag $ECR_REPO_NAME:latest ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:${{ github.sha }}
+
+      - name: Push Docker Images to ECR
+        run: |
+          ECR_REPO_NAME="${{ secrets.PROJECT_NAME }}-dev"
+          docker push ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:latest
+          docker push ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:dev
+          docker push ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:${{ github.sha }}
+
+      - name: Verify Development Deployment
+        working-directory: ./terraform
+        run: |
+          echo "Verifying development deployment..."
+          INSTANCE_IP=$(terraform output -raw dev_instance_info | jq -r '.public_ip')
+          HEALTH_ENDPOINT="http://$INSTANCE_IP:8000/health"
+          
+          echo "Testing development instance health endpoint: $HEALTH_ENDPOINT"
+          sleep 120  # Allow more time for instance startup
+          
+          if curl -f --max-time 30 --retry 10 --retry-delay 15 "$HEALTH_ENDPOINT"; then
+            echo "✅ Development deployment verification successful!"
+            echo "🔗 Access your application at: http://$INSTANCE_IP:8000"
+          else
+            echo "❌ Development deployment verification failed!"
+            echo "Instance IP: $INSTANCE_IP"
+            exit 1
+          fi
+
+      - name: Development Deployment Success
+        if: success()
+        run: |
+          echo "🚀 Development deployment completed successfully!"
+          echo "Environment: dev"
+          echo "Branch: dev"
+          echo "Commit: ${{ github.sha }}"
+          echo "Cost Optimized: Single EC2 instance without load balancer"

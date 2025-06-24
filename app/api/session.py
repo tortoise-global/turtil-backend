@@ -3,7 +3,7 @@ Simplified Session API
 Multi-device authentication, session tracking, and token management
 """
 
-from fastapi import APIRouter, HTTPException, status, Depends, Request, Header
+from fastapi import APIRouter, HTTPException, status, Depends, Request, Header, Response, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -109,10 +109,11 @@ async def get_current_session(
         )
 
 
-@router.post("/signin", response_model=SigninResponse)
+@router.post("/signin")
 async def signin(
     request: SigninRequest,
     http_request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -187,6 +188,18 @@ async def signin(
         
         logger.info(f"Signin successful for {email} from {ip_address}")
         
+        # Set HttpOnly secure cookie for refresh token
+        from app.config import settings
+        response.set_cookie(
+            key="refreshToken",
+            value=session_data["refresh_token"],
+            httponly=True,
+            secure=not settings.is_development,  # Only secure in production (HTTPS)
+            samesite="lax" if settings.is_development else "strict",  # Relaxed for dev
+            max_age=30 * 24 * 60 * 60,  # 30 days
+            path="/api/auth/session"  # Scoped to session endpoints only
+        )
+        
         # Send login notification email (non-blocking)
         try:
             from app.core.aws import EmailService
@@ -203,11 +216,12 @@ async def signin(
             # Don't fail login if notification email fails
             logger.warning(f"Failed to send login notification email to {email}: {e}")
         
-        return SigninResponse(
-            refresh_token=session_data["refresh_token"],
-            device_info=DeviceInfo(**session_data["device_info"]),
-            staff=staff
-        )
+        # Return response without refresh token (it's in HttpOnly cookie)
+        return {
+            "device_info": session_data["device_info"],
+            "staff": staff.to_dict(),
+            "message": "Sign in successful"
+        }
         
     except HTTPException:
         raise
@@ -221,20 +235,29 @@ async def signin(
 
 @router.post("/refresh", response_model=RefreshTokenResponse)
 async def refresh_tokens(
-    request: RefreshTokenRequest,
-    db: AsyncSession = Depends(get_db)
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    refresh_token: Optional[str] = Cookie(None, alias="refreshToken")
 ):
     """
-    Refresh access token using refresh token
+    Refresh access token using refresh token from HttpOnly cookie
     Mandatory token rotation for security
     
+    **Note:** Refresh token is automatically read from HttpOnly cookie
     **Note:** Session ID is automatically extracted from the refresh token JWT payload
     """
     try:
+        # Check if refresh token is present in cookie
+        if not refresh_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="No refresh token found. Please sign in again."
+            )
+        
         # Extract session_id from refresh token JWT payload
         try:
             # Decode without verification to extract session_id (we'll verify in refresh_session)
-            payload = jwt.decode(request.refresh_token, key="", options={"verify_signature": False})
+            payload = jwt.decode(refresh_token, key="", options={"verify_signature": False})
             session_id = payload.get("session_id")
             
             # Handle legacy tokens without session_id (from CMS auth system)
@@ -257,15 +280,27 @@ async def refresh_tokens(
         # Refresh session with mandatory token rotation
         token_data = await session_manager.refresh_session(
             session_id=session_id,
-            refresh_token=request.refresh_token,
+            refresh_token=refresh_token,
             db=db
         )
         
         logger.info(f"Token refreshed for session {session_id}")
         
+        # Update HttpOnly cookie with new refresh token (mandatory rotation)
+        from app.config import settings
+        response.set_cookie(
+            key="refreshToken",
+            value=token_data["refresh_token"],
+            httponly=True,
+            secure=not settings.is_development,  # Only secure in production (HTTPS)
+            samesite="lax" if settings.is_development else "strict",  # Relaxed for dev
+            max_age=30 * 24 * 60 * 60,  # 30 days
+            path="/api/auth/session"
+        )
+        
         return RefreshTokenResponse(
             access_token=token_data["access_token"],
-            refresh_token=token_data["refresh_token"],
+            refresh_token=token_data["refresh_token"],  # Still return in response for compatibility
             token_type=token_data["token_type"],
             expires_in=token_data["expires_in"]
         )
@@ -363,6 +398,7 @@ async def get_current_session_info(
 
 @router.post("/signout", response_model=LogoutResponse)
 async def signout(
+    response: Response,
     current_session: dict = Depends(get_current_session),
     db: AsyncSession = Depends(get_db)
 ):
@@ -383,6 +419,12 @@ async def signout(
             )
         
         logger.info(f"User {staff.email} signed out from session {session_id}")
+        
+        # Clear refresh token cookie
+        response.delete_cookie(
+            key="refreshToken",
+            path="/api/auth/session"
+        )
         
         return LogoutResponse(
             success=True,

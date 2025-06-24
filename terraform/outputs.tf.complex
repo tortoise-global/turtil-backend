@@ -1,0 +1,216 @@
+# ============================================================================
+# INFRASTRUCTURE OUTPUTS
+# ============================================================================
+# Outputs for multi-environment infrastructure
+
+# Environment Information
+output "environment" {
+  description = "Current environment"
+  value       = var.environment
+}
+
+output "project_name" {
+  description = "Project name"
+  value       = var.project_name
+}
+
+output "terraform_workspace" {
+  description = "Current Terraform workspace"
+  value       = terraform.workspace
+}
+
+# Database Outputs
+output "database_endpoint" {
+  description = "Database endpoint for application connections"
+  value       = module.database.database_endpoint
+  sensitive   = false
+}
+
+output "database_type" {
+  description = "Type of database deployed"
+  value       = module.database.database_type
+}
+
+output "database_name" {
+  description = "Database name"
+  value       = module.database.database_name
+}
+
+output "database_connection_info" {
+  description = "Database connection information for application"
+  value = {
+    endpoint = module.database.database_endpoint
+    port     = module.database.database_port
+    database = module.database.database_name
+    username = module.database.database_username
+  }
+  sensitive = false
+}
+
+# S3 Bucket Outputs
+output "s3_buckets" {
+  description = "S3 bucket information"
+  value       = module.s3_buckets.bucket_info
+}
+
+output "app_storage_bucket_name" {
+  description = "Main application storage bucket name"
+  value       = module.s3_buckets.app_storage_bucket_name
+}
+
+# ECR Repository Outputs
+output "ecr_repository" {
+  description = "ECR repository information"
+  value = {
+    name = module.ecr_repo.repository_name
+    url  = module.ecr_repo.repository_url
+    arn  = module.ecr_repo.repository_arn
+  }
+}
+
+output "ecr_repository_url" {
+  description = "ECR repository URL for Docker images"
+  value       = module.ecr_repo.repository_url
+}
+
+# Docker Commands
+output "docker_commands" {
+  description = "Useful Docker commands for this environment"
+  value = {
+    login = module.ecr_repo.docker_login_command
+    push  = module.ecr_repo.docker_push_command
+  }
+}
+
+# Network Information
+output "vpc_id" {
+  description = "VPC ID being used"
+  value       = module.ec2.vpc_id
+}
+
+output "availability_zones" {
+  description = "Availability zones in use"
+  value       = module.ec2.availability_zones
+}
+
+# Auto Scaling Group Information
+output "asg_name" {
+  description = "Auto Scaling Group name"
+  value       = module.ec2.asg_name
+}
+
+output "database_security_group_id" {
+  description = "Database security group ID"
+  value       = module.database.database_security_group_id
+}
+
+# Application Configuration for Environment Variables
+output "application_environment_variables" {
+  description = "Environment variables for the application"
+  value = {
+    ENVIRONMENT           = var.environment
+    DATABASE_URL         = module.database.database_url_asyncpg
+    S3_BUCKET_NAME       = module.app_storage_bucket.bucket_name
+    S3_BUCKET_PREFIX     = var.project_name
+    ECR_REPOSITORY_NAME  = module.ecr_repo.repository_name
+    AWS_REGION          = data.aws_region.current.name
+  }
+  sensitive = true
+}
+
+# Cost Estimation Information
+output "cost_estimation" {
+  description = "Estimated monthly costs for this environment"
+  value = {
+    environment = var.environment
+    database = var.database_type == "aurora-serverless-v2" ? "Aurora Serverless v2: $80-200/month" : "RDS t4g.micro: $9-12/month"
+    compute = "EC2 ${var.instance_type}: Varies by usage"
+    storage = "S3 buckets: $3-20/month depending on usage"
+    container_registry = "ECR: $1-5/month"
+    estimated_total = var.environment == "production" ? "$200-400/month" : "$25-50/month"
+  }
+}
+
+# Monitoring and Health Check URLs
+output "health_check_endpoints" {
+  description = "Health check endpoints for monitoring"
+  value = var.app_environment != "dev" ? {
+    basic    = "http://${module.example_alb[0].alb_dns_name}/health"
+    detailed = "http://${module.example_alb[0].alb_dns_name}/health/detailed"
+    info     = "http://${module.example_alb[0].alb_dns_name}/info"
+  } : {
+    basic    = "http://${module.ec2.instance_public_ip}:8000/health"
+    detailed = "http://${module.ec2.instance_public_ip}:8000/health/detailed"
+    info     = "http://${module.ec2.instance_public_ip}:8000/info"
+  }
+}
+
+# Load Balancer Information (Conditional)
+output "example_alb_dns_name" {
+  description = "Application Load Balancer DNS name (if enabled)"
+  value       = var.app_environment != "dev" ? module.example_alb[0].alb_dns_name : null
+}
+
+output "example_alb_target_group_arn" {
+  description = "Application Load Balancer target group ARN (if enabled)"
+  value       = var.app_environment != "dev" ? module.example_alb[0].target_group_arn : null
+}
+
+# Development Instance Information
+output "dev_instance_info" {
+  description = "Development instance information (dev environment only)"
+  value = var.app_environment == "dev" ? {
+    public_ip    = module.ec2.instance_public_ip
+    private_ip   = module.ec2.instance_private_ip
+    instance_id  = module.ec2.instance_id
+    access_url   = "http://${module.ec2.instance_public_ip}:8000"
+  } : null
+}
+
+# CloudFront Information (Production only)
+output "cloudfront_distribution" {
+  description = "CloudFront distribution information (production only)"
+  value = var.app_environment == "prod" ? {
+    domain_name = module.cloudfront_with_alb[0].cloudfront_domain_name
+    hosted_zone_id = module.cloudfront_with_alb[0].cloudfront_hosted_zone_id
+  } : null
+}
+
+# Backup and Security Information
+output "backup_configuration" {
+  description = "Backup configuration for this environment"
+  value = {
+    database_backup_retention = var.database_backup_retention
+    s3_versioning_enabled    = var.enable_s3_versioning
+    s3_lifecycle_enabled     = var.s3_lifecycle_enabled
+    deletion_protection      = var.enable_deletion_protection
+  }
+}
+
+# Deployment Information
+output "deployment_info" {
+  description = "Information for deployment scripts and CI/CD"
+  value = {
+    environment           = var.environment
+    terraform_workspace   = terraform.workspace
+    aws_region           = data.aws_region.current.name
+    aws_account_id       = data.aws_caller_identity.current.account_id
+    database_endpoint    = module.database.database_endpoint
+    s3_bucket_name      = module.s3_buckets.app_storage_bucket_name
+    ecr_repository_url  = module.ecr_repo.repository_url
+    load_balancer_dns   = var.app_environment != "dev" ? module.example_alb[0].alb_dns_name : null
+  }
+  sensitive = false
+}
+
+# Resource Identifiers
+output "resource_identifiers" {
+  description = "Important resource identifiers for reference"
+  value = {
+    database_identifier    = module.database.database_identifier
+    app_storage_bucket_id  = module.s3_buckets.app_storage_bucket_id
+    logs_bucket_id         = module.s3_buckets.logs_bucket_id
+    ecr_repository_name    = module.ecr_repo.repository_name
+    asg_name              = module.ec2.asg_name
+  }
+}
