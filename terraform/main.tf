@@ -155,7 +155,87 @@ resource "aws_db_subnet_group" "main" {
   }
 }
 
-# Note: Using default security group for dev environment to avoid permission issues
+# Security Group for EC2 (allow HTTP and SSH)
+resource "aws_security_group" "dev_ec2" {
+  name_prefix = "turtil-backend-dev-ec2-"
+  vpc_id      = data.aws_vpc.default.id
+  description = "Security group for dev EC2 instance"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTP traffic"
+  }
+
+  ingress {
+    from_port   = 8000
+    to_port     = 8000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "FastAPI application (direct access)"
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "SSH access"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "All outbound traffic"
+  }
+
+  tags = {
+    Name        = "turtil-backend-dev-ec2-sg"
+    Environment = "dev"
+    Project     = "turtil-backend"
+  }
+}
+
+# EC2 Instance for the application
+resource "aws_instance" "dev_app" {
+  ami           = "ami-0dee22c13ea7a9a67" # Amazon Linux 2023 ARM64
+  instance_type = "t4g.micro"
+  
+  vpc_security_group_ids = [aws_security_group.dev_ec2.id]
+  
+  user_data = base64encode(templatefile("${path.module}/user_data.sh", {
+    ecr_repository_url = aws_ecr_repository.dev_app.repository_url
+    aws_region        = "ap-south-1"
+    environment       = "dev"
+  }))
+  
+  tags = {
+    Name        = "turtil-backend-dev"
+    Environment = "dev"
+    Project     = "turtil-backend"
+  }
+}
+
+# Route 53 Hosted Zone (assuming turtil.co exists)
+data "aws_route53_zone" "main" {
+  name         = "turtil.co"
+  private_zone = false
+}
+
+# Route 53 A Record for dev.api.turtil.co
+resource "aws_route53_record" "dev_api" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "dev.api.turtil.co"
+  type    = "A"
+  ttl     = 300
+  records = [aws_instance.dev_app.public_ip]
+  
+  depends_on = [aws_instance.dev_app]
+}
 
 # Outputs
 output "database_url" {
@@ -182,6 +262,38 @@ output "ecr_repository_url" {
 output "aws_account_id" {
   description = "AWS Account ID"
   value       = data.aws_caller_identity.current.account_id
+}
+
+output "ec2_instance_id" {
+  description = "EC2 instance ID"
+  value       = aws_instance.dev_app.id
+}
+
+output "ec2_public_ip" {
+  description = "EC2 instance public IP"
+  value       = aws_instance.dev_app.public_ip
+}
+
+output "dev_api_url" {
+  description = "Development API URL"
+  value       = "http://dev.api.turtil.co"
+}
+
+output "route53_record" {
+  description = "Route 53 record for dev API"
+  value       = aws_route53_record.dev_api.fqdn
+}
+
+output "dev_instance_info" {
+  description = "Development instance information"
+  value = {
+    instance_id = aws_instance.dev_app.id
+    public_ip   = aws_instance.dev_app.public_ip
+    api_url     = "http://dev.api.turtil.co"
+    health_url  = "http://dev.api.turtil.co/health"
+    docs_url    = "http://dev.api.turtil.co/docs"
+    direct_url  = "http://${aws_instance.dev_app.public_ip}:8000"
+  }
 }
 
 data "aws_caller_identity" "current" {}

@@ -48,28 +48,48 @@ jobs:
         working-directory: ./terraform
         run: terraform plan -var-file="environments/dev.tfvars" -out=tfplan
         env:
-          TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
+          # Project Configuration
+          TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
+          TF_VAR_app_version: ${{ secrets.VERSION }}
+          TF_VAR_app_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_app_debug: ${{ secrets.DEBUG }}
+          TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
+          
+          # Security & Authentication
           TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
           TF_VAR_app_algorithm: ${{ secrets.ALGORITHM }}
           TF_VAR_app_access_token_expire_minutes: ${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
-          TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
-          TF_VAR_app_version: ${{ secrets.VERSION }}
-          TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
+          TF_VAR_app_refresh_token_expire_minutes: ${{ secrets.REFRESH_TOKEN_EXPIRE_MINUTES }}
+          
+          # OTP Configuration
+          TF_VAR_app_otp_expiry_minutes: ${{ secrets.OTP_EXPIRY_MINUTES }}
+          TF_VAR_app_otp_max_attempts: ${{ secrets.OTP_MAX_ATTEMPTS }}
+          TF_VAR_app_dev_otp: ${{ secrets.DEV_OTP }}
+          
+          # Application Settings
+          TF_VAR_app_cors_origins: ${{ secrets.CORS_ORIGINS }}
+          TF_VAR_app_allowed_hosts: ${{ secrets.ALLOWED_HOSTS }}
           TF_VAR_app_rate_limit_calls: ${{ secrets.RATE_LIMIT_CALLS }}
           TF_VAR_app_rate_limit_period: ${{ secrets.RATE_LIMIT_PERIOD }}
-          TF_VAR_app_otp_expiry_minutes: ${{ secrets.OTP_EXPIRY_MINUTES }}
-          TF_VAR_app_redis_user_cache_ttl: ${{ secrets.REDIS_USER_CACHE_TTL }}
-          TF_VAR_app_redis_blacklist_ttl: ${{ secrets.REDIS_BLACKLIST_TTL }}
-          TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          TF_VAR_project_name: ${{ secrets.PROJECT_NAME }}
+          
+          # Database & Cache
+          TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
           TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
           TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
+          TF_VAR_app_redis_user_cache_ttl: ${{ secrets.REDIS_USER_CACHE_TTL }}
+          TF_VAR_app_redis_blacklist_ttl: ${{ secrets.REDIS_BLACKLIST_TTL }}
+          
+          # AWS Services
+          TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_app_aws_region: ${{ secrets.AWS_REGION }}
           TF_VAR_app_aws_ses_from_email: ${{ secrets.AWS_SES_FROM_EMAIL }}
           TF_VAR_app_aws_ses_region: ${{ secrets.AWS_SES_REGION }}
           TF_VAR_ecr_account_id: ${{ secrets.ECR_ACCOUNT_ID }}
-          TF_VAR_app_environment: ${{ env.ENVIRONMENT }}
-          TF_VAR_app_debug: "true"
+          TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          
+          # Legacy compatibility
+          TF_VAR_project_name: ${{ secrets.PROJECT_NAME }}
 
       - name: Import Existing Resources
         working-directory: ./terraform
@@ -129,18 +149,27 @@ jobs:
         working-directory: ./terraform
         run: |
           echo "Verifying development deployment..."
-          INSTANCE_IP=$(terraform output -raw dev_instance_info | jq -r '.public_ip')
-          HEALTH_ENDPOINT="http://$INSTANCE_IP:8000/health"
+          API_URL=$(terraform output -raw dev_api_url)
+          HEALTH_ENDPOINT="${API_URL}/health"
           
-          echo "Testing development instance health endpoint: $HEALTH_ENDPOINT"
-          sleep 120  # Allow more time for instance startup
+          echo "Testing development API health endpoint: $HEALTH_ENDPOINT"
+          sleep 180  # Allow more time for nginx + FastAPI startup
           
-          if curl -f --max-time 30 --retry 10 --retry-delay 15 "$HEALTH_ENDPOINT"; then
+          if curl -f --max-time 30 --retry 15 --retry-delay 20 "$HEALTH_ENDPOINT"; then
             echo "✅ Development deployment verification successful!"
-            echo "🔗 Access your application at: http://$INSTANCE_IP:8000"
+            echo "🔗 API URL: $API_URL"
+            echo "📚 API Docs: ${API_URL}/docs"
+            echo "💚 Health Check: $HEALTH_ENDPOINT"
           else
             echo "❌ Development deployment verification failed!"
-            echo "Instance IP: $INSTANCE_IP"
+            echo "Attempting fallback to direct IP..."
+            INSTANCE_IP=$(terraform output -raw ec2_public_ip)
+            FALLBACK_URL="http://$INSTANCE_IP:8000/health"
+            echo "Trying direct access: $FALLBACK_URL"
+            if curl -f --max-time 30 --retry 5 --retry-delay 10 "$FALLBACK_URL"; then
+              echo "⚠️ Direct IP access works, but domain routing failed"
+              echo "Check Route 53 DNS propagation for dev.api.turtil.co"
+            fi
             exit 1
           fi
 
