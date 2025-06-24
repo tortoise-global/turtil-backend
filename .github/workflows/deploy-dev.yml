@@ -169,6 +169,19 @@ jobs:
             terraform import aws_db_instance.dev_database "$DB_INSTANCE_NAME" || echo "⚠️ RDS database import failed or already imported"
           fi
           
+          # Import IAM resources if they exist
+          IAM_ROLE_NAME="${{ secrets.PROJECT_NAME }}-dev-ec2-role"
+          if aws iam get-role --role-name "$IAM_ROLE_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            echo "✅ IAM role exists, importing..."
+            terraform import aws_iam_role.dev_ec2_role "$IAM_ROLE_NAME" || echo "⚠️ IAM role import failed or already imported"
+          fi
+          
+          IAM_PROFILE_NAME="${{ secrets.PROJECT_NAME }}-dev-ec2-profile"
+          if aws iam get-instance-profile --instance-profile-name "$IAM_PROFILE_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            echo "✅ IAM instance profile exists, importing..."
+            terraform import aws_iam_instance_profile.dev_ec2_profile "$IAM_PROFILE_NAME" || echo "⚠️ IAM instance profile import failed or already imported"
+          fi
+          
           # Skip ALB import for development environment (no ALB in dev)
           echo "⚠️ Skipping ALB import for development environment (no load balancer)"
           

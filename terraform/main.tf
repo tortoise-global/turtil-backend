@@ -200,12 +200,71 @@ resource "aws_security_group" "dev_ec2" {
   }
 }
 
+# IAM Role for EC2 instance
+resource "aws_iam_role" "dev_ec2_role" {
+  name = "turtil-backend-dev-ec2-role"
+  
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+  
+  tags = {
+    Name        = "turtil-backend-dev-ec2-role"
+    Environment = "dev"
+    Project     = "turtil-backend"
+  }
+}
+
+# IAM Policy for ECR access
+resource "aws_iam_role_policy" "dev_ec2_ecr_policy" {
+  name = "turtil-backend-dev-ecr-policy"
+  role = aws_iam_role.dev_ec2_role.id
+  
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# IAM Instance Profile
+resource "aws_iam_instance_profile" "dev_ec2_profile" {
+  name = "turtil-backend-dev-ec2-profile"
+  role = aws_iam_role.dev_ec2_role.name
+  
+  tags = {
+    Name        = "turtil-backend-dev-ec2-profile"
+    Environment = "dev"
+    Project     = "turtil-backend"
+  }
+}
+
 # EC2 Instance for the application
 resource "aws_instance" "dev_app" {
   ami           = "ami-02f607855bfce66b6" # Ubuntu 24.04 LTS ARM64
   instance_type = "t4g.micro"
   
   vpc_security_group_ids = [aws_security_group.dev_ec2.id]
+  iam_instance_profile   = aws_iam_instance_profile.dev_ec2_profile.name
   
   user_data = base64encode(templatefile("${path.module}/user_data.sh", {
     ecr_repository_url = aws_ecr_repository.dev_app.repository_url
