@@ -42,6 +42,9 @@ echo ""
 print_info "Loading environment variables from .env.$ENVIRONMENT..."
 source ./scripts/loadenv.sh "$ENVIRONMENT"
 
+# Determine which tfvars file to use
+TFVARS_FILE="environments/${ENVIRONMENT}.tfvars"
+
 # Switch to the correct workspace
 CURRENT_WORKSPACE=$(terraform workspace show)
 if [ "$CURRENT_WORKSPACE" != "$ENVIRONMENT" ]; then
@@ -50,8 +53,11 @@ if [ "$CURRENT_WORKSPACE" != "$ENVIRONMENT" ]; then
     terraform workspace select "$ENVIRONMENT" || terraform workspace new "$ENVIRONMENT"
 fi
 
-# Determine which tfvars file to use
-TFVARS_FILE="environments/${ENVIRONMENT}.tfvars"
+# Sync state with remote backend
+print_info "Syncing Terraform state with remote backend..."
+terraform refresh -var-file="$TFVARS_FILE" || {
+    print_warning "State refresh failed, continuing with plan..."
+}
 
 if [ ! -f "$TFVARS_FILE" ]; then
     print_error "$TFVARS_FILE not found!"

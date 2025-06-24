@@ -50,6 +50,12 @@ if [ "$CURRENT_WORKSPACE" != "$ENVIRONMENT" ]; then
     terraform workspace select "$ENVIRONMENT" || terraform workspace new "$ENVIRONMENT"
 fi
 
+# Sync state with remote backend before applying
+print_info "Syncing Terraform state with remote backend..."
+terraform refresh -var-file="environments/$ENVIRONMENT.tfvars" || {
+    print_warning "State refresh failed, continuing with apply..."
+}
+
 # Check if plan file exists
 PLAN_FILE="tfplan-$ENVIRONMENT"
 if [ ! -f "$PLAN_FILE" ]; then
