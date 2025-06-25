@@ -5,19 +5,10 @@ on:
     branches:
       - dev
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - prod
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
-  ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+  ENVIRONMENT: 'dev'
 
 jobs:
   build-and-deploy:
