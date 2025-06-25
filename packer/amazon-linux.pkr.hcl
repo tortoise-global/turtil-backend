@@ -79,7 +79,7 @@ build {
   provisioner "shell" {
     inline = [
       "sudo dnf update -y",
-      "sudo dnf install -y git curl wget unzip"
+      "sudo dnf install -y git wget unzip --allowerasing"
     ]
   }
 

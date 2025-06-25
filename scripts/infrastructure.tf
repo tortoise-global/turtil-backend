@@ -103,6 +103,12 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+# Get the Route53 hosted zone for turtil.co
+data "aws_route53_zone" "main" {
+  name         = "turtil.co"
+  private_zone = false
+}
+
 # Get default VPC
 data "aws_vpc" "default" {
   default = true
@@ -314,6 +320,32 @@ resource "aws_lb_listener" "main" {
   }
 }
 
+# Route53 record for dev.api.turtil.com
+resource "aws_route53_record" "dev_api" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "dev.api.turtil.co"
+  type    = "CNAME"
+  ttl     = 300
+  records = [aws_lb.main.dns_name]
+}
+
+# ALB listener rule for dev subdomain
+resource "aws_lb_listener_rule" "dev_api" {
+  listener_arn = aws_lb_listener.main.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.main.arn
+  }
+
+  condition {
+    host_header {
+      values = ["dev.api.turtil.co"]
+    }
+  }
+}
+
 # Launch Template
 resource "aws_launch_template" "main" {
   name_prefix   = "${var.project_name}-lt"
@@ -420,8 +452,8 @@ resource "aws_autoscaling_group" "main" {
   health_check_grace_period = 300
 
   min_size         = 1
-  max_size         = 6
-  desired_capacity = 2
+  max_size         = 4
+  desired_capacity = 1
 
   launch_template {
     id      = aws_launch_template.main.id
@@ -484,6 +516,11 @@ output "secret_key" {
   sensitive   = true
 }
 
+output "dev_api_url" {
+  description = "Dev API URL"
+  value       = "http://dev.api.turtil.co"
+}
+
 # Environment configuration template
 locals {
   env_config = {
@@ -495,6 +532,7 @@ locals {
     PORT            = "8000"
     
     DATABASE_URL    = "postgresql+asyncpg://${var.db_username}:${random_password.db_password.result}@${aws_db_instance.main.endpoint}:5432/${var.db_name}"
+    SECRET_KEY      = random_password.secret_key.result
     
     ALGORITHM                       = "HS256"
     CMS_ACCESS_TOKEN_EXPIRE_MINUTES = "30"
@@ -515,6 +553,11 @@ locals {
     AWS_SES_REGION      = var.aws_region
     
     S3_BUCKET_NAME = aws_s3_bucket.uploads.bucket
+    
+    # Infrastructure variables for GitHub Actions
+    LAUNCH_TEMPLATE_ID        = aws_launch_template.main.id
+    AUTO_SCALING_GROUP_NAME   = aws_autoscaling_group.main.name
+    LOAD_BALANCER_DNS         = aws_lb.main.dns_name
   }
 }
 
