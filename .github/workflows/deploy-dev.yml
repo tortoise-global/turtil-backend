@@ -163,7 +163,7 @@ jobs:
           # Legacy compatibility
           TF_VAR_project_name: ${{ secrets.PROJECT_NAME }}
 
-      - name: Import Existing Resources
+      - name: Remove Conflicting Resources
         working-directory: ./terraform
         continue-on-error: true
         env:
@@ -212,93 +212,41 @@ jobs:
           # Legacy compatibility
           TF_VAR_project_name: ${{ secrets.PROJECT_NAME }}
         run: |
-          echo "🔍 Comprehensive import of existing AWS resources..."
+          echo "🗑️ Removing conflicting AWS resources for clean deployment..."
           
-          # Import ECR repository
-          ECR_REPO_NAME="${{ secrets.PROJECT_NAME }}-dev"
-          if aws ecr describe-repositories --repository-names "$ECR_REPO_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
-            echo "✅ ECR repository exists, importing..."
-            terraform import module.ecr.aws_ecr_repository.main "$ECR_REPO_NAME" || echo "⚠️ ECR import failed or already imported"
-          fi
-          
-          # Import VPC and subnets
-          VPC_NAME="${{ secrets.PROJECT_NAME }}-dev"
-          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=$VPC_NAME" --query 'Vpcs[0].VpcId' --output text --region ${{ env.AWS_REGION }} 2>/dev/null || echo "null")
-          if [ "$VPC_ID" != "null" ] && [ "$VPC_ID" != "None" ]; then
-            echo "✅ VPC exists, importing..."
-            terraform import module.vpc.aws_vpc.main "$VPC_ID" || echo "⚠️ VPC import failed or already imported"
-          fi
-          
-          # Import RDS instance
-          DB_INSTANCE_NAME="${{ secrets.PROJECT_NAME }}-dev"
-          if aws rds describe-db-instances --db-instance-identifier "$DB_INSTANCE_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
-            echo "✅ RDS database exists, importing..."
-            terraform import module.rds.aws_db_instance.main "$DB_INSTANCE_NAME" || echo "⚠️ RDS import failed or already imported"
-          fi
-          
-          # Import S3 bucket
-          S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}"
-          if aws s3api head-bucket --bucket "$S3_BUCKET_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
-            echo "✅ S3 bucket exists, importing..."
-            terraform import module.s3_storage.aws_s3_bucket.main "$S3_BUCKET_NAME" || echo "⚠️ S3 import failed or already imported"
-          fi
-          
-          # Import EC2 instance
-          INSTANCE_NAME="${{ secrets.PROJECT_NAME }}-dev"
-          INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=$INSTANCE_NAME" "Name=instance-state-name,Values=running,pending,stopped" --query 'Reservations[0].Instances[0].InstanceId' --output text --region ${{ env.AWS_REGION }} 2>/dev/null || echo "null")
-          if [ "$INSTANCE_ID" != "null" ] && [ "$INSTANCE_ID" != "None" ]; then
-            echo "✅ EC2 instance exists, importing..."
-            terraform import module.ec2.aws_instance.main "$INSTANCE_ID" || echo "⚠️ EC2 import failed or already imported"
-          fi
-          
-          # Import IAM role and instance profile
+          # Remove IAM role policies first (dependencies)
           IAM_ROLE_NAME="${{ secrets.PROJECT_NAME }}-dev-ec2-role"
-          if aws iam get-role --role-name "$IAM_ROLE_NAME" > /dev/null 2>&1; then
-            echo "✅ IAM role exists, importing..."
-            terraform import module.iam.aws_iam_role.ec2_role "$IAM_ROLE_NAME" || echo "⚠️ IAM role import failed or already imported"
-          fi
+          echo "Removing IAM role policies..."
+          aws iam delete-role-policy --role-name "$IAM_ROLE_NAME" --policy-name "${{ secrets.PROJECT_NAME }}-dev-ecr-policy" 2>/dev/null || echo "ECR policy not found or already deleted"
+          aws iam delete-role-policy --role-name "$IAM_ROLE_NAME" --policy-name "${{ secrets.PROJECT_NAME }}-dev-s3-policy" 2>/dev/null || echo "S3 policy not found or already deleted"
+          aws iam delete-role-policy --role-name "$IAM_ROLE_NAME" --policy-name "${{ secrets.PROJECT_NAME }}-dev-ses-policy" 2>/dev/null || echo "SES policy not found or already deleted"
+          aws iam delete-role-policy --role-name "$IAM_ROLE_NAME" --policy-name "${{ secrets.PROJECT_NAME }}-dev-cloudwatch-policy" 2>/dev/null || echo "CloudWatch policy not found or already deleted"
           
+          # Remove IAM instance profile
           IAM_PROFILE_NAME="${{ secrets.PROJECT_NAME }}-dev-ec2-profile"
-          if aws iam get-instance-profile --instance-profile-name "$IAM_PROFILE_NAME" > /dev/null 2>&1; then
-            echo "✅ IAM instance profile exists, importing..."
-            terraform import module.iam.aws_iam_instance_profile.ec2_profile "$IAM_PROFILE_NAME" || echo "⚠️ IAM instance profile import failed or already imported"
+          echo "Removing IAM instance profile..."
+          aws iam remove-role-from-instance-profile --instance-profile-name "$IAM_PROFILE_NAME" --role-name "$IAM_ROLE_NAME" 2>/dev/null || echo "Role not attached or already removed"
+          aws iam delete-instance-profile --instance-profile-name "$IAM_PROFILE_NAME" 2>/dev/null || echo "Instance profile not found or already deleted"
+          
+          # Remove IAM role
+          echo "Removing IAM role..."
+          aws iam delete-role --role-name "$IAM_ROLE_NAME" 2>/dev/null || echo "IAM role not found or already deleted"
+          
+          # Remove DB subnet groups
+          echo "Removing DB subnet groups..."
+          aws rds delete-db-subnet-group --db-subnet-group-name "${{ secrets.PROJECT_NAME }}-dev-private-db-subnet-group" --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Private DB subnet group not found or already deleted"
+          aws rds delete-db-subnet-group --db-subnet-group-name "${{ secrets.PROJECT_NAME }}-dev-public-db-subnet-group" --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Public DB subnet group not found or already deleted"
+          
+          # Import ECR repository to preserve Docker images
+          ECR_REPO_NAME="${{ secrets.PROJECT_NAME }}-dev"
+          echo "Importing ECR repository to preserve images..."
+          if aws ecr describe-repositories --repository-names "$ECR_REPO_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            terraform import module.ecr.aws_ecr_repository.main "$ECR_REPO_NAME" 2>/dev/null || echo "ECR repository import failed or already imported"
           fi
           
-          # Import DB Subnet Groups
-          DB_SUBNET_GROUP_PRIVATE="${{ secrets.PROJECT_NAME }}-dev-private-db-subnet-group"
-          if aws rds describe-db-subnet-groups --db-subnet-group-name "$DB_SUBNET_GROUP_PRIVATE" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
-            echo "✅ Private DB subnet group exists, importing..."
-            terraform import module.vpc.aws_db_subnet_group.private "$DB_SUBNET_GROUP_PRIVATE" || echo "⚠️ Private DB subnet group import failed or already imported"
-          fi
-          
-          DB_SUBNET_GROUP_PUBLIC="${{ secrets.PROJECT_NAME }}-dev-public-db-subnet-group"
-          if aws rds describe-db-subnet-groups --db-subnet-group-name "$DB_SUBNET_GROUP_PUBLIC" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
-            echo "✅ Public DB subnet group exists, importing..."
-            terraform import module.vpc.aws_db_subnet_group.public "$DB_SUBNET_GROUP_PUBLIC" || echo "⚠️ Public DB subnet group import failed or already imported"
-          fi
-          
-          # Import IAM policies
-          IAM_ROLE_NAME="${{ secrets.PROJECT_NAME }}-dev-ec2-role"
-          if aws iam get-role-policy --role-name "$IAM_ROLE_NAME" --policy-name "${{ secrets.PROJECT_NAME }}-dev-ecr-policy" > /dev/null 2>&1; then
-            echo "✅ IAM ECR policy exists, importing..."
-            terraform import module.iam.aws_iam_role_policy.ecr_policy "$IAM_ROLE_NAME:${{ secrets.PROJECT_NAME }}-dev-ecr-policy" || echo "⚠️ IAM ECR policy import failed or already imported"
-          fi
-          
-          if aws iam get-role-policy --role-name "$IAM_ROLE_NAME" --policy-name "${{ secrets.PROJECT_NAME }}-dev-s3-policy" > /dev/null 2>&1; then
-            echo "✅ IAM S3 policy exists, importing..."
-            terraform import module.iam.aws_iam_role_policy.s3_policy "$IAM_ROLE_NAME:${{ secrets.PROJECT_NAME }}-dev-s3-policy" || echo "⚠️ IAM S3 policy import failed or already imported"
-          fi
-          
-          # Import Route53 record
-          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "turtil.co" --query 'HostedZones[0].Id' --output text --region ${{ env.AWS_REGION }} 2>/dev/null | cut -d'/' -f3 || echo "null")
-          if [ "$HOSTED_ZONE_ID" != "null" ] && [ "$HOSTED_ZONE_ID" != "None" ]; then
-            echo "✅ Route53 hosted zone found, importing dev record..."
-            terraform import aws_route53_record.dev_api "${HOSTED_ZONE_ID}_dev.api.turtil.co_A" || echo "⚠️ Route53 record import failed or already imported"
-          fi
-          
-          echo "🔧 Comprehensive import phase completed"
+          echo "✅ Conflicting resource cleanup completed"
 
-      - name: Regenerate Terraform Plan After Imports
+      - name: Regenerate Terraform Plan After Cleanup
         working-directory: ./terraform
         run: terraform plan -out=tfplan
         env:
