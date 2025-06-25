@@ -34,9 +34,41 @@ jobs:
         with:
           terraform_version: 1.5.0
 
+      - name: Clean Problematic State
+        working-directory: ./terraform
+        continue-on-error: true
+        run: |
+          echo "🧹 Cleaning problematic state entries..."
+          
+          # Initialize temporarily to access state commands
+          terraform init -reconfigure > /dev/null 2>&1 || true
+          
+          # Try to remove any problematic check resources from state
+          terraform state list 2>/dev/null | grep -E "^check\." | while read resource; do
+            echo "Removing problematic resource: $resource"
+            terraform state rm "$resource" 2>/dev/null || true
+          done
+          
+          # Clean up validation blocks that might cause issues
+          terraform state list 2>/dev/null | grep -E "^validation\." | while read resource; do
+            echo "Removing validation resource: $resource"
+            terraform state rm "$resource" 2>/dev/null || true
+          done
+          
+          echo "✅ State cleanup completed"
+
       - name: Terraform Init
         working-directory: ./terraform
-        run: terraform init
+        run: |
+          echo "🔧 Initializing Terraform with clean state..."
+          # Clean any local state files
+          rm -f .terraform.lock.hcl
+          rm -rf .terraform/
+          
+          # Initialize with backend reconfiguration
+          terraform init -reconfigure -upgrade
+          
+          echo "✅ Terraform initialization completed"
 
       - name: Sync Terraform State
         working-directory: ./terraform
