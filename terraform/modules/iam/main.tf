@@ -50,8 +50,6 @@ resource "aws_iam_role_policy" "ecr_policy" {
 
 # IAM Policy for S3 access
 resource "aws_iam_role_policy" "s3_policy" {
-  count = var.s3_bucket_arn != null ? 1 : 0
-  
   name = "${var.project_name}-${var.environment}-s3-policy"
   role = aws_iam_role.ec2_role.id
   
