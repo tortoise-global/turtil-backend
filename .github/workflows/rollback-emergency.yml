@@ -1,0 +1,268 @@
+name: Emergency Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_commit:
+        description: 'Commit SHA to rollback to (leave empty to rollback to previous deployment)'
+        required: false
+        type: string
+      confirm_rollback:
+        description: 'Type CONFIRM to proceed with rollback'
+        required: true
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ap-south-1
+
+jobs:
+  validate-rollback:
+    name: Validate Rollback Request
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      target_sha: ${{ steps.determine-target.outputs.target_sha }}
+      proceed: ${{ steps.validate.outputs.proceed }}
+    
+    steps:
+      - name: 🔍 Validate Rollback Confirmation
+        id: validate
+        run: |
+          if [ "${{ github.event.inputs.confirm_rollback }}" != "CONFIRM" ]; then
+            echo "❌ Rollback not confirmed. Must type CONFIRM exactly."
+            exit 1
+          fi
+          echo "✅ Rollback confirmed"
+          echo "proceed=true" >> $GITHUB_OUTPUT
+
+      - name: 📦 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
+
+      - name: 🎯 Determine Target Commit
+        id: determine-target
+        run: |
+          if [ -n "${{ github.event.inputs.target_commit }}" ]; then
+            TARGET_SHA="${{ github.event.inputs.target_commit }}"
+            echo "🎯 Using specified commit: $TARGET_SHA"
+          else
+            # Get the commit before the current HEAD
+            TARGET_SHA=$(git rev-parse HEAD~1)
+            echo "🎯 Using previous commit: $TARGET_SHA"
+          fi
+          
+          # Validate commit exists
+          if ! git cat-file -e "$TARGET_SHA"; then
+            echo "❌ Commit $TARGET_SHA does not exist"
+            exit 1
+          fi
+          
+          echo "✅ Target commit validated: $TARGET_SHA"
+          echo "target_sha=$TARGET_SHA" >> $GITHUB_OUTPUT
+
+  emergency-rollback:
+    name: Execute Emergency Rollback
+    runs-on: ubuntu-latest
+    environment: dev
+    needs: validate-rollback
+    if: needs.validate-rollback.outputs.proceed == 'true'
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📦 Checkout Target Commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-rollback.outputs.target_sha }}
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🚨 Rollback Notification
+        run: |
+          echo "========================================"
+          echo "🚨 EMERGENCY ROLLBACK IN PROGRESS"
+          echo "========================================"
+          echo "Target Commit: ${{ needs.validate-rollback.outputs.target_sha }}"
+          echo "Reason: ${{ github.event.inputs.reason }}"
+          echo "Initiated by: ${{ github.actor }}"
+          echo "Timestamp: $(date -u)"
+          echo "========================================"
+
+      - name: 🛑 Stop Current Application
+        run: |
+          echo "🛑 Stopping current application..."
+          
+          # Get current instance ID
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${{ secrets.PROJECT_NAME }}-dev" \
+                     "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text --region ${{ env.AWS_REGION }})
+          
+          if [ "$INSTANCE_ID" != "None" ] && [ "$INSTANCE_ID" != "null" ]; then
+            echo "📍 Found instance: $INSTANCE_ID"
+            
+            # Stop application service
+            aws ssm send-command \
+              --instance-ids $INSTANCE_ID \
+              --document-name "AWS-RunShellScript" \
+              --parameters 'commands=["sudo systemctl stop turtil-backend"]' \
+              --region ${{ env.AWS_REGION }} || echo "⚠️ Failed to stop service"
+            
+            echo "✅ Application stopped"
+          else
+            echo "⚠️ No running instance found"
+          fi
+
+      - name: 🐳 Build and Deploy Rollback Image
+        run: |
+          echo "🏗️ Building rollback Docker image..."
+          
+          # Login to ECR
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            docker login --username AWS --password-stdin ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          
+          ECR_REPO_NAME="${{ secrets.PROJECT_NAME }}-dev"
+          ECR_REGISTRY="${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          ROLLBACK_TAG="rollback-$(date +%Y%m%d-%H%M%S)"
+          
+          # Build rollback image
+          docker build --platform linux/arm64 -t $ECR_REPO_NAME:$ROLLBACK_TAG .
+          
+          # Tag and push
+          docker tag $ECR_REPO_NAME:$ROLLBACK_TAG $ECR_REGISTRY/$ECR_REPO_NAME:$ROLLBACK_TAG
+          docker tag $ECR_REPO_NAME:$ROLLBACK_TAG $ECR_REGISTRY/$ECR_REPO_NAME:latest
+          
+          docker push $ECR_REGISTRY/$ECR_REPO_NAME:$ROLLBACK_TAG
+          docker push $ECR_REGISTRY/$ECR_REPO_NAME:latest
+          
+          echo "✅ Rollback image deployed with tag: $ROLLBACK_TAG"
+
+      - name: 🔄 Restart Application with Rollback
+        run: |
+          echo "🔄 Restarting application with rollback version..."
+          
+          # Get instance ID
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${{ secrets.PROJECT_NAME }}-dev" \
+                     "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text --region ${{ env.AWS_REGION }})
+          
+          if [ "$INSTANCE_ID" != "None" ] && [ "$INSTANCE_ID" != "null" ]; then
+            # Restart application service
+            aws ssm send-command \
+              --instance-ids $INSTANCE_ID \
+              --document-name "AWS-RunShellScript" \
+              --parameters 'commands=[
+                "sudo docker pull ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ secrets.PROJECT_NAME }}-dev:latest",
+                "sudo systemctl restart turtil-backend",
+                "sudo systemctl status turtil-backend"
+              ]' \
+              --region ${{ env.AWS_REGION }} \
+              --output json > /tmp/restart_command.json
+            
+            # Wait for restart to complete
+            COMMAND_ID=$(cat /tmp/restart_command.json | jq -r '.Command.CommandId')
+            aws ssm wait command-executed \
+              --command-id $COMMAND_ID \
+              --instance-id $INSTANCE_ID \
+              --region ${{ env.AWS_REGION }}
+            
+            echo "✅ Application restarted with rollback version"
+          else
+            echo "❌ No instance found for restart"
+            exit 1
+          fi
+
+      - name: 🏥 Verify Rollback Health
+        timeout-minutes: 5
+        run: |
+          echo "🏥 Verifying rollback health..."
+          
+          # Get instance IP
+          INSTANCE_IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${{ secrets.PROJECT_NAME }}-dev" \
+                     "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text --region ${{ env.AWS_REGION }})
+          
+          HEALTH_URL="http://$INSTANCE_IP:8000/health"
+          
+          # Wait for application to start
+          echo "⏳ Waiting for application startup (30 seconds)..."
+          sleep 30
+          
+          # Health check with retries
+          for i in {1..10}; do
+            if curl -f -s --max-time 10 "$HEALTH_URL" > /dev/null; then
+              echo "✅ Rollback health check passed (attempt $i/10)"
+              break
+            else
+              echo "⏳ Health check failed, retrying... (attempt $i/10)"
+              if [ $i -eq 10 ]; then
+                echo "❌ Rollback health check failed after 10 attempts"
+                exit 1
+              fi
+              sleep 15
+            fi
+          done
+          
+          echo "🎉 Rollback verification completed successfully"
+
+      - name: 📊 Rollback Summary
+        if: always()
+        run: |
+          echo "========================================"
+          echo "🚨 ROLLBACK SUMMARY"
+          echo "========================================"
+          echo "Target Commit: ${{ needs.validate-rollback.outputs.target_sha }}"
+          echo "Reason: ${{ github.event.inputs.reason }}"
+          echo "Initiated by: ${{ github.actor }}"
+          echo "Completed at: $(date -u)"
+          
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Rollback Status: SUCCESS"
+            echo ""
+            echo "🌐 Application URLs:"
+            
+            INSTANCE_IP=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=${{ secrets.PROJECT_NAME }}-dev" \
+                       "Name=instance-state-name,Values=running" \
+              --query 'Reservations[0].Instances[0].PublicIpAddress' \
+              --output text --region ${{ env.AWS_REGION }})
+            
+            echo "   Health: http://$INSTANCE_IP:8000/health"
+            echo "   API: http://dev.api.turtil.co"
+            echo "   Docs: http://dev.api.turtil.co/docs"
+          else
+            echo "❌ Rollback Status: FAILED"
+            echo ""
+            echo "🎯 Manual intervention required:"
+            echo "1. Check EC2 instance logs"
+            echo "2. Verify Docker container status"
+            echo "3. Consider infrastructure rollback if needed"
+          fi
+          echo "========================================"
+
+      - name: 🚨 Post-Rollback Actions
+        if: success()
+        run: |
+          echo "🚨 Post-rollback actions completed:"
+          echo "1. ✅ Application rolled back to commit ${{ needs.validate-rollback.outputs.target_sha }}"
+          echo "2. ✅ Health checks passed"
+          echo "3. ⚠️  Consider investigating the issue that caused the rollback"
+          echo "4. ⚠️  Update team about the rollback status"
+          echo "5. ⚠️  Plan for fixing the issue and redeploying when ready"
