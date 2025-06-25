@@ -212,6 +212,10 @@ module "ec2" {
     database_url      = module.rds.database_url
     s3_bucket_name    = module.s3_storage.bucket_name
     
+    # Database credentials
+    app_db_username   = var.app_db_username
+    app_db_password   = var.app_db_password
+    
     # Application configuration
     app_secret_key    = var.app_secret_key
     algorithm         = var.app_algorithm

@@ -168,6 +168,8 @@ services:
       - RATE_LIMIT_PERIOD=${rate_limit_period}
       
       # Database & Cache
+      - DB_USERNAME=${app_db_username}
+      - DB_PASSWORD=${app_db_password}
       - DATABASE_URL=${database_url}
       - UPSTASH_REDIS_URL=${upstash_redis_url}
       - UPSTASH_REDIS_TOKEN=${upstash_redis_token}
