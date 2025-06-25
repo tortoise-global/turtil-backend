@@ -168,8 +168,9 @@ resource "aws_db_instance" "dev_database" {
   username = "turtiluser"
   password = "DevPassword123!"
   
-  publicly_accessible = true
+  publicly_accessible    = false
   db_subnet_group_name   = aws_db_subnet_group.main.name
+  vpc_security_group_ids = [aws_security_group.dev_db.id]
   
   backup_retention_period = 7
   backup_window          = "03:00-04:00"
@@ -258,22 +259,117 @@ resource "aws_ecr_lifecycle_policy" "dev_app" {
   })
 }
 
-# Default VPC and Subnets
-data "aws_vpc" "default" {
-  default = true
+# Dedicated VPC for Turtil Backend
+resource "aws_vpc" "main" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Name        = "turtil-backend-vpc"
+    Environment = "dev"
+    Project     = "turtil-backend"
+  }
 }
 
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
+# Internet Gateway
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name        = "turtil-backend-igw"
+    Environment = "dev"
+    Project     = "turtil-backend"
   }
+}
+
+# Public Subnets
+resource "aws_subnet" "public_1" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "ap-south-1a"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name        = "turtil-backend-public-1"
+    Environment = "dev"
+    Project     = "turtil-backend"
+    Type        = "public"
+  }
+}
+
+resource "aws_subnet" "public_2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.2.0/24"
+  availability_zone       = "ap-south-1b"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name        = "turtil-backend-public-2"
+    Environment = "dev"
+    Project     = "turtil-backend"
+    Type        = "public"
+  }
+}
+
+# Private Subnets for Database
+resource "aws_subnet" "private_1" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.10.0/24"
+  availability_zone = "ap-south-1a"
+
+  tags = {
+    Name        = "turtil-backend-private-1"
+    Environment = "dev"
+    Project     = "turtil-backend"
+    Type        = "private"
+  }
+}
+
+resource "aws_subnet" "private_2" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.11.0/24"
+  availability_zone = "ap-south-1b"
+
+  tags = {
+    Name        = "turtil-backend-private-2"
+    Environment = "dev"
+    Project     = "turtil-backend"
+    Type        = "private"
+  }
+}
+
+# Route Table for Public Subnets
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
+
+  tags = {
+    Name        = "turtil-backend-public-rt"
+    Environment = "dev"
+    Project     = "turtil-backend"
+  }
+}
+
+# Route Table Associations
+resource "aws_route_table_association" "public_1" {
+  subnet_id      = aws_subnet.public_1.id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "public_2" {
+  subnet_id      = aws_subnet.public_2.id
+  route_table_id = aws_route_table.public.id
 }
 
 # DB Subnet Group
 resource "aws_db_subnet_group" "main" {
   name       = "turtil-backend-dev-db-subnet-group"
-  subnet_ids = data.aws_subnets.default.ids
+  subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
 
   tags = {
     Name        = "turtil-backend-dev-db-subnet-group"
@@ -284,8 +380,8 @@ resource "aws_db_subnet_group" "main" {
 
 # Security Group for EC2 (allow HTTP and SSH)
 resource "aws_security_group" "dev_ec2" {
-  name_prefix = "turtil-backend-dev-ec2-"
-  vpc_id      = data.aws_vpc.default.id
+  name        = "turtil-backend-dev-ec2"
+  vpc_id      = aws_vpc.main.id
   description = "Security group for dev EC2 instance"
 
   ingress {
@@ -322,6 +418,35 @@ resource "aws_security_group" "dev_ec2" {
 
   tags = {
     Name        = "turtil-backend-dev-ec2-sg"
+    Environment = "dev"
+    Project     = "turtil-backend"
+  }
+}
+
+# Security Group for RDS Database
+resource "aws_security_group" "dev_db" {
+  name        = "turtil-backend-dev-db"
+  vpc_id      = aws_vpc.main.id
+  description = "Security group for RDS database"
+
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.dev_ec2.id]
+    description     = "PostgreSQL access from EC2"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "All outbound traffic"
+  }
+
+  tags = {
+    Name        = "turtil-backend-dev-db-sg"
     Environment = "dev"
     Project     = "turtil-backend"
   }
@@ -389,7 +514,9 @@ resource "aws_iam_instance_profile" "dev_ec2_profile" {
 resource "aws_instance" "dev_app" {
   ami           = var.custom_ami_id
   instance_type = "t4g.micro"
+  key_name      = "turtil-backend"
   
+  subnet_id              = aws_subnet.public_1.id
   vpc_security_group_ids = [aws_security_group.dev_ec2.id]
   iam_instance_profile   = aws_iam_instance_profile.dev_ec2_profile.name
   

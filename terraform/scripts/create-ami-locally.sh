@@ -19,12 +19,12 @@ print_success() { echo -e "${GREEN}✅ $1${NC}"; }
 print_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 print_error() { echo -e "${RED}❌ $1${NC}"; }
 
-# Configuration
+# Configuration (auto-detected from your AWS account)
 BASE_AMI="ami-0eb4445f6c0a650a1"  # Ubuntu Server Pro 24.04 LTS ARM64
 INSTANCE_TYPE="t4g.micro"
-KEY_NAME="your-key-pair-name"  # Update this with your key pair name
-SECURITY_GROUP="sg-0123456789abcdef0"  # Update this with your security group
-SUBNET_ID="subnet-0123456789abcdef0"  # Update this with your subnet
+KEY_NAME="turtil-backend"  # Turtil-backend specific key pair
+SECURITY_GROUP="sg-0a116288db42e7091"  # Turtil-backend AMI creation security group
+SUBNET_ID="subnet-00fe2bd0c30a0efd5"  # Will be updated to use new VPC subnet after terraform apply
 
 AMI_NAME="turtil-backend-docker-ubuntu-24.04-arm64"
 AMI_DESCRIPTION="Ubuntu 24.04 LTS ARM64 with Docker, docker-compose, nginx, and AWS CLI pre-installed for Turtil Backend"
