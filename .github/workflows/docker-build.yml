@@ -1,0 +1,84 @@
+name: Docker Build & Push
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'app/**'
+      - 'Dockerfile'
+      - 'requirements.txt'
+      - '.github/workflows/docker-build.yml'
+
+env:
+  AWS_REGION: ap-south-2
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.build.outputs.image-tag }}
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate Image Tag
+        id: tag
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          SHORT_SHA=${GITHUB_SHA::8}
+          IMAGE_TAG="${BRANCH_NAME}-${SHORT_SHA}-$(date +%s)"
+          echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "Generated tag: $IMAGE_TAG"
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            docker login --username AWS --password-stdin ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+      - name: Build and Push Docker Image
+        id: build
+        run: |
+          ECR_REPOSITORY=${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY_NAME }}
+          IMAGE_TAG=${{ steps.tag.outputs.image-tag }}
+          
+          # Build multi-platform image
+          docker buildx build \
+            --platform linux/arm64 \
+            --push \
+            --tag $ECR_REPOSITORY:$IMAGE_TAG \
+            --tag $ECR_REPOSITORY:latest \
+            .
+          
+          echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "Built and pushed: $ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Image Security Scan
+        continue-on-error: true
+        run: |
+          # Run basic security scan
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v $PWD:/tmp -w /tmp \
+            aquasec/trivy image \
+            --severity HIGH,CRITICAL \
+            --format table \
+            ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY_NAME }}:${{ steps.tag.outputs.image-tag }}
+
+      - name: Update Deployment Tag
+        run: |
+          echo "::notice::Docker image built successfully"
+          echo "::notice::Image tag: ${{ steps.build.outputs.image-tag }}"
+          echo "::notice::ECR Repository: ${{ secrets.ECR_REPOSITORY_NAME }}"
