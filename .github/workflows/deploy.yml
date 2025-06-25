@@ -110,12 +110,11 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push Docker image
-        working-directory: ./turtil-backend
         run: |
           # Get ECR repository URL from terraform output
-          cd ../terraform-files
+          cd terraform-files
           ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)
-          cd ../turtil-backend
+          cd ..
           
           # Build Docker image
           docker build -t $ECR_REPOSITORY_URL:dev .
