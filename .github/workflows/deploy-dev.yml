@@ -61,6 +61,89 @@ jobs:
           
           echo "✅ Terraform initialization completed"
 
+      - name: Create Environment File
+        run: |
+          echo "📄 Creating .env.dev from GitHub secrets..."
+          cat > .env.dev << 'EOF'
+          # ============================================================================
+          # PROJECT CONFIGURATION
+          # ============================================================================
+          
+          PROJECT_NAME=${{ secrets.PROJECT_NAME }}
+          VERSION=${{ secrets.VERSION }}
+          ENVIRONMENT=dev
+          DEBUG=${{ secrets.DEBUG }}
+          LOG_LEVEL=${{ secrets.LOG_LEVEL }}
+          
+          # ============================================================================
+          # SECURITY & AUTHENTICATION
+          # ============================================================================
+          
+          SECRET_KEY=${{ secrets.SECRET_KEY }}
+          ALGORITHM=${{ secrets.ALGORITHM }}
+          ACCESS_TOKEN_EXPIRE_MINUTES=${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          REFRESH_TOKEN_EXPIRE_MINUTES=${{ secrets.REFRESH_TOKEN_EXPIRE_MINUTES }}
+          
+          # OTP Configuration  
+          OTP_EXPIRY_MINUTES=${{ secrets.OTP_EXPIRY_MINUTES }}
+          OTP_MAX_ATTEMPTS=${{ secrets.OTP_MAX_ATTEMPTS }}
+          DEV_OTP=${{ secrets.DEV_OTP }}
+          
+          # ============================================================================
+          # APPLICATION SETTINGS
+          # ============================================================================
+          
+          CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+          ALLOWED_HOSTS=${{ secrets.ALLOWED_HOSTS }}
+          
+          # Rate Limiting
+          RATE_LIMIT_CALLS=${{ secrets.RATE_LIMIT_CALLS }}
+          RATE_LIMIT_PERIOD=${{ secrets.RATE_LIMIT_PERIOD }}
+          
+          # ============================================================================
+          # DATABASE & CACHE
+          # ============================================================================
+          
+          # PostgreSQL Database Credentials
+          DB_USERNAME=${{ secrets.DB_USERNAME }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          
+          # PostgreSQL Database
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          
+          # Redis Cache (Upstash)
+          UPSTASH_REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }}
+          UPSTASH_REDIS_TOKEN=${{ secrets.UPSTASH_REDIS_TOKEN }}
+          REDIS_USER_CACHE_TTL=${{ secrets.REDIS_USER_CACHE_TTL }}
+          REDIS_BLACKLIST_TTL=${{ secrets.REDIS_BLACKLIST_TTL }}
+          
+          # ============================================================================
+          # AWS SERVICES
+          # ============================================================================
+          
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          
+          # AWS SES (Email Service)
+          AWS_SES_FROM_EMAIL=${{ secrets.AWS_SES_FROM_EMAIL }}
+          AWS_SES_REGION=${{ secrets.AWS_SES_REGION }}
+          
+          # AWS ECR (Container Registry)
+          ECR_ACCOUNT_ID=${{ secrets.ECR_ACCOUNT_ID }}
+          
+          # S3 Storage
+          S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+          
+          # Custom AMI Configuration
+          CUSTOM_AMI_ID=${{ secrets.CUSTOM_AMI_ID }}
+          
+          # Server Configuration  
+          PORT=8000
+          EOF
+          
+          echo "✅ Environment file created"
+
       - name: Sync Terraform State
         working-directory: ./terraform
         run: |
