@@ -33,7 +33,7 @@ jobs:
 
     - name: Create environment file for Packer
       run: |
-        cd turtil-backend/packer
+        cd packer
         cat > build.env << EOF
         # Application Configuration
         PROJECT_NAME=${{ vars.PROJECT_NAME || 'turtil-backend' }}
@@ -81,12 +81,12 @@ jobs:
 
     - name: Initialize Packer
       run: |
-        cd turtil-backend/packer
+        cd packer
         packer init .
 
     - name: Validate Packer template
       run: |
-        cd turtil-backend/packer
+        cd packer
         packer validate \
           -var "aws_region=${{ env.AWS_REGION }}" \
           -var "environment=${{ env.ENVIRONMENT }}" \
@@ -97,7 +97,7 @@ jobs:
     - name: Build AMI with Packer
       id: packer-build
       run: |
-        cd turtil-backend/packer
+        cd packer
         # Build AMI and capture the output
         packer build \
           -var "aws_region=${{ env.AWS_REGION }}" \

@@ -94,6 +94,12 @@ build {
     destination = "/tmp/turtil-backend"
   }
 
+  # Copy build environment file
+  provisioner "file" {
+    source      = "build.env"
+    destination = "/tmp/build.env"
+  }
+
   # Setup application
   provisioner "shell" {
     script = "scripts/setup-app.sh"

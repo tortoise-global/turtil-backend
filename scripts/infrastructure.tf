@@ -122,6 +122,12 @@ resource "random_password" "db_password" {
   special = true
 }
 
+# Generate random secret key for JWT
+resource "random_password" "secret_key" {
+  length  = 64
+  special = true
+}
+
 # S3 Bucket for file uploads
 resource "aws_s3_bucket" "uploads" {
   bucket        = var.s3_bucket_name
@@ -469,6 +475,12 @@ output "aws_region" {
 output "database_password" {
   description = "RDS master password"
   value       = random_password.db_password.result
+  sensitive   = true
+}
+
+output "secret_key" {
+  description = "JWT secret key"
+  value       = random_password.secret_key.result
   sensitive   = true
 }
 
