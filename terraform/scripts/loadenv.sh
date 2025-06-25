@@ -9,7 +9,7 @@ set -e
 
 # Get the directory of this script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Determine environment from argument or default to 'dev'
 ENVIRONMENT="${1:-dev}"
@@ -53,6 +53,11 @@ export TF_VAR_app_log_level="$LOG_LEVEL"
 export TF_VAR_app_rate_limit_calls="$RATE_LIMIT_CALLS"
 export TF_VAR_app_rate_limit_period="$RATE_LIMIT_PERIOD"
 export TF_VAR_app_otp_expiry_minutes="$OTP_EXPIRY_MINUTES"
+export TF_VAR_app_otp_max_attempts="$OTP_MAX_ATTEMPTS"
+export TF_VAR_app_dev_otp="$DEV_OTP"
+export TF_VAR_app_cors_origins="$CORS_ORIGINS"
+export TF_VAR_app_allowed_hosts="$ALLOWED_HOSTS"
+export TF_VAR_app_refresh_token_expire_minutes="$REFRESH_TOKEN_EXPIRE_MINUTES"
 export TF_VAR_app_redis_user_cache_ttl="$REDIS_USER_CACHE_TTL"
 export TF_VAR_app_redis_blacklist_ttl="$REDIS_BLACKLIST_TTL"
 export TF_VAR_app_aws_access_key_id="$AWS_ACCESS_KEY_ID"

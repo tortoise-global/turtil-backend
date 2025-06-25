@@ -18,9 +18,9 @@ log "Starting user data script execution..."
 log "Updating system packages..."
 apt update -y
 
-# Install Docker and nginx
-log "Installing Docker, nginx, and unzip..."
-apt install -y docker.io nginx unzip
+# Install Docker, docker-compose, and nginx
+log "Installing Docker, docker-compose, nginx, and unzip..."
+apt install -y docker.io docker-compose nginx unzip curl
 log "Starting and enabling Docker service..."
 systemctl start docker
 systemctl enable docker
@@ -29,7 +29,7 @@ log "Docker installation completed"
 
 # Configure nginx as reverse proxy
 cat > /etc/nginx/nginx.conf << 'EOF'
-user nginx;
+user www-data;
 worker_processes auto;
 error_log /var/log/nginx/error.log;
 pid /run/nginx.pid;
@@ -126,17 +126,75 @@ PORT=8000
 EOF
 chown ubuntu:ubuntu /home/ubuntu/app.env
 
-# Run the container
-log "Starting Docker container..."
-if docker run -d \
-  --name turtil-backend \
-  --restart unless-stopped \
-  -p 8000:8000 \
-  --env-file /home/ubuntu/app.env \
-  ${ecr_repository_url}:latest; then
-    log "Docker container started successfully"
+# Create docker-compose.yml file with all environment variables
+log "Creating docker-compose.yml file..."
+cat > /home/ubuntu/docker-compose.yml << 'EOF'
+version: '3.8'
+
+services:
+  turtil-backend:
+    image: ${ecr_repository_url}:latest
+    container_name: turtil-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Project Configuration
+      - PROJECT_NAME=turtil-backend
+      - VERSION=1.0.0
+      - ENVIRONMENT=${environment}
+      - DEBUG=true
+      - PORT=8000
+      - LOG_LEVEL=INFO
+      
+      # Security & Authentication
+      - SECRET_KEY=${app_secret_key}
+      - ALGORITHM=${algorithm}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${access_token_expire_minutes}
+      - REFRESH_TOKEN_EXPIRE_MINUTES=${refresh_token_expire_minutes}
+      
+      # OTP Configuration
+      - OTP_EXPIRY_MINUTES=${otp_expiry_minutes}
+      - OTP_MAX_ATTEMPTS=${otp_max_attempts}
+      - DEV_OTP=${dev_otp}
+      
+      # Application Settings
+      - CORS_ORIGINS=${cors_origins}
+      - ALLOWED_HOSTS=${allowed_hosts}
+      - RATE_LIMIT_CALLS=${rate_limit_calls}
+      - RATE_LIMIT_PERIOD=${rate_limit_period}
+      
+      # Database & Cache
+      - DATABASE_URL=${database_url}
+      - UPSTASH_REDIS_URL=${upstash_redis_url}
+      - UPSTASH_REDIS_TOKEN=${upstash_redis_token}
+      - REDIS_USER_CACHE_TTL=${redis_user_cache_ttl}
+      - REDIS_BLACKLIST_TTL=${redis_blacklist_ttl}
+      
+      # AWS Services
+      - AWS_ACCESS_KEY_ID=${aws_access_key_id}
+      - AWS_SECRET_ACCESS_KEY=${aws_secret_access_key}
+      - AWS_REGION=${aws_region}
+      - AWS_SES_FROM_EMAIL=${aws_ses_from_email}
+      - AWS_SES_REGION=${aws_region}
+      - S3_BUCKET_NAME=${s3_bucket_name}
+      
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+EOF
+chown ubuntu:ubuntu /home/ubuntu/docker-compose.yml
+
+# Run the container using docker-compose
+log "Starting Docker container with docker-compose..."
+cd /home/ubuntu
+if docker-compose up -d; then
+    log "Docker container started successfully with docker-compose"
 else
-    log "ERROR: Failed to start Docker container"
+    log "ERROR: Failed to start Docker container with docker-compose"
     exit 1
 fi
 

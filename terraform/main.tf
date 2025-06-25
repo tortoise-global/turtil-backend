@@ -21,6 +21,127 @@ provider "aws" {
   region = "ap-south-1"
 }
 
+# Variables for application configuration
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "ap-south-1"
+}
+
+variable "app_environment" {
+  description = "Application environment"
+  type        = string
+  default     = "dev"
+}
+
+variable "app_secret_key" {
+  description = "JWT secret key"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_algorithm" {
+  description = "JWT algorithm"
+  type        = string
+  default     = "HS256"
+}
+
+variable "app_access_token_expire_minutes" {
+  description = "Access token expiry in minutes"
+  type        = number
+  default     = 30
+}
+
+variable "app_refresh_token_expire_minutes" {
+  description = "Refresh token expiry in minutes"
+  type        = number
+  default     = 43200
+}
+
+variable "app_otp_expiry_minutes" {
+  description = "OTP expiry in minutes"
+  type        = number
+  default     = 5
+}
+
+variable "app_otp_max_attempts" {
+  description = "Maximum OTP attempts"
+  type        = number
+  default     = 3
+}
+
+variable "app_dev_otp" {
+  description = "Development OTP code"
+  type        = string
+  default     = "123456"
+}
+
+variable "app_cors_origins" {
+  description = "CORS allowed origins"
+  type        = string
+  default     = "http://localhost:3000,http://127.0.0.1:3000"
+}
+
+variable "app_allowed_hosts" {
+  description = "Allowed hosts"
+  type        = string
+  default     = "localhost,127.0.0.1"
+}
+
+variable "app_rate_limit_calls" {
+  description = "Rate limit calls per period"
+  type        = number
+  default     = 100
+}
+
+variable "app_rate_limit_period" {
+  description = "Rate limit period in seconds"
+  type        = number
+  default     = 60
+}
+
+variable "app_upstash_redis_url" {
+  description = "Upstash Redis URL"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_upstash_redis_token" {
+  description = "Upstash Redis token"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_redis_user_cache_ttl" {
+  description = "Redis user cache TTL in seconds"
+  type        = number
+  default     = 300
+}
+
+variable "app_redis_blacklist_ttl" {
+  description = "Redis blacklist TTL in seconds"
+  type        = number
+  default     = 1800
+}
+
+variable "app_aws_access_key_id" {
+  description = "AWS access key ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_aws_secret_access_key" {
+  description = "AWS secret access key"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_aws_ses_from_email" {
+  description = "AWS SES from email"
+  type        = string
+  default     = "noreply@turtil.co"
+}
+
 # Random suffix for unique bucket names
 resource "random_string" "bucket_suffix" {
   length  = 8
@@ -268,8 +389,28 @@ resource "aws_instance" "dev_app" {
   
   user_data = base64encode(templatefile("${path.module}/user_data.sh", {
     ecr_repository_url = aws_ecr_repository.dev_app.repository_url
-    aws_region        = "ap-south-1"
-    environment       = "dev"
+    aws_region        = var.aws_region
+    environment       = var.app_environment
+    database_url      = "postgresql+asyncpg://${aws_db_instance.dev_database.username}:DevPassword123!@${aws_db_instance.dev_database.endpoint}/${aws_db_instance.dev_database.db_name}"
+    s3_bucket_name    = aws_s3_bucket.dev_storage.bucket
+    app_secret_key    = var.app_secret_key
+    algorithm         = var.app_algorithm
+    access_token_expire_minutes = var.app_access_token_expire_minutes
+    refresh_token_expire_minutes = var.app_refresh_token_expire_minutes
+    otp_expiry_minutes = var.app_otp_expiry_minutes
+    otp_max_attempts  = var.app_otp_max_attempts
+    dev_otp          = var.app_dev_otp
+    cors_origins     = var.app_cors_origins
+    allowed_hosts    = var.app_allowed_hosts
+    rate_limit_calls = var.app_rate_limit_calls
+    rate_limit_period = var.app_rate_limit_period
+    upstash_redis_url = var.app_upstash_redis_url
+    upstash_redis_token = var.app_upstash_redis_token
+    redis_user_cache_ttl = var.app_redis_user_cache_ttl
+    redis_blacklist_ttl = var.app_redis_blacklist_ttl
+    aws_access_key_id = var.app_aws_access_key_id
+    aws_secret_access_key = var.app_aws_secret_access_key
+    aws_ses_from_email = var.app_aws_ses_from_email
   }))
   
   tags = {
