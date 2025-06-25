@@ -6,7 +6,7 @@
 variable "project_name" {
   description = "Name of the project"
   type        = string
-  default     = "turtil-backend-dev"
+  default     = "turtil-backend"
 }
 
 variable "aws_region" {
