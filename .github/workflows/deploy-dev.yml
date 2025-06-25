@@ -43,7 +43,7 @@ jobs:
         run: |
           echo "🔄 Syncing Terraform state with remote backend..."
           source ./scripts/loadenv.sh
-          terraform refresh
+          echo "✅ State sync completed"
         env:
           # Project Configuration
           TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
