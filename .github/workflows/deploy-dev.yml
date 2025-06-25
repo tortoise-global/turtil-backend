@@ -264,6 +264,31 @@ jobs:
             terraform import module.iam.aws_iam_instance_profile.ec2_profile "$IAM_PROFILE_NAME" || echo "⚠️ IAM instance profile import failed or already imported"
           fi
           
+          # Import DB Subnet Groups
+          DB_SUBNET_GROUP_PRIVATE="${{ secrets.PROJECT_NAME }}-dev-private-db-subnet-group"
+          if aws rds describe-db-subnet-groups --db-subnet-group-name "$DB_SUBNET_GROUP_PRIVATE" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            echo "✅ Private DB subnet group exists, importing..."
+            terraform import module.vpc.aws_db_subnet_group.private "$DB_SUBNET_GROUP_PRIVATE" || echo "⚠️ Private DB subnet group import failed or already imported"
+          fi
+          
+          DB_SUBNET_GROUP_PUBLIC="${{ secrets.PROJECT_NAME }}-dev-public-db-subnet-group"
+          if aws rds describe-db-subnet-groups --db-subnet-group-name "$DB_SUBNET_GROUP_PUBLIC" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            echo "✅ Public DB subnet group exists, importing..."
+            terraform import module.vpc.aws_db_subnet_group.public "$DB_SUBNET_GROUP_PUBLIC" || echo "⚠️ Public DB subnet group import failed or already imported"
+          fi
+          
+          # Import IAM policies
+          IAM_ROLE_NAME="${{ secrets.PROJECT_NAME }}-dev-ec2-role"
+          if aws iam get-role-policy --role-name "$IAM_ROLE_NAME" --policy-name "${{ secrets.PROJECT_NAME }}-dev-ecr-policy" > /dev/null 2>&1; then
+            echo "✅ IAM ECR policy exists, importing..."
+            terraform import module.iam.aws_iam_role_policy.ecr_policy "$IAM_ROLE_NAME:${{ secrets.PROJECT_NAME }}-dev-ecr-policy" || echo "⚠️ IAM ECR policy import failed or already imported"
+          fi
+          
+          if aws iam get-role-policy --role-name "$IAM_ROLE_NAME" --policy-name "${{ secrets.PROJECT_NAME }}-dev-s3-policy" > /dev/null 2>&1; then
+            echo "✅ IAM S3 policy exists, importing..."
+            terraform import module.iam.aws_iam_role_policy.s3_policy "$IAM_ROLE_NAME:${{ secrets.PROJECT_NAME }}-dev-s3-policy" || echo "⚠️ IAM S3 policy import failed or already imported"
+          fi
+          
           # Import Route53 record
           HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "turtil.co" --query 'HostedZones[0].Id' --output text --region ${{ env.AWS_REGION }} 2>/dev/null | cut -d'/' -f3 || echo "null")
           if [ "$HOSTED_ZONE_ID" != "null" ] && [ "$HOSTED_ZONE_ID" != "None" ]; then
