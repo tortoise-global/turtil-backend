@@ -10,7 +10,7 @@ output "ami_name" {
 
 output "ami_creation_date" {
   description = "AMI creation date"
-  value       = data.aws_ami.existing_ami.id != null ? data.aws_ami.existing_ami.creation_date : aws_ami_from_instance.custom_ami[0].creation_date
+  value       = data.aws_ami.existing_ami.id != null ? data.aws_ami.existing_ami.creation_date : timestamp()
 }
 
 output "ami_architecture" {

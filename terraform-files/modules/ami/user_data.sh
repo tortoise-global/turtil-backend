@@ -89,5 +89,5 @@ touch /tmp/ami-ready
 
 echo "$(date): AMI preparation completed successfully for ${environment}!"
 
-# Signal completion
-/opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region} || true
+# Signal completion - AMI preparation finished
+echo "$(date): AMI preparation signal complete" >> /var/log/ami-preparation.log

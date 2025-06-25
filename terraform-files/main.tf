@@ -9,10 +9,10 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "turtul-cms-terraform-be"
+    bucket         = "turtil-backend-dev"
     key            = "tf-infra/terraform.tfstate"
     region         = "ap-south-2"
-    dynamodb_table = "terraform-state-lock"
+    dynamodb_table = "turtil-backend-dev-terraform-lock"
     encrypt        = true
   }
 }
