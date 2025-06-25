@@ -31,6 +31,11 @@ output "vpc_id" {
   value       = module.vpc.vpc_id
 }
 
+output "asg_name" {
+  description = "Auto Scaling Group name"
+  value       = module.compute.asg_name
+}
+
 # Resource Names for Reference
 output "resource_summary" {
   description = "Summary of created resources"

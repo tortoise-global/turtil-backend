@@ -58,31 +58,15 @@ jobs:
         working-directory: ./terraform-files
         run: terraform apply -auto-approve tfplan
 
-      - name: Update GitHub Secrets with Outputs
+      - name: Save Terraform Outputs
         working-directory: ./terraform-files
         run: |
-          # Get terraform outputs
-          DATABASE_URL=$(terraform output -raw database_url)
-          S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name)
-          ALB_DNS_NAME=$(terraform output -raw alb_dns_name)
-          ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)
-          CUSTOM_AMI_ID=$(terraform output -raw custom_ami_id)
+          # Get terraform outputs for reference
+          echo "📊 Terraform Outputs:"
+          terraform output
           
-          # Update GitHub environment secrets
-          echo "DATABASE_URL=$DATABASE_URL" >> secrets.txt
-          echo "S3_BUCKET_NAME=$S3_BUCKET_NAME" >> secrets.txt
-          echo "ALB_DNS_NAME=$ALB_DNS_NAME" >> secrets.txt
-          echo "ECR_REPOSITORY_URL=$ECR_REPOSITORY_URL" >> secrets.txt
-          echo "CUSTOM_AMI_ID=$CUSTOM_AMI_ID" >> secrets.txt
-          
-          # Use GitHub CLI to update secrets
-          gh secret set DATABASE_URL --env dev --body "$DATABASE_URL"
-          gh secret set S3_BUCKET_NAME --env dev --body "$S3_BUCKET_NAME"
-          gh secret set ALB_DNS_NAME --env dev --body "$ALB_DNS_NAME"
-          gh secret set ECR_REPOSITORY_URL --env dev --body "$ECR_REPOSITORY_URL"
-          gh secret set CUSTOM_AMI_ID --env dev --body "$CUSTOM_AMI_ID"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Save outputs to file for reference
+          terraform output -json > terraform-outputs.json
 
       - name: Deployment Summary
         working-directory: ./terraform-files
@@ -128,8 +112,10 @@ jobs:
       - name: Build and push Docker image
         working-directory: ./turtil-backend
         run: |
-          # Get ECR repository URL from secrets
-          ECR_REPOSITORY_URL="${{ secrets.ECR_REPOSITORY_URL }}"
+          # Get ECR repository URL from terraform output
+          cd ../terraform-files
+          ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)
+          cd ../turtil-backend
           
           # Build Docker image
           docker build -t $ECR_REPOSITORY_URL:dev .
