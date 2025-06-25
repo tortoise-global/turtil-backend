@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     )
     debug: bool = Field(default=True, env="DEBUG", description="Debug mode")
     log_level: str = Field(default="INFO", env="LOG_LEVEL", description="Log level")
+    port: int = Field(default=8000, env="PORT", description="Server port")
 
     # Database Configuration
     database_url: str = Field(

@@ -24,9 +24,9 @@ def main():
 🚀 Starting {settings.project_name} v{settings.version}
 📊 Environment: {settings.environment}
 🔧 Debug mode: {settings.debug}
-🌐 Server: http://0.0.0.0:8000
-📚 API docs: {"http://0.0.0.0:8000/docs" if settings.debug else "disabled"}
-📡 Health check: http://0.0.0.0:8000/health
+🌐 Server: http://0.0.0.0:{settings.port}
+📚 API docs: {"http://0.0.0.0:" + str(settings.port) + "/docs" if settings.debug else "disabled"}
+📡 Health check: http://0.0.0.0:{settings.port}/health
     """)
 
     # Configure uvicorn based on environment
@@ -35,7 +35,7 @@ def main():
         uvicorn.run(
             "app.main:app",
             host="0.0.0.0",
-            port=8000,
+            port=settings.port,
             workers=1,  # Use 1 worker for simplicity; scale with gunicorn if needed
             reload=False,
             log_level="info",
@@ -48,7 +48,7 @@ def main():
         uvicorn.run(
             "app.main:app",
             host="0.0.0.0",
-            port=8000,
+            port=settings.port,
             reload=True,
             log_level=settings.log_level.lower(),
             access_log=True,
