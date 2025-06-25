@@ -23,8 +23,8 @@ print_error() { echo -e "${RED}❌ $1${NC}"; }
 BASE_AMI="ami-0eb4445f6c0a650a1"  # Ubuntu Server Pro 24.04 LTS ARM64
 INSTANCE_TYPE="t4g.micro"
 KEY_NAME="turtil-backend"  # Turtil-backend specific key pair
-SECURITY_GROUP="sg-0a116288db42e7091"  # Turtil-backend AMI creation security group
-SUBNET_ID="subnet-00fe2bd0c30a0efd5"  # Will be updated to use new VPC subnet after terraform apply
+SECURITY_GROUP="sg-05946dca5d9f05450"  # Turtil-backend EC2 security group
+SUBNET_ID="subnet-0768ac16599890822"  # Turtil-backend VPC public subnet
 
 AMI_NAME="turtil-backend-docker-ubuntu-24.04-arm64"
 AMI_DESCRIPTION="Ubuntu 24.04 LTS ARM64 with Docker, docker-compose, nginx, and AWS CLI pre-installed for Turtil Backend"

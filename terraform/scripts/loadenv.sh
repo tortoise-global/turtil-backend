@@ -11,30 +11,18 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Determine environment from argument or default to 'dev'
-ENVIRONMENT="${1:-dev}"
+# Always use dev environment
+ENVIRONMENT="dev"
 
-# Check for valid environment
-case "$ENVIRONMENT" in
-    "dev"|"test"|"prod")
-        ;;
-    *)
-        echo "❌ Invalid environment: $ENVIRONMENT"
-        echo "Valid environments: dev, test, prod"
-        exit 1
-        ;;
-esac
-
-# Check if environment-specific .env file exists
-ENV_FILE="$PROJECT_ROOT/.env.$ENVIRONMENT"
+# Check if environment file exists
+ENV_FILE="$PROJECT_ROOT/.env.dev"
 if [[ ! -f "$ENV_FILE" ]]; then
     echo "❌ Environment file not found: $ENV_FILE"
-    echo "Please create a .env.$ENVIRONMENT file in the project root directory"
-    echo "You can use the populate-env.sh script to generate it from Terraform outputs"
+    echo "Please create a .env.dev file in the project root directory"
     exit 1
 fi
 
-echo "📄 Loading environment variables for: $ENVIRONMENT"
+echo "📄 Loading environment variables for dev"
 echo "📄 From file: $ENV_FILE"
 
 # Source the environment-specific .env file
@@ -73,24 +61,4 @@ export TF_VAR_app_debug="$DEBUG"
 export TF_VAR_aws_region="$AWS_REGION"
 export TF_VAR_custom_ami_id="$CUSTOM_AMI_ID"
 
-# Environment-specific Terraform variables
-case "$ENVIRONMENT" in
-    "dev")
-        export TF_VAR_enable_single_instance="true"
-        export TF_VAR_enable_load_balancer="false"
-        echo "🔧 Development mode: Single instance, no load balancer"
-        ;;
-    "test")
-        export TF_VAR_enable_single_instance="false"
-        export TF_VAR_enable_load_balancer="true"
-        echo "🧪 Test mode: Auto scaling group with load balancer"
-        ;;
-    "prod")
-        export TF_VAR_enable_single_instance="false"
-        export TF_VAR_enable_load_balancer="true"
-        echo "🚀 Production mode: Full auto scaling with load balancer and CloudFront"
-        ;;
-esac
-
-echo "✅ Environment variables loaded for $ENVIRONMENT and exported as TF_VAR_* variables"
-echo "💡 Use terraform workspace select $ENVIRONMENT before applying"
+echo "✅ Environment variables loaded for dev and exported as TF_VAR_* variables"

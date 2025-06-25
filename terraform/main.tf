@@ -1,5 +1,5 @@
 # ============================================================================
-# SIMPLIFIED DEV ENVIRONMENT - CORE RESOURCES ONLY
+# MODULAR TERRAFORM CONFIGURATION - TURTIL BACKEND
 # ============================================================================
 
 terraform {
@@ -9,168 +9,168 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.53.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.1"
+    }
   }
   backend "s3" {
     bucket = "turtil-backend-terraform"
-    key    = "simple-dev/terraform.tfstate"
+    key    = "modular-dev/terraform.tfstate"
     region = "ap-south-1"
   }
 }
 
 provider "aws" {
-  region = "ap-south-1"
+  region = var.aws_region
 }
 
-# Variables for application configuration
-variable "aws_region" {
-  description = "AWS region"
-  type        = string
-  default     = "ap-south-1"
+# Data sources
+data "aws_caller_identity" "current" {}
+data "aws_route53_zone" "main" {
+  name         = "turtil.co"
+  private_zone = false
 }
 
-variable "app_environment" {
-  description = "Application environment"
-  type        = string
-  default     = "dev"
-}
+# ============================================================================
+# VPC MODULE
+# ============================================================================
 
-variable "app_secret_key" {
-  description = "JWT secret key"
-  type        = string
-  sensitive   = true
-}
-
-variable "app_algorithm" {
-  description = "JWT algorithm"
-  type        = string
-  default     = "HS256"
-}
-
-variable "app_access_token_expire_minutes" {
-  description = "Access token expiry in minutes"
-  type        = number
-  default     = 30
-}
-
-variable "app_refresh_token_expire_minutes" {
-  description = "Refresh token expiry in minutes"
-  type        = number
-  default     = 43200
-}
-
-variable "app_otp_expiry_minutes" {
-  description = "OTP expiry in minutes"
-  type        = number
-  default     = 5
-}
-
-variable "app_otp_max_attempts" {
-  description = "Maximum OTP attempts"
-  type        = number
-  default     = 3
-}
-
-variable "app_dev_otp" {
-  description = "Development OTP code"
-  type        = string
-  default     = "123456"
-}
-
-variable "app_cors_origins" {
-  description = "CORS allowed origins"
-  type        = string
-  default     = "http://localhost:3000,http://127.0.0.1:3000"
-}
-
-variable "app_allowed_hosts" {
-  description = "Allowed hosts"
-  type        = string
-  default     = "localhost,127.0.0.1"
-}
-
-variable "app_rate_limit_calls" {
-  description = "Rate limit calls per period"
-  type        = number
-  default     = 100
-}
-
-variable "app_rate_limit_period" {
-  description = "Rate limit period in seconds"
-  type        = number
-  default     = 60
-}
-
-variable "app_upstash_redis_url" {
-  description = "Upstash Redis URL"
-  type        = string
-  sensitive   = true
-}
-
-variable "app_upstash_redis_token" {
-  description = "Upstash Redis token"
-  type        = string
-  sensitive   = true
-}
-
-variable "app_redis_user_cache_ttl" {
-  description = "Redis user cache TTL in seconds"
-  type        = number
-  default     = 300
-}
-
-variable "app_redis_blacklist_ttl" {
-  description = "Redis blacklist TTL in seconds"
-  type        = number
-  default     = 1800
-}
-
-variable "app_aws_access_key_id" {
-  description = "AWS access key ID"
-  type        = string
-  sensitive   = true
-}
-
-variable "app_aws_secret_access_key" {
-  description = "AWS secret access key"
-  type        = string
-  sensitive   = true
-}
-
-variable "app_aws_ses_from_email" {
-  description = "AWS SES from email"
-  type        = string
-  default     = "noreply@turtil.co"
-}
-
-variable "custom_ami_id" {
-  description = "Custom AMI ID with Docker pre-installed"
-  type        = string
-  default     = "ami-0eb4445f6c0a650a1"  # Fallback to Ubuntu 24.04 LTS ARM64
-}
-
-# Random suffix for unique bucket names
-resource "random_string" "bucket_suffix" {
-  length  = 8
-  special = false
-  upper   = false
-}
-
-# PostgreSQL RDS Database
-resource "aws_db_instance" "dev_database" {
-  identifier             = "turtil-backend-dev"
-  engine                 = "postgres"
-  engine_version         = "15.7"
-  instance_class         = "db.t4g.micro"
-  allocated_storage      = 20
-  max_allocated_storage  = 100
+module "vpc" {
+  source = "./modules/vpc"
   
-  db_name  = "turtil_backend_dev"
-  username = "turtiluser"
-  password = "DevPassword123!"
+  project_name    = var.project_name
+  environment     = var.app_environment
+  vpc_cidr        = "10.0.0.0/16"
   
-  publicly_accessible    = false
-  db_subnet_group_name   = aws_db_subnet_group.main.name
-  vpc_security_group_ids = [aws_security_group.dev_db.id]
+  public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+  private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
+  availability_zones   = ["ap-south-1a", "ap-south-1b"]
+  
+  # Allow external DB access for development
+  allow_external_db_access = var.app_environment == "dev"
+}
+
+# ============================================================================
+# IAM MODULE
+# ============================================================================
+
+module "iam" {
+  source = "./modules/iam"
+  
+  project_name = var.project_name
+  environment  = var.app_environment
+  
+  s3_bucket_arn         = module.s3_storage.bucket_arn
+  enable_ses_access     = true
+  enable_cloudwatch_logs = true
+}
+
+# ============================================================================
+# S3 MODULES
+# ============================================================================
+
+# Main storage bucket
+module "s3_storage" {
+  source = "./modules/s3"
+  
+  project_name   = var.project_name
+  environment    = var.app_environment
+  bucket_purpose = "storage"
+  
+  versioning_enabled = true
+  
+  # Enable public access for development file uploads
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+  
+  # CORS configuration for file uploads
+  cors_rules = [
+    {
+      allowed_methods = ["GET", "POST", "PUT"]
+      allowed_origins = ["*"]
+      allowed_headers = ["*"]
+      max_age_seconds = 3600
+    }
+  ]
+  
+  
+  # Lifecycle rules
+  lifecycle_rules = [
+    {
+      id     = "delete_incomplete_uploads"
+      status = "Enabled"
+      expiration = {
+        days = 7
+      }
+    }
+  ]
+}
+
+# ============================================================================
+# ECR MODULE
+# ============================================================================
+
+module "ecr" {
+  source = "./modules/ecr"
+  
+  project_name         = var.project_name
+  environment          = var.app_environment
+  image_tag_mutability = "MUTABLE"
+  scan_on_push         = false
+  
+  # Lifecycle policy
+  create_lifecycle_policy = true
+  max_image_count        = 10
+  tag_prefix_list        = ["v", "dev", "latest"]
+  untagged_image_days    = 1
+}
+
+# S3 bucket policy for public read access
+resource "aws_s3_bucket_policy" "storage_policy" {
+  bucket = module.s3_storage.bucket_name
+  
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicReadGetObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${module.s3_storage.bucket_arn}/*"
+      }
+    ]
+  })
+  
+  depends_on = [module.s3_storage]
+}
+
+# ============================================================================
+# RDS MODULE
+# ============================================================================
+
+module "rds" {
+  source = "./modules/rds"
+  
+  project_name    = var.project_name
+  environment     = var.app_environment
+  postgres_version = "15.7"
+  instance_class   = "db.t4g.micro"
+  
+  allocated_storage     = 20
+  max_allocated_storage = 100
+  
+  database_name = replace("${var.project_name}_${var.app_environment}", "-", "_")
+  username      = var.app_db_username
+  password      = var.app_db_password
+  
+  # Use public subnet group for development external access
+  db_subnet_group_name = var.app_environment == "dev" ? module.vpc.public_db_subnet_group_name : module.vpc.private_db_subnet_group_name
+  security_group_ids   = [module.vpc.rds_security_group_id]
+  publicly_accessible  = var.app_environment == "dev"
   
   backup_retention_period = 7
   backup_window          = "03:00-04:00"
@@ -179,353 +179,40 @@ resource "aws_db_instance" "dev_database" {
   skip_final_snapshot = true
   deletion_protection = false
   
-  tags = {
-    Name        = "turtil-backend-dev-database"
-    Environment = "dev"
-    Project     = "turtil-backend"
-  }
+  # Performance and monitoring
+  performance_insights_enabled = false
+  monitoring_interval         = 0
+  storage_encrypted          = true
+  multi_az                   = false
 }
 
-# S3 Bucket for file storage
-resource "aws_s3_bucket" "dev_storage" {
-  bucket = "turtil-backend-dev-storage-${random_string.bucket_suffix.result}"
+# ============================================================================
+# EC2 MODULE
+# ============================================================================
+
+module "ec2" {
+  source = "./modules/ec2"
   
-  tags = {
-    Name        = "turtil-backend-dev-storage"
-    Environment = "dev"
-    Project     = "turtil-backend"
-  }
-}
-
-resource "aws_s3_bucket_versioning" "dev_storage" {
-  bucket = aws_s3_bucket.dev_storage.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "dev_storage" {
-  bucket = aws_s3_bucket.dev_storage.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-resource "aws_s3_bucket_public_access_block" "dev_storage" {
-  bucket = aws_s3_bucket.dev_storage.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-# ECR Repository
-resource "aws_ecr_repository" "dev_app" {
-  name                 = "turtil-backend-dev"
-  image_tag_mutability = "MUTABLE"
-  
-  image_scanning_configuration {
-    scan_on_push = false
-  }
-  
-  tags = {
-    Name        = "turtil-backend-dev-ecr"
-    Environment = "dev"
-    Project     = "turtil-backend"
-  }
-}
-
-resource "aws_ecr_lifecycle_policy" "dev_app" {
-  repository = aws_ecr_repository.dev_app.name
-
-  policy = jsonencode({
-    rules = [{
-      rulePriority = 1
-      description  = "Keep last 10 images"
-      selection = {
-        tagStatus     = "tagged"
-        tagPrefixList = ["v"]
-        countType     = "imageCountMoreThan"
-        countNumber   = 10
-      }
-      action = {
-        type = "expire"
-      }
-    }]
-  })
-}
-
-# Dedicated VPC for Turtil Backend
-resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-
-  tags = {
-    Name        = "turtil-backend-vpc"
-    Environment = "dev"
-    Project     = "turtil-backend"
-  }
-}
-
-# Internet Gateway
-resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
-
-  tags = {
-    Name        = "turtil-backend-igw"
-    Environment = "dev"
-    Project     = "turtil-backend"
-  }
-}
-
-# Public Subnets
-resource "aws_subnet" "public_1" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
-  availability_zone       = "ap-south-1a"
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name        = "turtil-backend-public-1"
-    Environment = "dev"
-    Project     = "turtil-backend"
-    Type        = "public"
-  }
-}
-
-resource "aws_subnet" "public_2" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.2.0/24"
-  availability_zone       = "ap-south-1b"
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name        = "turtil-backend-public-2"
-    Environment = "dev"
-    Project     = "turtil-backend"
-    Type        = "public"
-  }
-}
-
-# Private Subnets for Database
-resource "aws_subnet" "private_1" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.10.0/24"
-  availability_zone = "ap-south-1a"
-
-  tags = {
-    Name        = "turtil-backend-private-1"
-    Environment = "dev"
-    Project     = "turtil-backend"
-    Type        = "private"
-  }
-}
-
-resource "aws_subnet" "private_2" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.11.0/24"
-  availability_zone = "ap-south-1b"
-
-  tags = {
-    Name        = "turtil-backend-private-2"
-    Environment = "dev"
-    Project     = "turtil-backend"
-    Type        = "private"
-  }
-}
-
-# Route Table for Public Subnets
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.main.id
-  }
-
-  tags = {
-    Name        = "turtil-backend-public-rt"
-    Environment = "dev"
-    Project     = "turtil-backend"
-  }
-}
-
-# Route Table Associations
-resource "aws_route_table_association" "public_1" {
-  subnet_id      = aws_subnet.public_1.id
-  route_table_id = aws_route_table.public.id
-}
-
-resource "aws_route_table_association" "public_2" {
-  subnet_id      = aws_subnet.public_2.id
-  route_table_id = aws_route_table.public.id
-}
-
-# DB Subnet Group
-resource "aws_db_subnet_group" "main" {
-  name       = "turtil-backend-dev-db-subnet-group"
-  subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
-
-  tags = {
-    Name        = "turtil-backend-dev-db-subnet-group"
-    Environment = "dev"
-    Project     = "turtil-backend"
-  }
-}
-
-# Security Group for EC2 (allow HTTP and SSH)
-resource "aws_security_group" "dev_ec2" {
-  name        = "turtil-backend-dev-ec2"
-  vpc_id      = aws_vpc.main.id
-  description = "Security group for dev EC2 instance"
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTP traffic"
-  }
-
-  ingress {
-    from_port   = 8000
-    to_port     = 8000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "FastAPI application (direct access)"
-  }
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "SSH access"
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "All outbound traffic"
-  }
-
-  tags = {
-    Name        = "turtil-backend-dev-ec2-sg"
-    Environment = "dev"
-    Project     = "turtil-backend"
-  }
-}
-
-# Security Group for RDS Database
-resource "aws_security_group" "dev_db" {
-  name        = "turtil-backend-dev-db"
-  vpc_id      = aws_vpc.main.id
-  description = "Security group for RDS database"
-
-  ingress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.dev_ec2.id]
-    description     = "PostgreSQL access from EC2"
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "All outbound traffic"
-  }
-
-  tags = {
-    Name        = "turtil-backend-dev-db-sg"
-    Environment = "dev"
-    Project     = "turtil-backend"
-  }
-}
-
-# IAM Role for EC2 instance
-resource "aws_iam_role" "dev_ec2_role" {
-  name = "turtil-backend-dev-ec2-role"
-  
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-      }
-    ]
-  })
-  
-  tags = {
-    Name        = "turtil-backend-dev-ec2-role"
-    Environment = "dev"
-    Project     = "turtil-backend"
-  }
-}
-
-# IAM Policy for ECR access
-resource "aws_iam_role_policy" "dev_ec2_ecr_policy" {
-  name = "turtil-backend-dev-ecr-policy"
-  role = aws_iam_role.dev_ec2_role.id
-  
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "ecr:GetAuthorizationToken",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-# IAM Instance Profile
-resource "aws_iam_instance_profile" "dev_ec2_profile" {
-  name = "turtil-backend-dev-ec2-profile"
-  role = aws_iam_role.dev_ec2_role.name
-  
-  tags = {
-    Name        = "turtil-backend-dev-ec2-profile"
-    Environment = "dev"
-    Project     = "turtil-backend"
-  }
-}
-
-# EC2 Instance for the application
-resource "aws_instance" "dev_app" {
-  ami           = var.custom_ami_id
+  project_name  = var.project_name
+  environment   = var.app_environment
+  ami_id        = var.custom_ami_id
   instance_type = "t4g.micro"
   key_name      = "turtil-backend"
   
-  subnet_id              = aws_subnet.public_1.id
-  vpc_security_group_ids = [aws_security_group.dev_ec2.id]
-  iam_instance_profile   = aws_iam_instance_profile.dev_ec2_profile.name
+  subnet_id                   = module.vpc.public_subnet_ids[0]
+  security_group_ids          = [module.vpc.ec2_security_group_id]
+  iam_instance_profile_name   = module.iam.ec2_instance_profile_name
   
-  user_data = base64encode(templatefile("${path.module}/user_data.sh", {
-    ecr_repository_url = aws_ecr_repository.dev_app.repository_url
+  # User data for application setup
+  user_data_script = "${path.module}/user_data.sh"
+  user_data_vars = {
+    ecr_repository_url = module.ecr.repository_url
     aws_region        = var.aws_region
     environment       = var.app_environment
-    database_url      = "postgresql+asyncpg://${aws_db_instance.dev_database.username}:DevPassword123!@${aws_db_instance.dev_database.endpoint}/${aws_db_instance.dev_database.db_name}"
-    s3_bucket_name    = aws_s3_bucket.dev_storage.bucket
+    database_url      = module.rds.database_url
+    s3_bucket_name    = module.s3_storage.bucket_name
+    
+    # Application configuration
     app_secret_key    = var.app_secret_key
     algorithm         = var.app_algorithm
     access_token_expire_minutes = var.app_access_token_expire_minutes
@@ -537,60 +224,104 @@ resource "aws_instance" "dev_app" {
     allowed_hosts    = var.app_allowed_hosts
     rate_limit_calls = var.app_rate_limit_calls
     rate_limit_period = var.app_rate_limit_period
+    
+    # Redis configuration
     upstash_redis_url = var.app_upstash_redis_url
     upstash_redis_token = var.app_upstash_redis_token
     redis_user_cache_ttl = var.app_redis_user_cache_ttl
     redis_blacklist_ttl = var.app_redis_blacklist_ttl
+    
+    # AWS services
     aws_access_key_id = var.app_aws_access_key_id
     aws_secret_access_key = var.app_aws_secret_access_key
     aws_ses_from_email = var.app_aws_ses_from_email
     custom_ami_id = var.custom_ami_id
-  }))
+  }
   
-  tags = {
-    Name        = "turtil-backend-dev"
-    Environment = "dev"
-    Project     = "turtil-backend"
+  # Storage configuration
+  root_volume_type      = "gp3"
+  root_volume_size      = 20
+  root_volume_encrypted = true
+  
+  # Monitoring
+  detailed_monitoring       = false
+  enable_cloudwatch_alarms = false
+  
+  additional_tags = {
+    Application = "turtil-backend"
+    Terraform   = "true"
   }
 }
 
-# Route 53 Hosted Zone (assuming turtil.co exists)
-data "aws_route53_zone" "main" {
-  name         = "turtil.co"
-  private_zone = false
-}
+# ============================================================================
+# ROUTE 53 RECORDS
+# ============================================================================
 
-# Route 53 A Record for dev.api.turtil.co
 resource "aws_route53_record" "dev_api" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = "dev.api.turtil.co"
+  name    = "${var.app_environment}.api.turtil.co"
   type    = "A"
   ttl     = 300
-  records = [aws_instance.dev_app.public_ip]
+  records = [module.ec2.public_ip]
   
-  depends_on = [aws_instance.dev_app]
+  depends_on = [module.ec2]
 }
 
-# Outputs
+# ============================================================================
+# OUTPUTS
+# ============================================================================
+
+output "infrastructure_info" {
+  description = "Complete infrastructure information"
+  value = {
+    # VPC
+    vpc_id = module.vpc.vpc_id
+    public_subnet_ids = module.vpc.public_subnet_ids
+    private_subnet_ids = module.vpc.private_subnet_ids
+    
+    # Database
+    database_endpoint = module.rds.db_instance_endpoint
+    database_url     = module.rds.database_url
+    
+    # Storage
+    s3_bucket_name = module.s3_storage.bucket_name
+    
+    # Container Registry
+    ecr_repository_url = module.ecr.repository_url
+    
+    # Compute
+    ec2_instance_id = module.ec2.instance_id
+    ec2_public_ip   = module.ec2.public_ip
+    
+    # Application URLs
+    api_url     = "http://${var.app_environment}.api.turtil.co"
+    health_url  = "http://${var.app_environment}.api.turtil.co/health"
+    docs_url    = "http://${var.app_environment}.api.turtil.co/docs"
+    direct_url  = "http://${module.ec2.public_ip}:8000"
+  }
+  sensitive = true
+}
+
+# Legacy compatibility outputs
 output "database_url" {
   description = "Complete database URL for application"
-  value       = "postgresql+asyncpg://${aws_db_instance.dev_database.username}:DevPassword123!@${aws_db_instance.dev_database.endpoint}/${aws_db_instance.dev_database.db_name}"
+  value       = module.rds.database_url
   sensitive   = true
 }
 
 output "database_endpoint" {
   description = "RDS instance endpoint"
-  value       = aws_db_instance.dev_database.endpoint
+  value       = module.rds.db_instance_endpoint
 }
 
 output "s3_bucket_name" {
   description = "S3 bucket name for file storage"
-  value       = aws_s3_bucket.dev_storage.bucket
+  value       = module.s3_storage.bucket_name
 }
 
 output "ecr_repository_url" {
   description = "ECR repository URL"
-  value       = aws_ecr_repository.dev_app.repository_url
+  value       = module.ecr.repository_url
 }
 
 output "aws_account_id" {
@@ -600,17 +331,17 @@ output "aws_account_id" {
 
 output "ec2_instance_id" {
   description = "EC2 instance ID"
-  value       = aws_instance.dev_app.id
+  value       = module.ec2.instance_id
 }
 
 output "ec2_public_ip" {
   description = "EC2 instance public IP"
-  value       = aws_instance.dev_app.public_ip
+  value       = module.ec2.public_ip
 }
 
 output "dev_api_url" {
   description = "Development API URL"
-  value       = "http://dev.api.turtil.co"
+  value       = "http://${var.app_environment}.api.turtil.co"
 }
 
 output "route53_record" {
@@ -621,13 +352,11 @@ output "route53_record" {
 output "dev_instance_info" {
   description = "Development instance information"
   value = {
-    instance_id = aws_instance.dev_app.id
-    public_ip   = aws_instance.dev_app.public_ip
-    api_url     = "http://dev.api.turtil.co"
-    health_url  = "http://dev.api.turtil.co/health"
-    docs_url    = "http://dev.api.turtil.co/docs"
-    direct_url  = "http://${aws_instance.dev_app.public_ip}:8000"
+    instance_id = module.ec2.instance_id
+    public_ip   = module.ec2.public_ip
+    api_url     = "http://${var.app_environment}.api.turtil.co"
+    health_url  = "http://${var.app_environment}.api.turtil.co/health"
+    docs_url    = "http://${var.app_environment}.api.turtil.co/docs"
+    direct_url  = "http://${module.ec2.public_ip}:8000"
   }
 }
-
-data "aws_caller_identity" "current" {}

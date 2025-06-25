@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, env="PORT", description="Server port")
 
     # Database Configuration
+    db_username: str = Field(
+        default="turtiluser", env="DB_USERNAME", description="Database username"
+    )
+    db_password: str = Field(
+        ..., env="DB_PASSWORD", description="Database password"
+    )
     database_url: str = Field(
         ...,
         env="DATABASE_URL",
@@ -138,6 +144,11 @@ class Settings(BaseSettings):
         default=None, env="S3_BUCKET_NAME", description="S3 bucket name for file storage"
     )
 
+    # Custom AMI Configuration (used by Terraform)
+    custom_ami_id: Optional[str] = Field(
+        default=None, env="CUSTOM_AMI_ID", description="Custom AMI ID for EC2 instances (Terraform only)"
+    )
+
     @property
     def is_development(self) -> bool:
         return self.environment.lower() in ["dev", "local"]
@@ -178,6 +189,7 @@ def print_config():
     config_dict = settings.dict()
     sensitive_keys = {
         "secret_key",
+        "db_password",
         "database_url",
         "aws_access_key_id",
         "aws_secret_access_key",

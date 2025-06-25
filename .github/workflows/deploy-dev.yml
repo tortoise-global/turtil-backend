@@ -1,23 +1,21 @@
-name: Deploy to Development
+name: Deploy Turtil Backend
 
 on:
   push:
     branches:
       - dev
+      - main
     paths-ignore:
       - '**.md'
       - 'docs/**'
 
 env:
   AWS_REGION: ap-south-1
-  ENVIRONMENT: dev
-  TF_WORKSPACE: dev
 
 jobs:
-  deploy-dev:
-    name: Deploy to Development Environment
+  deploy:
+    name: Deploy Turtil Backend
     runs-on: ubuntu-latest
-    environment: dev
     
     steps:
       - name: Checkout code
@@ -39,23 +37,17 @@ jobs:
         working-directory: ./terraform
         run: terraform init
 
-      - name: Select Terraform Workspace
-        working-directory: ./terraform
-        run: |
-          # Unset TF_WORKSPACE to allow manual workspace selection
-          unset TF_WORKSPACE
-          terraform workspace select dev || terraform workspace new dev
-
       - name: Sync Terraform State
         working-directory: ./terraform
         run: |
           echo "🔄 Syncing Terraform state with remote backend..."
-          terraform refresh -var-file="environments/dev.tfvars"
+          source ./scripts/loadenv.sh
+          terraform refresh
         env:
           # Project Configuration
           TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
           TF_VAR_app_version: ${{ secrets.VERSION }}
-          TF_VAR_app_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_app_environment: dev
           TF_VAR_app_debug: ${{ secrets.DEBUG }}
           TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
           
@@ -77,6 +69,8 @@ jobs:
           TF_VAR_app_rate_limit_period: ${{ secrets.RATE_LIMIT_PERIOD }}
           
           # Database & Cache
+          TF_VAR_app_db_username: ${{ secrets.DB_USERNAME }}
+          TF_VAR_app_db_password: ${{ secrets.DB_PASSWORD }}
           TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
           TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
           TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
@@ -91,18 +85,21 @@ jobs:
           TF_VAR_app_aws_ses_region: ${{ secrets.AWS_SES_REGION }}
           TF_VAR_ecr_account_id: ${{ secrets.ECR_ACCOUNT_ID }}
           TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          TF_VAR_custom_ami_id: ${{ secrets.CUSTOM_AMI_ID }}
           
           # Legacy compatibility
           TF_VAR_project_name: ${{ secrets.PROJECT_NAME }}
 
       - name: Terraform Plan
         working-directory: ./terraform
-        run: terraform plan -var-file="environments/dev.tfvars" -out=tfplan
+        run: |
+          source ./scripts/loadenv.sh
+          terraform plan -out=tfplan
         env:
           # Project Configuration
           TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
           TF_VAR_app_version: ${{ secrets.VERSION }}
-          TF_VAR_app_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_app_environment: dev
           TF_VAR_app_debug: ${{ secrets.DEBUG }}
           TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
           
@@ -124,6 +121,8 @@ jobs:
           TF_VAR_app_rate_limit_period: ${{ secrets.RATE_LIMIT_PERIOD }}
           
           # Database & Cache
+          TF_VAR_app_db_username: ${{ secrets.DB_USERNAME }}
+          TF_VAR_app_db_password: ${{ secrets.DB_PASSWORD }}
           TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
           TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
           TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
@@ -138,6 +137,7 @@ jobs:
           TF_VAR_app_aws_ses_region: ${{ secrets.AWS_SES_REGION }}
           TF_VAR_ecr_account_id: ${{ secrets.ECR_ACCOUNT_ID }}
           TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          TF_VAR_custom_ami_id: ${{ secrets.CUSTOM_AMI_ID }}
           
           # Legacy compatibility
           TF_VAR_project_name: ${{ secrets.PROJECT_NAME }}
@@ -149,7 +149,7 @@ jobs:
           # Project Configuration
           TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
           TF_VAR_app_version: ${{ secrets.VERSION }}
-          TF_VAR_app_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_app_environment: dev
           TF_VAR_app_debug: ${{ secrets.DEBUG }}
           TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
           
@@ -171,6 +171,8 @@ jobs:
           TF_VAR_app_rate_limit_period: ${{ secrets.RATE_LIMIT_PERIOD }}
           
           # Database & Cache
+          TF_VAR_app_db_username: ${{ secrets.DB_USERNAME }}
+          TF_VAR_app_db_password: ${{ secrets.DB_PASSWORD }}
           TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
           TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
           TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
@@ -184,6 +186,7 @@ jobs:
           TF_VAR_app_aws_ses_from_email: ${{ secrets.AWS_SES_FROM_EMAIL }}
           TF_VAR_ecr_account_id: ${{ secrets.ECR_ACCOUNT_ID }}
           TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          TF_VAR_custom_ami_id: ${{ secrets.CUSTOM_AMI_ID }}
           
           # Legacy compatibility
           TF_VAR_project_name: ${{ secrets.PROJECT_NAME }}
@@ -197,8 +200,8 @@ jobs:
             terraform import aws_ecr_repository.dev_app "$ECR_REPO_NAME" || echo "⚠️ ECR import failed or already imported"
           fi
           
-          # Import DB subnet group if it exists
-          DB_SUBNET_GROUP_NAME="${{ secrets.PROJECT_NAME }}-dev-db-subnet-group"
+          # Import DB subnet group if it exists (new VPC version)
+          DB_SUBNET_GROUP_NAME="${{ secrets.PROJECT_NAME }}-dev-vpc-db-subnet-group"
           if aws rds describe-db-subnet-groups --db-subnet-group-name "$DB_SUBNET_GROUP_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
             echo "✅ DB subnet group exists, importing..."
             terraform import aws_db_subnet_group.main "$DB_SUBNET_GROUP_NAME" || echo "⚠️ DB subnet group import failed or already imported"
@@ -231,12 +234,14 @@ jobs:
 
       - name: Regenerate Terraform Plan After Imports
         working-directory: ./terraform
-        run: terraform plan -var-file="environments/dev.tfvars" -out=tfplan
+        run: |
+          source ./scripts/loadenv.sh
+          terraform plan -out=tfplan
         env:
           # Project Configuration
           TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
           TF_VAR_app_version: ${{ secrets.VERSION }}
-          TF_VAR_app_environment: ${{ env.ENVIRONMENT }}
+          TF_VAR_app_environment: dev
           TF_VAR_app_debug: ${{ secrets.DEBUG }}
           TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
           
@@ -258,6 +263,8 @@ jobs:
           TF_VAR_app_rate_limit_period: ${{ secrets.RATE_LIMIT_PERIOD }}
           
           # Database & Cache
+          TF_VAR_app_db_username: ${{ secrets.DB_USERNAME }}
+          TF_VAR_app_db_password: ${{ secrets.DB_PASSWORD }}
           TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
           TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
           TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
@@ -272,6 +279,7 @@ jobs:
           TF_VAR_app_aws_ses_region: ${{ secrets.AWS_SES_REGION }}
           TF_VAR_ecr_account_id: ${{ secrets.ECR_ACCOUNT_ID }}
           TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          TF_VAR_custom_ami_id: ${{ secrets.CUSTOM_AMI_ID }}
           
           # Legacy compatibility
           TF_VAR_project_name: ${{ secrets.PROJECT_NAME }}
@@ -310,23 +318,23 @@ jobs:
           docker push ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:dev
           docker push ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:${{ github.sha }}
 
-      - name: Verify Development Deployment
+      - name: Verify Deployment
         working-directory: ./terraform
         run: |
-          echo "Verifying development deployment..."
+          echo "Verifying deployment..."
           API_URL=$(terraform output -raw dev_api_url)
           HEALTH_ENDPOINT="${API_URL}/health"
           
-          echo "Testing development API health endpoint: $HEALTH_ENDPOINT"
+          echo "Testing API health endpoint: $HEALTH_ENDPOINT"
           sleep 180  # Allow more time for nginx + FastAPI startup
           
           if curl -f --max-time 30 --retry 15 --retry-delay 20 "$HEALTH_ENDPOINT"; then
-            echo "✅ Development deployment verification successful!"
+            echo "✅ Deployment verification successful!"
             echo "🔗 API URL: $API_URL"
             echo "📚 API Docs: ${API_URL}/docs"
             echo "💚 Health Check: $HEALTH_ENDPOINT"
           else
-            echo "❌ Development deployment verification failed!"
+            echo "❌ Deployment verification failed!"
             echo "Attempting fallback to direct IP..."
             INSTANCE_IP=$(terraform output -raw ec2_public_ip)
             FALLBACK_URL="http://$INSTANCE_IP:8000/health"
@@ -338,11 +346,10 @@ jobs:
             exit 1
           fi
 
-      - name: Development Deployment Success
+      - name: Deployment Success
         if: success()
         run: |
-          echo "🚀 Development deployment completed successfully!"
-          echo "Environment: dev"
-          echo "Branch: dev"
+          echo "🚀 Deployment completed successfully!"
+          echo "Branch: ${{ github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
-          echo "Cost Optimized: Single EC2 instance without load balancer"
+          echo "Single EC2 instance deployment"

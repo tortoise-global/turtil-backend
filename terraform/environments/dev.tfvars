@@ -6,7 +6,7 @@
 
 # Environment Configuration
 environment = "dev"
-project_name = "turtil-backend"
+project_name = "turtil-backend-dev"
 
 # Compute Configuration (Single Instance - No Auto Scaling)
 instance_type = "t4g.micro"           # ARM Graviton2 for cost efficiency
@@ -20,17 +20,17 @@ database_allocated_storage = 20              # Minimal storage
 database_backup_retention = 1                # 1-day backup retention
 database_multi_az = false                    # Single-AZ for cost savings
 enable_deletion_protection = false           # Allow easy cleanup
-database_name = "turtil-backend-dev"
+database_name = "turtil_backend_dev"
 
 # Storage Configuration 
-s3_bucket_prefix = "turtil-backend"           # S3 bucket prefix
+s3_bucket_prefix = "turtil-backend-dev"           # S3 bucket prefix
 enable_s3_versioning = false                 # Disable versioning for cost
 s3_lifecycle_enabled = true                  # Enable lifecycle for cleanup
 s3_transition_to_ia_days = 30                # Move to IA after 30 days
 s3_expiration_days = 90                      # Delete after 90 days
 
 # Container Registry Configuration
-ecr_repository_name = "turtil-backend"        # ECR repository name
+ecr_repository_name = "turtil-backend-dev"        # ECR repository name
 ecr_image_tag_mutability = "MUTABLE"
 ecr_max_image_count = 5                      # Keep fewer images
 
@@ -61,7 +61,7 @@ log_level = "DEBUG"                          # Verbose logging for dev
 # Tags
 tags = {
   Environment = "dev"
-  Application = "turtil-backend"
+  Application = "turtil-backend-dev"
   ManagedBy   = "terraform"
   CostCenter  = "dev"
   Owner       = "dev-team"

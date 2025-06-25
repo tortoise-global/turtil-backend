@@ -2,114 +2,57 @@
 # EC2 MODULE OUTPUTS
 # ============================================================================
 
-# Environment Information
-output "deployment_mode" {
-  description = "Deployment mode (single-instance or auto-scaling-group)"
-  value       = var.enable_single_instance ? "single-instance" : "auto-scaling-group"
-}
-
-# Network Information
-output "vpc_id" {
-  description = "VPC ID"
-  value       = data.aws_vpc.default.id
-}
-
-output "availability_zones" {
-  description = "Available zones"
-  value       = data.aws_availability_zones.available.names
-}
-
-output "subnet_ids" {
-  description = "Subnet IDs in the VPC"
-  value       = data.aws_subnets.default.ids
-}
-
-output "security_group_id" {
-  description = "Application security group ID"
-  value       = aws_security_group.app.id
-}
-
-# Single Instance Outputs (Development)
 output "instance_id" {
-  description = "EC2 instance ID (single instance mode only)"
-  value       = var.enable_single_instance ? aws_instance.single[0].id : null
+  description = "ID of the EC2 instance"
+  value       = aws_instance.main.id
 }
 
-output "instance_public_ip" {
-  description = "Public IP address of the instance (single instance mode only)"
-  value       = var.enable_single_instance ? aws_instance.single[0].public_ip : null
+output "instance_arn" {
+  description = "ARN of the EC2 instance"
+  value       = aws_instance.main.arn
 }
 
-output "instance_private_ip" {
-  description = "Private IP address of the instance (single instance mode only)"
-  value       = var.enable_single_instance ? aws_instance.single[0].private_ip : null
+output "instance_state" {
+  description = "State of the EC2 instance"
+  value       = aws_instance.main.instance_state
 }
 
-output "instance_public_dns" {
-  description = "Public DNS name of the instance (single instance mode only)"
-  value       = var.enable_single_instance ? aws_instance.single[0].public_dns : null
+output "public_ip" {
+  description = "Public IP address of the instance"
+  value       = aws_instance.main.public_ip
 }
 
-# Auto Scaling Group Outputs (Test/Production)
-output "asg_name" {
-  description = "Auto Scaling Group name (ASG mode only)"
-  value       = var.enable_single_instance ? null : aws_autoscaling_group.app[0].name
+output "private_ip" {
+  description = "Private IP address of the instance"
+  value       = aws_instance.main.private_ip
 }
 
-output "asg_arn" {
-  description = "Auto Scaling Group ARN (ASG mode only)"
-  value       = var.enable_single_instance ? null : aws_autoscaling_group.app[0].arn
+output "public_dns" {
+  description = "Public DNS name of the instance"
+  value       = aws_instance.main.public_dns
 }
 
-output "launch_template_id" {
-  description = "Launch template ID"
-  value       = aws_launch_template.app.id
+output "private_dns" {
+  description = "Private DNS name of the instance"
+  value       = aws_instance.main.private_dns
 }
 
-output "launch_template_version" {
-  description = "Launch template version"
-  value       = aws_launch_template.app.latest_version
+output "availability_zone" {
+  description = "Availability zone of the instance"
+  value       = aws_instance.main.availability_zone
 }
 
-# IAM Information
-output "iam_role_arn" {
-  description = "IAM role ARN for instances"
-  value       = aws_iam_role.app_role.arn
+output "key_name" {
+  description = "Key name of the instance"
+  value       = aws_instance.main.key_name
 }
 
-output "iam_instance_profile_name" {
-  description = "IAM instance profile name"
-  value       = aws_iam_instance_profile.app_profile.name
+output "security_groups" {
+  description = "Security groups attached to the instance"
+  value       = aws_instance.main.vpc_security_group_ids
 }
 
-# Access Information
-output "access_info" {
-  description = "Access information for the deployment"
-  value = var.enable_single_instance ? {
-    mode        = "single-instance"
-    public_ip   = aws_instance.single[0].public_ip
-    health_url  = "http://${aws_instance.single[0].public_ip}:8000/health"
-    app_url     = "http://${aws_instance.single[0].public_ip}:8000"
-    ssh_command = "ssh -i your-key.pem ubuntu@${aws_instance.single[0].public_ip}"
-  } : {
-    mode         = "auto-scaling-group"
-    asg_name     = aws_autoscaling_group.app[0].name
-    min_size     = aws_autoscaling_group.app[0].min_size
-    max_size     = aws_autoscaling_group.app[0].max_size
-    desired_size = aws_autoscaling_group.app[0].desired_capacity
-  }
-}
-
-# Cost Information
-output "cost_estimation" {
-  description = "Estimated monthly cost"
-  value = {
-    instance_type = var.instance_type
-    spot_enabled  = var.enable_spot_instances
-    estimated_cost = var.enable_single_instance ? (
-      var.enable_spot_instances ? "$3-5/month (spot)" : "$8-12/month (on-demand)"
-    ) : (
-      var.enable_spot_instances ? "$15-25/month (spot)" : "$30-50/month (on-demand)"
-    )
-  }
+output "elastic_ip" {
+  description = "Elastic IP address (if created)"
+  value       = var.associate_elastic_ip ? aws_eip.main[0].public_ip : null
 }
