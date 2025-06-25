@@ -381,7 +381,7 @@ resource "aws_iam_instance_profile" "dev_ec2_profile" {
 
 # EC2 Instance for the application
 resource "aws_instance" "dev_app" {
-  ami           = "ami-02f607855bfce66b6" # Ubuntu 24.04 LTS ARM64
+  ami           = "ami-0c2af51e265bd5e0e" # Amazon Linux 2023 ARM64 with Docker
   instance_type = "t4g.micro"
   
   vpc_security_group_ids = [aws_security_group.dev_ec2.id]

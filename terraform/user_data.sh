@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # ============================================================================
-# EC2 USER DATA SCRIPT - DEV ENVIRONMENT
+# EC2 USER DATA SCRIPT - DEV ENVIRONMENT (Amazon Linux 2023)
 # ============================================================================
-# This script sets up Docker and runs the Turtil Backend application
+# This script sets up the Turtil Backend application (Docker pre-installed)
 
 set -e
 
@@ -14,22 +14,24 @@ log() {
 
 log "Starting user data script execution..."
 
-# Update system
+# Update system and install required packages
 log "Updating system packages..."
-apt update -y
+dnf update -y
 
-# Install Docker, docker-compose, and nginx
-log "Installing Docker, docker-compose, nginx, and unzip..."
-apt install -y docker.io docker-compose nginx unzip curl
+# Install docker-compose and nginx
+log "Installing docker-compose, nginx, and unzip..."
+dnf install -y nginx unzip
+curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
 log "Starting and enabling Docker service..."
 systemctl start docker
 systemctl enable docker
-usermod -a -G docker ubuntu
-log "Docker installation completed"
+usermod -a -G docker ec2-user
+log "Docker setup completed"
 
 # Configure nginx as reverse proxy
 cat > /etc/nginx/nginx.conf << 'EOF'
-user www-data;
+user nginx;
 worker_processes auto;
 error_log /var/log/nginx/error.log;
 pid /run/nginx.pid;
@@ -118,17 +120,17 @@ fi
 
 # Create environment file for the container
 log "Creating environment file..."
-cat > /home/ubuntu/app.env << 'EOF'
+cat > /home/ec2-user/app.env << 'EOF'
 ENVIRONMENT=${environment}
 DEBUG=true
 LOG_LEVEL=INFO
 PORT=8000
 EOF
-chown ubuntu:ubuntu /home/ubuntu/app.env
+chown ec2-user:ec2-user /home/ec2-user/app.env
 
 # Create docker-compose.yml file with all environment variables
 log "Creating docker-compose.yml file..."
-cat > /home/ubuntu/docker-compose.yml << 'EOF'
+cat > /home/ec2-user/docker-compose.yml << 'EOF'
 version: '3.8'
 
 services:
@@ -186,11 +188,11 @@ services:
       retries: 3
       start_period: 40s
 EOF
-chown ubuntu:ubuntu /home/ubuntu/docker-compose.yml
+chown ec2-user:ec2-user /home/ec2-user/docker-compose.yml
 
 # Run the container using docker-compose
 log "Starting Docker container with docker-compose..."
-cd /home/ubuntu
+cd /home/ec2-user
 if docker-compose up -d; then
     log "Docker container started successfully with docker-compose"
 else
@@ -208,17 +210,17 @@ cat > /etc/logrotate.d/turtil-backend << 'EOF'
     delaycompress
     missingok
     notifempty
-    create 644 ubuntu ubuntu
+    create 644 ec2-user ec2-user
 }
 EOF
 
 # Create health check script
-cat > /home/ubuntu/health-check.sh << 'EOF'
+cat > /home/ec2-user/health-check.sh << 'EOF'
 #!/bin/bash
 # Check both nginx (port 80) and FastAPI (port 8000)
 curl -f http://localhost/health && curl -f http://localhost:8000/health || exit 1
 EOF
-chmod +x /home/ubuntu/health-check.sh
+chmod +x /home/ec2-user/health-check.sh
 
 # Final verification
 log "Verifying deployment..."
