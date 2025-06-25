@@ -84,6 +84,7 @@ jobs:
       
       - name: 🏗️ Deploy Infrastructure
         working-directory: ./terraform
+        shell: bash
         env:
           # Project Configuration
           TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
@@ -131,12 +132,16 @@ jobs:
           # Legacy compatibility
           TF_VAR_project_name: ${{ secrets.PROJECT_NAME }}
         run: |
+          set +e  # Disable exit on error temporarily for terraform plan
+          
           echo "🔧 Initializing Terraform..."
           terraform init -upgrade
           
           echo "📋 Creating Terraform plan..."
           terraform plan -out=tfplan -detailed-exitcode
           PLAN_EXIT_STATUS=$?
+          
+          set -e  # Re-enable exit on error
           
           if [ $PLAN_EXIT_STATUS -eq 0 ]; then
             echo "✅ No infrastructure changes needed"
@@ -150,7 +155,7 @@ jobs:
             echo "🔄 Infrastructure changes detected, applying..."
             terraform apply -auto-approve tfplan
           else
-            echo "❌ Terraform plan failed"
+            echo "❌ Terraform plan failed with exit code $PLAN_EXIT_STATUS"
             exit 1
           fi
           
@@ -207,29 +212,39 @@ jobs:
 
       - name: ⚡ Restart Application Service
         working-directory: ./terraform
+        continue-on-error: true  # Don't fail deployment if restart fails
         run: |
           echo "🔄 Restarting application on EC2 instance..."
           
           INSTANCE_ID=$(terraform output -raw ec2_instance_id)
           
           # Send restart command to EC2 instance
-          aws ssm send-command \
+          echo "📤 Sending restart command to instance $INSTANCE_ID..."
+          ECR_URI="${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ secrets.PROJECT_NAME }}-dev:latest"
+          
+          if aws ssm send-command \
             --instance-ids $INSTANCE_ID \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["sudo systemctl restart turtil-backend", "sudo systemctl status turtil-backend"]' \
+            --parameters "commands=[\"aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com\",\"sudo docker pull $ECR_URI\",\"sudo systemctl restart turtil-backend\",\"sleep 10\",\"sudo systemctl status turtil-backend --no-pager\"]" \
             --region ${{ env.AWS_REGION }} \
-            --output json > /tmp/restart_command.json
-          
-          # Get command ID and wait for completion
-          COMMAND_ID=$(cat /tmp/restart_command.json | jq -r '.Command.CommandId')
-          
-          echo "⏳ Waiting for restart command to complete..."
-          aws ssm wait command-executed \
-            --command-id $COMMAND_ID \
-            --instance-id $INSTANCE_ID \
-            --region ${{ env.AWS_REGION }}
-          
-          echo "✅ Application restart completed"
+            --output json > /tmp/restart_command.json; then
+            
+            # Get command ID and wait for completion
+            COMMAND_ID=$(cat /tmp/restart_command.json | jq -r '.Command.CommandId')
+            
+            echo "⏳ Waiting for restart command to complete (Command ID: $COMMAND_ID)..."
+            if aws ssm wait command-executed \
+              --command-id $COMMAND_ID \
+              --instance-id $INSTANCE_ID \
+              --region ${{ env.AWS_REGION }} \
+              --cli-read-timeout 300; then
+              echo "✅ Application restart completed successfully"
+            else
+              echo "⚠️ Restart command timed out, but continuing with health checks"
+            fi
+          else
+            echo "⚠️ Failed to send SSM command, will rely on user data script for deployment"
+          fi
 
       - name: 🏥 Comprehensive Health Checks
         working-directory: ./terraform
