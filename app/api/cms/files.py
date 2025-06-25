@@ -20,7 +20,7 @@ router = APIRouter(prefix="/cms/files", tags=["CMS File Management"])
 
 # File configuration - now using environment-aware bucket
 from app.config import settings
-BUCKET_NAME = settings.environment_s3_bucket_name
+BUCKET_NAME = settings.s3_bucket_name
 
 # Common MIME types for reference (not restrictive)
 COMMON_MIME_TYPES = {

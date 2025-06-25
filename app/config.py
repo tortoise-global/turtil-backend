@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 from typing import List, Optional
 import os
@@ -43,16 +43,25 @@ class Settings(BaseSettings):
     )
 
     # CORS and Host Configuration
-    cors_origins: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"],
+    cors_origins: str = Field(
+        default="http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000",
         env="CORS_ORIGINS",
-        description="CORS origins - no wildcards when using credentials",
+        description="Comma-separated CORS origins",
     )
-    allowed_hosts: List[str] = Field(
-        default=["*", "localhost", "127.0.0.1", "0.0.0.0"],
+
+    allowed_hosts: str = Field(
+        default="*,localhost,127.0.0.1,0.0.0.0",
         env="ALLOWED_HOSTS",
-        description="Allowed hosts",
+        description="Comma-separated allowed hosts",
     )
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        return [i.strip() for i in self.cors_origins.split(",") if i.strip()]
+
+    @property
+    def allowed_hosts_list(self) -> List[str]:
+        return [i.strip() for i in self.allowed_hosts.split(",") if i.strip()]
 
     # Rate Limiting Configuration
     rate_limit_calls: int = Field(
@@ -110,25 +119,10 @@ class Settings(BaseSettings):
     def is_development(self) -> bool:
         return self.environment.lower() in ["dev", "local"]
     
-    @property
-    def environment_s3_bucket_name(self) -> str:
-        """Get environment-specific S3 bucket name"""
-        return f"{self.project_name}-{self.environment}-storage"
-    
-    @property
-    def logs_s3_bucket_name(self) -> str:
-        """Get environment-specific logs S3 bucket name"""
-        return f"{self.project_name}-{self.environment}-logs"
-    
-    @property
-    def terraform_state_bucket_name(self) -> str:
-        """Get environment-specific Terraform state S3 bucket name"""
-        return f"{self.project_name}-{self.environment}-terraform-state"
-    
-    @property
-    def ecr_repository_name(self) -> str:
-        """Get environment-specific ECR repository name"""
-        return f"{self.project_name}-{self.environment}"
+    # S3 Bucket Configuration
+    s3_bucket_name: str = Field(
+        default="turtil-backend-dev", env="S3_BUCKET_NAME", description="S3 bucket name for all storage"
+    )
 
     class Config:
         env_file = os.getenv("ENV_FILE", ".env")

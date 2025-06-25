@@ -721,39 +721,19 @@ class EmailService:
 
 
 class S3Service:
-    """Enhanced S3 service for file uploads with environment-aware configuration"""
-
-    @staticmethod
-    def get_environment_bucket_name(bucket_type: str = "storage") -> str:
-        """
-        Get environment-specific bucket name
-        
-        Args:
-            bucket_type: Type of bucket (storage, logs, terraform-state)
-            
-        Returns:
-            Environment-specific bucket name
-        """
-        if bucket_type == "logs":
-            return settings.logs_s3_bucket_name
-        elif bucket_type == "terraform-state":
-            return settings.terraform_state_bucket_name
-        else:
-            return settings.environment_s3_bucket_name
+    """S3 service for file uploads using single bucket configuration"""
 
     @staticmethod
     def generate_presigned_url(
         object_name: str, 
-        bucket_type: str = "storage",
         expiration: int = 3600,
         conditions: list = None
     ) -> dict:
         """
-        Generate a presigned URL for S3 object upload with enhanced security
+        Generate a presigned URL for S3 object upload
 
         Args:
             object_name: Name of the object to upload
-            bucket_type: Type of bucket to use (storage, logs, terraform-state)
             expiration: Time in seconds for the presigned URL to remain valid
             conditions: List of conditions for the presigned POST
 
@@ -762,7 +742,7 @@ class S3Service:
         """
         try:
             s3_client = get_s3_client()
-            bucket_name = S3Service.get_environment_bucket_name(bucket_type)
+            bucket_name = settings.s3_bucket_name
 
             # Default conditions for security
             if not conditions:
@@ -781,7 +761,7 @@ class S3Service:
             )
 
             logger.info(
-                f"Generated presigned URL for {object_name} in {bucket_type} bucket ({bucket_name})"
+                f"Generated presigned URL for {object_name} in bucket {bucket_name}"
             )
             
             return {
@@ -871,33 +851,17 @@ class S3Service:
         return mime_types.get(extension, "application/octet-stream")
 
     @staticmethod
-    def get_object_url(object_name: str, bucket_type: str = "storage") -> str:
+    def get_object_url(object_name: str) -> str:
         """
         Get the public URL for an S3 object
 
         Args:
             object_name: Name of the object
-            bucket_type: Type of bucket (storage, logs, terraform-state)
 
         Returns:
             Public URL string
         """
-        bucket_name = S3Service.get_environment_bucket_name(bucket_type)
-        return f"https://{bucket_name}.s3.{settings.aws_region}.amazonaws.com/{object_name}"
-
-    @staticmethod
-    def get_object_url_legacy(bucket_name: str, object_name: str) -> str:
-        """
-        Get the public URL for an S3 object (legacy method)
-
-        Args:
-            bucket_name: Name of the S3 bucket
-            object_name: Name of the object
-
-        Returns:
-            Public URL string
-        """
-        return f"https://{bucket_name}.s3.{settings.aws_region}.amazonaws.com/{object_name}"
+        return f"https://{settings.s3_bucket_name}.s3.{settings.aws_region}.amazonaws.com/{object_name}"
 
 
 # Health check function
