@@ -62,5 +62,7 @@ export TF_VAR_environment="$ENVIRONMENT"
 export TF_VAR_app_debug="$DEBUG"
 export TF_VAR_aws_region="$AWS_REGION"
 export TF_VAR_custom_ami_id="$CUSTOM_AMI_ID"
+export TF_VAR_app_s3_bucket_name="$S3_BUCKET_NAME"
 
 echo "✅ Environment variables loaded for dev and exported as TF_VAR_* variables"
+echo "🔧 You can now run terraform commands like: terraform plan, terraform apply"
