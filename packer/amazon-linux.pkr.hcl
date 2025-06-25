@@ -88,7 +88,14 @@ build {
     script = "scripts/install-docker.sh"
   }
 
-  # Copy application files (will create turtil-backend directory in /tmp)
+  # Create directory for application files
+  provisioner "shell" {
+    inline = [
+      "mkdir -p /tmp/turtil-backend"
+    ]
+  }
+
+  # Copy application files
   provisioner "file" {
     source      = "../"
     destination = "/tmp/turtil-backend/"
