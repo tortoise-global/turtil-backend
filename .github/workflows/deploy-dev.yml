@@ -192,46 +192,67 @@ jobs:
           # Legacy compatibility
           TF_VAR_project_name: ${{ secrets.PROJECT_NAME }}
         run: |
-          echo "🔍 Checking for existing development resources to import..."
+          echo "🔍 Comprehensive import of existing AWS resources..."
+          source ./scripts/loadenv.sh
           
-          # Import ECR repository if it exists
+          # Import ECR repository
           ECR_REPO_NAME="${{ secrets.PROJECT_NAME }}-dev"
           if aws ecr describe-repositories --repository-names "$ECR_REPO_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
             echo "✅ ECR repository exists, importing..."
-            terraform import aws_ecr_repository.dev_app "$ECR_REPO_NAME" || echo "⚠️ ECR import failed or already imported"
+            terraform import module.ecr.aws_ecr_repository.main "$ECR_REPO_NAME" || echo "⚠️ ECR import failed or already imported"
           fi
           
-          # Import DB subnet group if it exists (new VPC version)
-          DB_SUBNET_GROUP_NAME="${{ secrets.PROJECT_NAME }}-dev-vpc-db-subnet-group"
-          if aws rds describe-db-subnet-groups --db-subnet-group-name "$DB_SUBNET_GROUP_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
-            echo "✅ DB subnet group exists, importing..."
-            terraform import aws_db_subnet_group.main "$DB_SUBNET_GROUP_NAME" || echo "⚠️ DB subnet group import failed or already imported"
+          # Import VPC and subnets
+          VPC_NAME="${{ secrets.PROJECT_NAME }}-dev"
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=$VPC_NAME" --query 'Vpcs[0].VpcId' --output text --region ${{ env.AWS_REGION }} 2>/dev/null || echo "null")
+          if [ "$VPC_ID" != "null" ] && [ "$VPC_ID" != "None" ]; then
+            echo "✅ VPC exists, importing..."
+            terraform import module.vpc.aws_vpc.main "$VPC_ID" || echo "⚠️ VPC import failed or already imported"
           fi
           
-          # Import RDS database instance if it exists
+          # Import RDS instance
           DB_INSTANCE_NAME="${{ secrets.PROJECT_NAME }}-dev"
           if aws rds describe-db-instances --db-instance-identifier "$DB_INSTANCE_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
             echo "✅ RDS database exists, importing..."
-            terraform import aws_db_instance.dev_database "$DB_INSTANCE_NAME" || echo "⚠️ RDS database import failed or already imported"
+            terraform import module.rds.aws_db_instance.main "$DB_INSTANCE_NAME" || echo "⚠️ RDS import failed or already imported"
           fi
           
-          # Import IAM resources if they exist
+          # Import S3 bucket
+          S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}"
+          if aws s3api head-bucket --bucket "$S3_BUCKET_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            echo "✅ S3 bucket exists, importing..."
+            terraform import module.s3_storage.aws_s3_bucket.main "$S3_BUCKET_NAME" || echo "⚠️ S3 import failed or already imported"
+          fi
+          
+          # Import EC2 instance
+          INSTANCE_NAME="${{ secrets.PROJECT_NAME }}-dev"
+          INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=$INSTANCE_NAME" "Name=instance-state-name,Values=running,pending,stopped" --query 'Reservations[0].Instances[0].InstanceId' --output text --region ${{ env.AWS_REGION }} 2>/dev/null || echo "null")
+          if [ "$INSTANCE_ID" != "null" ] && [ "$INSTANCE_ID" != "None" ]; then
+            echo "✅ EC2 instance exists, importing..."
+            terraform import module.ec2.aws_instance.main "$INSTANCE_ID" || echo "⚠️ EC2 import failed or already imported"
+          fi
+          
+          # Import IAM role and instance profile
           IAM_ROLE_NAME="${{ secrets.PROJECT_NAME }}-dev-ec2-role"
-          if aws iam get-role --role-name "$IAM_ROLE_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+          if aws iam get-role --role-name "$IAM_ROLE_NAME" > /dev/null 2>&1; then
             echo "✅ IAM role exists, importing..."
-            terraform import aws_iam_role.dev_ec2_role "$IAM_ROLE_NAME" || echo "⚠️ IAM role import failed or already imported"
+            terraform import module.iam.aws_iam_role.ec2_role "$IAM_ROLE_NAME" || echo "⚠️ IAM role import failed or already imported"
           fi
           
           IAM_PROFILE_NAME="${{ secrets.PROJECT_NAME }}-dev-ec2-profile"
-          if aws iam get-instance-profile --instance-profile-name "$IAM_PROFILE_NAME" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+          if aws iam get-instance-profile --instance-profile-name "$IAM_PROFILE_NAME" > /dev/null 2>&1; then
             echo "✅ IAM instance profile exists, importing..."
-            terraform import aws_iam_instance_profile.dev_ec2_profile "$IAM_PROFILE_NAME" || echo "⚠️ IAM instance profile import failed or already imported"
+            terraform import module.iam.aws_iam_instance_profile.ec2_profile "$IAM_PROFILE_NAME" || echo "⚠️ IAM instance profile import failed or already imported"
           fi
           
-          # Skip ALB import for development environment (no ALB in dev)
-          echo "⚠️ Skipping ALB import for development environment (no load balancer)"
+          # Import Route53 record
+          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "turtil.co" --query 'HostedZones[0].Id' --output text --region ${{ env.AWS_REGION }} 2>/dev/null | cut -d'/' -f3 || echo "null")
+          if [ "$HOSTED_ZONE_ID" != "null" ] && [ "$HOSTED_ZONE_ID" != "None" ]; then
+            echo "✅ Route53 hosted zone found, importing dev record..."
+            terraform import aws_route53_record.dev_api "${HOSTED_ZONE_ID}_dev.api.turtil.co_A" || echo "⚠️ Route53 record import failed or already imported"
+          fi
           
-          echo "🔧 Development import phase completed"
+          echo "🔧 Comprehensive import phase completed"
 
       - name: Regenerate Terraform Plan After Imports
         working-directory: ./terraform
