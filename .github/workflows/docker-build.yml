@@ -2,12 +2,13 @@ name: Docker Build & Push
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
     paths:
       - 'app/**'
       - 'Dockerfile'
       - 'requirements.txt'
       - '.github/workflows/docker-build.yml'
+  workflow_dispatch:
 
 env:
   AWS_REGION: ap-south-2

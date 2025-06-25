@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: [dev, prod]
+        environment: [dev]
         
     steps:
       - name: Checkout
@@ -37,48 +37,22 @@ jobs:
       - name: Load Environment Variables
         run: |
           echo "ENVIRONMENT=${{ matrix.environment }}" >> $GITHUB_ENV
-          echo "WORKSPACE=${{ matrix.environment }}" >> $GITHUB_ENV
 
       - name: Terraform Init
         working-directory: ./terraform-files
         run: terraform init
 
-      - name: Select Workspace
-        working-directory: ./terraform-files
-        run: |
-          terraform workspace select ${{ env.WORKSPACE }} || terraform workspace new ${{ env.WORKSPACE }}
-
       - name: Terraform Plan
         working-directory: ./terraform-files
-        run: |
-          terraform plan \
-            -var-file="environments/${{ env.ENVIRONMENT }}.tfvars" \
-            -out=tfplan-${{ env.ENVIRONMENT }}
+        run: terraform plan -out=tfplan-${{ env.ENVIRONMENT }}
         env:
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
-          TF_VAR_aws_ses_region: ap-south-1
-          TF_VAR_custom_ami_id: ${{ secrets.CUSTOM_AMI_ID }}
-          TF_VAR_app_database_url: ${{ secrets.DATABASE_URL }}
-          TF_VAR_app_secret_key: ${{ secrets.SECRET_KEY }}
-          TF_VAR_app_algorithm: ${{ secrets.ALGORITHM }}
-          TF_VAR_app_access_token_expire_minutes: ${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
-          TF_VAR_app_project_name: ${{ secrets.PROJECT_NAME }}
-          TF_VAR_app_version: ${{ secrets.VERSION }}
-          TF_VAR_app_log_level: ${{ secrets.LOG_LEVEL }}
-          TF_VAR_app_rate_limit_calls: ${{ secrets.RATE_LIMIT_CALLS }}
-          TF_VAR_app_rate_limit_period: ${{ secrets.RATE_LIMIT_PERIOD }}
-          TF_VAR_app_otp_secret: ${{ secrets.OTP_SECRET }}
-          TF_VAR_app_otp_expiry_minutes: ${{ secrets.OTP_EXPIRY_MINUTES }}
-          TF_VAR_app_redis_user_cache_ttl: ${{ secrets.REDIS_USER_CACHE_TTL }}
-          TF_VAR_app_redis_blacklist_ttl: ${{ secrets.REDIS_BLACKLIST_TTL }}
-          TF_VAR_app_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          TF_VAR_app_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          TF_VAR_app_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
-          TF_VAR_app_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
-          TF_VAR_app_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
-          TF_VAR_app_aws_ses_from_email: ${{ secrets.AWS_SES_FROM_EMAIL }}
-          TF_VAR_ecr_account_id: ${{ secrets.ECR_ACCOUNT_ID }}
-          TF_VAR_ecr_repository_name: ${{ secrets.ECR_REPOSITORY_NAME }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_upstash_redis_url: ${{ secrets.UPSTASH_REDIS_URL }}
+          TF_VAR_upstash_redis_token: ${{ secrets.UPSTASH_REDIS_TOKEN }}
+          TF_VAR_aws_ses_from_email: ${{ secrets.AWS_SES_FROM_EMAIL }}
 
       - name: Upload Plan
         uses: actions/upload-artifact@v4
