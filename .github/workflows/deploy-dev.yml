@@ -16,6 +16,7 @@ jobs:
   deploy:
     name: Deploy Turtil Backend
     runs-on: ubuntu-latest
+    environment: dev
     
     steps:
       - name: Checkout code
