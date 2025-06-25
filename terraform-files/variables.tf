@@ -2,7 +2,7 @@
 variable "aws_region" {
   description = "AWS region for infrastructure"
   type        = string
-  default     = "ap-south-2"
+  default     = "ap-south-1"
 }
 
 # User-provided secrets (from GitHub Secrets)

@@ -9,17 +9,16 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "turtil-backend-dev"
+    bucket         = "turtil-backend-dev-ap-south-1"
     key            = "tf-infra/terraform.tfstate"
-    region         = "ap-south-2"
-    dynamodb_table = "turtil-backend-dev-terraform-lock"
+    region         = "ap-south-1"
+    dynamodb_table = "turtil-backend-dev-ap-south-1-terraform-lock"
     encrypt        = true
   }
 }
 
 provider "aws" {
-  region                 = var.aws_region
-  skip_region_validation = true
+  region = var.aws_region
   
   default_tags {
     tags = {
