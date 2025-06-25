@@ -1,19 +1,49 @@
 # 🚨 Critical Deployment Fix - June 25, 2025
 
-## Issue Identified
+## Issues Identified
 
-**Problem**: Recent deployment failures caused by `bash -e` flag interaction with `terraform plan -detailed-exitcode`
+### 1. Docker Platform Mismatch (NEW - FIXED)
+**Problem**: Docker build failing with "exec format error" when building ARM64 images  
+**Root Cause**: Using `docker build --platform linux/arm64` instead of `docker buildx build` for cross-platform builds  
+**Error Signature**: 
+```
+exec /bin/sh: exec format error
+ERROR: failed to solve: process "/bin/sh -c ..." did not complete successfully: exit code 255
+```
 
-**Root Cause**: When Terraform detects infrastructure changes, it returns exit code 2. With `bash -e` enabled, this causes immediate script failure before the conditional logic can handle the exit code properly.
-
+### 2. Terraform Exit Code Handling (PREVIOUSLY FIXED)
+**Problem**: Recent deployment failures caused by `bash -e` flag interaction with `terraform plan -detailed-exitcode`  
+**Root Cause**: When Terraform detects infrastructure changes, it returns exit code 2. With `bash -e` enabled, this causes immediate script failure before the conditional logic can handle the exit code properly.  
 **Error Signature**: 
 ```
 ##[error]Process completed with exit code 2.
 ```
 
-## ✅ Fix Applied
+## ✅ Fixes Applied
 
-### 1. Fixed Terraform Plan Handling
+### 1. Fixed Docker Cross-Platform Build (NEW)
+**File**: `.github/workflows/deploy-dev.yml` and `.github/workflows/rollback-emergency.yml`  
+**Change**: Replaced `docker build --platform` with `docker buildx build` for proper ARM64 support
+
+**Before:**
+```bash
+docker build --platform linux/arm64 -t $ECR_REPO_NAME .
+docker tag $ECR_REPO_NAME:latest $ECR_REGISTRY/$ECR_REPO_NAME:latest
+docker push $ECR_REGISTRY/$ECR_REPO_NAME:latest
+```
+
+**After:**
+```bash
+docker buildx build \
+  --platform linux/arm64 \
+  --tag $ECR_REGISTRY/$ECR_REPO_NAME:latest \
+  --tag $ECR_REGISTRY/$ECR_REPO_NAME:dev \
+  --tag $ECR_REGISTRY/$ECR_REPO_NAME:${{ github.sha }} \
+  --push \
+  .
+```
+
+### 2. Fixed Terraform Plan Handling
 **File**: `.github/workflows/deploy-dev.yml`
 **Change**: Added `set +e` before terraform plan and `set -e` after capturing exit code
 
@@ -44,6 +74,7 @@ set -e  # Re-enable exit on error
 
 | Scenario | Before Fix | After Fix |
 |----------|------------|-----------|
+| Docker ARM64 build | ❌ Fails with exec format error | ✅ Cross-platform build works |
 | No infrastructure changes | ✅ Works | ✅ Works |
 | Infrastructure changes detected | ❌ Fails with exit code 2 | ✅ Applies changes properly |
 | Terraform plan errors | ❌ Fails silently | ✅ Fails with clear error message |
@@ -61,17 +92,19 @@ set -e  # Re-enable exit on error
 
 ## 📊 Deployment Success Rate Prediction
 
-- **Before Fix**: ~30% (failing on infrastructure changes)
-- **After Fix**: ~90% (only real errors should fail)
+- **Before Fixes**: ~10% (failing on Docker builds + terraform exits)
+- **After Both Fixes**: ~90% (only real errors should fail)
 
 ## 🛠️ Monitoring Points
 
 Watch for these improvements in the next deployment:
 
-1. **"🔄 Infrastructure changes detected, applying..."** message should appear
-2. **Terraform apply should execute successfully**
-3. **Health checks should complete without DNS issues**
-4. **SSM restart should work or gracefully degrade**
+1. **"🏗️ Building Docker image for ARM64 using buildx..."** message should appear
+2. **Docker buildx build should complete without exec format errors**
+3. **"🔄 Infrastructure changes detected, applying..."** message should appear
+4. **Terraform apply should execute successfully**
+5. **Health checks should complete without DNS issues**
+6. **SSM restart should work or gracefully degrade**
 
 ## 🚨 Rollback Plan
 

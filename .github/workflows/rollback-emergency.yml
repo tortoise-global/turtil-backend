@@ -138,15 +138,14 @@ jobs:
           ECR_REGISTRY="${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
           ROLLBACK_TAG="rollback-$(date +%Y%m%d-%H%M%S)"
           
-          # Build rollback image
-          docker build --platform linux/arm64 -t $ECR_REPO_NAME:$ROLLBACK_TAG .
-          
-          # Tag and push
-          docker tag $ECR_REPO_NAME:$ROLLBACK_TAG $ECR_REGISTRY/$ECR_REPO_NAME:$ROLLBACK_TAG
-          docker tag $ECR_REPO_NAME:$ROLLBACK_TAG $ECR_REGISTRY/$ECR_REPO_NAME:latest
-          
-          docker push $ECR_REGISTRY/$ECR_REPO_NAME:$ROLLBACK_TAG
-          docker push $ECR_REGISTRY/$ECR_REPO_NAME:latest
+          # Build and push rollback image using buildx
+          echo "🏗️ Building rollback image for ARM64 using buildx..."
+          docker buildx build \
+            --platform linux/arm64 \
+            --tag $ECR_REGISTRY/$ECR_REPO_NAME:$ROLLBACK_TAG \
+            --tag $ECR_REGISTRY/$ECR_REPO_NAME:latest \
+            --push \
+            .
           
           echo "✅ Rollback image deployed with tag: $ROLLBACK_TAG"
 
