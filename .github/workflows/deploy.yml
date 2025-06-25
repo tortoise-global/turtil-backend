@@ -90,7 +90,7 @@ jobs:
         packer validate \
           -var "aws_region=${{ env.AWS_REGION }}" \
           -var "environment=${{ env.ENVIRONMENT }}" \
-          -var "instance_type=t4g.small" \
+          -var "instance_type=t4g.xlarge" \
           -var "source_ami=ami-0f4448044b7b1e09b" \
           amazon-linux.pkr.hcl
 
@@ -102,13 +102,21 @@ jobs:
         packer build \
           -var "aws_region=${{ env.AWS_REGION }}" \
           -var "environment=${{ env.ENVIRONMENT }}" \
-          -var "instance_type=t4g.small" \
+          -var "instance_type=t4g.xlarge" \
           -var "source_ami=ami-0f4448044b7b1e09b" \
           -machine-readable \
           amazon-linux.pkr.hcl | tee packer-output.log
         
         # Extract AMI ID from Packer output
         AMI_ID=$(grep 'artifact,0,id' packer-output.log | cut -d, -f6 | cut -d: -f2)
+        
+        if [ -z "$AMI_ID" ]; then
+          echo "❌ Failed to extract AMI ID from Packer output"
+          echo "Packer output log:"
+          cat packer-output.log
+          exit 1
+        fi
+        
         echo "AMI_ID=$AMI_ID" >> $GITHUB_OUTPUT
         echo "New AMI created: $AMI_ID"
 
@@ -117,6 +125,16 @@ jobs:
         AMI_ID: ${{ steps.packer-build.outputs.AMI_ID }}
         LAUNCH_TEMPLATE_ID: ${{ vars.LAUNCH_TEMPLATE_ID }}
       run: |
+        if [ -z "$LAUNCH_TEMPLATE_ID" ]; then
+          echo "❌ LAUNCH_TEMPLATE_ID environment variable is not set"
+          exit 1
+        fi
+        
+        if [ -z "$AMI_ID" ]; then
+          echo "❌ AMI_ID is empty"
+          exit 1
+        fi
+        
         echo "Updating Launch Template $LAUNCH_TEMPLATE_ID with new AMI $AMI_ID"
         
         # Create new launch template version

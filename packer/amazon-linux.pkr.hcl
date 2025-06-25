@@ -17,7 +17,7 @@ variable "aws_region" {
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
-  default     = "t4g.small"
+  default     = "t4g.xlarge"
 }
 
 variable "ami_name_prefix" {
@@ -88,10 +88,10 @@ build {
     script = "scripts/install-docker.sh"
   }
 
-  # Copy application files
+  # Copy application files (will create turtil-backend directory in /tmp)
   provisioner "file" {
     source      = "../"
-    destination = "/tmp/turtil-backend"
+    destination = "/tmp/turtil-backend/"
   }
 
   # Copy build environment file

@@ -177,3 +177,5 @@ htmlcov/
 # Local testing
 test_*.py
 *_test.py
+
+*/env_config.json
