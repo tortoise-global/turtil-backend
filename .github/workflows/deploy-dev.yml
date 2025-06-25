@@ -38,24 +38,15 @@ jobs:
         working-directory: ./terraform
         continue-on-error: true
         run: |
-          echo "🧹 Cleaning problematic state entries..."
+          echo "🧹 Force cleaning corrupted remote state..."
           
-          # Initialize temporarily to access state commands
-          terraform init -reconfigure > /dev/null 2>&1 || true
+          # Backup current state
+          aws s3 cp s3://turtil-backend-terraform/modular-dev/terraform.tfstate s3://turtil-backend-terraform/modular-dev/terraform.tfstate.backup.$(date +%Y%m%d_%H%M%S) || true
           
-          # Try to remove any problematic check resources from state
-          terraform state list 2>/dev/null | grep -E "^check\." | while read resource; do
-            echo "Removing problematic resource: $resource"
-            terraform state rm "$resource" 2>/dev/null || true
-          done
+          # Remove the corrupted state file to force fresh initialization
+          aws s3 rm s3://turtil-backend-terraform/modular-dev/terraform.tfstate || true
           
-          # Clean up validation blocks that might cause issues
-          terraform state list 2>/dev/null | grep -E "^validation\." | while read resource; do
-            echo "Removing validation resource: $resource"
-            terraform state rm "$resource" 2>/dev/null || true
-          done
-          
-          echo "✅ State cleanup completed"
+          echo "✅ Remote state cleaned - will create fresh state"
 
       - name: Terraform Init
         working-directory: ./terraform
