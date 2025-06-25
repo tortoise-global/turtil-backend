@@ -142,6 +142,12 @@ variable "app_aws_ses_from_email" {
   default     = "noreply@turtil.co"
 }
 
+variable "custom_ami_id" {
+  description = "Custom AMI ID with Docker pre-installed"
+  type        = string
+  default     = "ami-0eb4445f6c0a650a1"  # Fallback to Ubuntu 24.04 LTS ARM64
+}
+
 # Random suffix for unique bucket names
 resource "random_string" "bucket_suffix" {
   length  = 8
@@ -381,7 +387,7 @@ resource "aws_iam_instance_profile" "dev_ec2_profile" {
 
 # EC2 Instance for the application
 resource "aws_instance" "dev_app" {
-  ami           = "ami-0c2af51e265bd5e0e" # Amazon Linux 2023 ARM64 with Docker
+  ami           = var.custom_ami_id
   instance_type = "t4g.micro"
   
   vpc_security_group_ids = [aws_security_group.dev_ec2.id]
@@ -411,6 +417,7 @@ resource "aws_instance" "dev_app" {
     aws_access_key_id = var.app_aws_access_key_id
     aws_secret_access_key = var.app_aws_secret_access_key
     aws_ses_from_email = var.app_aws_ses_from_email
+    custom_ami_id = var.custom_ami_id
   }))
   
   tags = {

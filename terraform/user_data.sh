@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # ============================================================================
-# EC2 USER DATA SCRIPT - DEV ENVIRONMENT (Amazon Linux 2023)
+# EC2 USER DATA SCRIPT - DOCKER-READY AMI (Ubuntu 24.04 LTS)
 # ============================================================================
-# This script sets up the Turtil Backend application (Docker pre-installed)
+# This script sets up the Turtil Backend application on Docker-ready AMI
+# Docker, docker-compose, nginx, and AWS CLI are pre-installed in the AMI
 
 set -e
 
@@ -12,26 +13,26 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a /var/log/user-data.log
 }
 
-log "Starting user data script execution..."
+log "Starting user data script execution on Docker-ready AMI..."
+log "AMI Info: $(cat /etc/ami-info 2>/dev/null || echo 'Custom Docker-ready AMI')"
 
-# Update system and install required packages
-log "Updating system packages..."
-dnf update -y
+# Verify Docker is running (should already be enabled in AMI)
+log "Verifying Docker service..."
+systemctl status docker || {
+    log "Starting Docker service..."
+    systemctl start docker
+    systemctl enable docker
+}
 
-# Install docker-compose and nginx
-log "Installing docker-compose, nginx, and unzip..."
-dnf install -y nginx unzip
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
-log "Starting and enabling Docker service..."
-systemctl start docker
-systemctl enable docker
-usermod -a -G docker ec2-user
-log "Docker setup completed"
+# Ensure ubuntu user is in docker group (should already be done in AMI)
+usermod -a -G docker ubuntu || log "User already in docker group"
+
+log "Docker setup verified - using pre-installed Docker from AMI"
 
 # Configure nginx as reverse proxy
+log "Configuring nginx reverse proxy..."
 cat > /etc/nginx/nginx.conf << 'EOF'
-user nginx;
+user www-data;
 worker_processes auto;
 error_log /var/log/nginx/error.log;
 pid /run/nginx.pid;
@@ -88,12 +89,12 @@ systemctl start nginx
 systemctl enable nginx
 log "Nginx configuration completed"
 
-# Install AWS CLI v2
-log "Installing AWS CLI v2..."
-curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-./aws/install
-log "AWS CLI installation completed"
+# Verify AWS CLI (should be pre-installed in AMI)
+log "Verifying AWS CLI installation..."
+aws --version || {
+    log "ERROR: AWS CLI not found in AMI"
+    exit 1
+}
 
 # Get instance metadata
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
@@ -120,17 +121,17 @@ fi
 
 # Create environment file for the container
 log "Creating environment file..."
-cat > /home/ec2-user/app.env << 'EOF'
+cat > /home/ubuntu/app.env << 'EOF'
 ENVIRONMENT=${environment}
 DEBUG=true
 LOG_LEVEL=INFO
 PORT=8000
 EOF
-chown ec2-user:ec2-user /home/ec2-user/app.env
+chown ubuntu:ubuntu /home/ubuntu/app.env
 
 # Create docker-compose.yml file with all environment variables
 log "Creating docker-compose.yml file..."
-cat > /home/ec2-user/docker-compose.yml << 'EOF'
+cat > /home/ubuntu/docker-compose.yml << 'EOF'
 version: '3.8'
 
 services:
@@ -188,11 +189,11 @@ services:
       retries: 3
       start_period: 40s
 EOF
-chown ec2-user:ec2-user /home/ec2-user/docker-compose.yml
+chown ubuntu:ubuntu /home/ubuntu/docker-compose.yml
 
 # Run the container using docker-compose
 log "Starting Docker container with docker-compose..."
-cd /home/ec2-user
+cd /home/ubuntu
 if docker-compose up -d; then
     log "Docker container started successfully with docker-compose"
 else
@@ -210,17 +211,17 @@ cat > /etc/logrotate.d/turtil-backend << 'EOF'
     delaycompress
     missingok
     notifempty
-    create 644 ec2-user ec2-user
+    create 644 ubuntu ubuntu
 }
 EOF
 
 # Create health check script
-cat > /home/ec2-user/health-check.sh << 'EOF'
+cat > /home/ubuntu/health-check.sh << 'EOF'
 #!/bin/bash
 # Check both nginx (port 80) and FastAPI (port 8000)
 curl -f http://localhost/health && curl -f http://localhost:8000/health || exit 1
 EOF
-chmod +x /home/ec2-user/health-check.sh
+chmod +x /home/ubuntu/health-check.sh
 
 # Final verification
 log "Verifying deployment..."

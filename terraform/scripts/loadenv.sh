@@ -71,6 +71,7 @@ export TF_VAR_ecr_account_id="$ECR_ACCOUNT_ID"
 export TF_VAR_environment="$ENVIRONMENT"
 export TF_VAR_app_debug="$DEBUG"
 export TF_VAR_aws_region="$AWS_REGION"
+export TF_VAR_custom_ami_id="$CUSTOM_AMI_ID"
 
 # Environment-specific Terraform variables
 case "$ENVIRONMENT" in
