@@ -134,6 +134,16 @@ resource "random_password" "secret_key" {
   special = true
 }
 
+# Create EC2 Key Pair for SSH access
+resource "aws_key_pair" "main" {
+  key_name   = "${var.project_name}-${var.environment}"
+  public_key = file("~/.ssh/id_rsa.pub")
+  
+  tags = {
+    Name = "${var.project_name}-${var.environment}"
+  }
+}
+
 # S3 Bucket for file uploads
 resource "aws_s3_bucket" "uploads" {
   bucket        = var.s3_bucket_name
@@ -250,6 +260,14 @@ resource "aws_security_group" "ec2" {
     security_groups = [aws_security_group.alb.id]
   }
 
+  ingress {
+    description = "SSH access"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -352,6 +370,7 @@ resource "aws_launch_template" "main" {
   description   = "Launch template for Turtil Backend"
   image_id      = var.ami_id
   instance_type = var.instance_type
+  key_name      = aws_key_pair.main.key_name
 
   vpc_security_group_ids = [aws_security_group.ec2.id]
 
@@ -519,6 +538,11 @@ output "secret_key" {
 output "dev_api_url" {
   description = "Dev API URL"
   value       = "http://dev.api.turtil.co"
+}
+
+output "key_pair_name" {
+  description = "EC2 Key Pair name for SSH access"
+  value       = aws_key_pair.main.key_name
 }
 
 # Environment configuration template

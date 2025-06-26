@@ -300,19 +300,28 @@ jobs:
       run: |
         echo "Cleaning up old AMIs..."
         
-        # Get list of AMIs for this environment (keeping last 5)
+        # Get list of ALL old AMIs for this environment (keeping only the latest one)
         aws ec2 describe-images \
           --owners self \
           --filters "Name=name,Values=turtil-backend-${{ env.ENVIRONMENT }}-*" \
-          --query 'sort_by(Images, &CreationDate)[:-5].[ImageId,Name]' \
+          --query 'sort_by(Images, &CreationDate)[:-1].[ImageId,Name]' \
           --output text | while read ami_id name; do
           if [ -n "$ami_id" ] && [ "$ami_id" != "None" ]; then
             echo "Deregistering old AMI: $ami_id ($name)"
             aws ec2 deregister-image --image-id $ami_id || true
+            
+            # Also delete associated snapshots
+            echo "Finding and deleting snapshots for AMI: $ami_id"
+            aws ec2 describe-images --image-ids $ami_id --query 'Images[0].BlockDeviceMappings[*].Ebs.SnapshotId' --output text 2>/dev/null | while read snapshot_id; do
+              if [ -n "$snapshot_id" ] && [ "$snapshot_id" != "None" ]; then
+                echo "Deleting snapshot: $snapshot_id"
+                aws ec2 delete-snapshot --snapshot-id $snapshot_id || true
+              fi
+            done
           fi
         done
         
-        echo "AMI cleanup completed"
+        echo "AMI and snapshot cleanup completed"
 
     - name: Deployment Summary
       env:
