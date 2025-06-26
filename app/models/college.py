@@ -42,6 +42,7 @@ class College(UUIDBaseModel):
     # Relationships
     staff_members = relationship("Staff", back_populates="college", foreign_keys="Staff.college_id")
     departments = relationship("Department", back_populates="college")
+    terms = relationship("Term", back_populates="college")
     principal = relationship("Staff", foreign_keys=[principal_staff_id], post_update=True)
     contact_staff = relationship("Staff", foreign_keys=[contact_staff_id], post_update=True)
 

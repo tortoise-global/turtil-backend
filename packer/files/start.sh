@@ -7,12 +7,12 @@ cd /home/ec2-user
 # Create logs directory if it doesn't exist
 mkdir -p /var/log/turtil-backend
 
-# Load environment variables from EC2 user data if available
-if [ -f /home/ec2-user/.env/production.env ]; then
-    echo "Loading environment variables from production.env"
-    export $(cat /home/ec2-user/.env/production.env | grep -v '^#' | xargs)
+# Load environment variables from .env file if available
+if [ -f /home/ec2-user/.env ]; then
+    echo "Loading environment variables from .env"
+    export $(cat /home/ec2-user/.env | grep -v '^#' | xargs)
 else
-    echo "Warning: production.env not found, using default values"
+    echo "Warning: .env not found, using default values"
 fi
 
 # Check if Docker is running

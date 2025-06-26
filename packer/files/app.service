@@ -19,7 +19,7 @@ RestartSec=5
 
 # Environment
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-EnvironmentFile=-/home/ec2-user/.env/production.env
+EnvironmentFile=-/home/ec2-user/.env
 
 # Security settings
 NoNewPrivileges=true

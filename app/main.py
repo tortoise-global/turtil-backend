@@ -20,6 +20,12 @@ from app.api.cms import (
     departments as cms_departments,
     staff as cms_staff,
     files as cms_files,
+    terms as cms_terms,
+    graduations as cms_graduations,
+    degrees as cms_degrees,
+    branches as cms_branches,
+    subjects as cms_subjects,
+    sections as cms_sections,
 )
 
 # Import dev router conditionally
@@ -248,6 +254,9 @@ async def app_info():
             "aws_s3_integration": True,
             "redis_caching": True,
             "camelcase_api": True,
+            "academic_programs": True,
+            "term_management": True,
+            "subject_section_assignment": True,
         },
         "endpoints": {
             "signup": "/api/auth/signup",
@@ -256,6 +265,12 @@ async def app_info():
             "cmsDepartments": "/api/cms/departments",
             "cmsStaff": "/api/cms/staff",
             "cmsFiles": "/api/cms/files",
+            "cmsTerms": "/api/cms/terms",
+            "cmsGraduations": "/api/cms/graduations",
+            "cmsDegrees": "/api/cms/degrees",
+            "cmsBranches": "/api/cms/branches",
+            "cmsSubjects": "/api/cms/subjects",
+            "cmsSections": "/api/cms/sections",
             "health": "/health",
             "healthDetailed": "/health/detailed",
             "docs": "/docs" if settings.debug else "disabled",
@@ -274,6 +289,14 @@ app.include_router(registration.router, prefix="/api/cms")
 app.include_router(cms_departments.router, prefix="/api")
 app.include_router(cms_staff.router, prefix="/api")
 app.include_router(cms_files.router, prefix="/api")
+
+# Academic program management routers
+app.include_router(cms_terms.router, prefix="/api")
+app.include_router(cms_graduations.router, prefix="/api")
+app.include_router(cms_degrees.router, prefix="/api")
+app.include_router(cms_branches.router, prefix="/api")
+app.include_router(cms_subjects.router, prefix="/api")
+app.include_router(cms_sections.router, prefix="/api")
 
 # Include dev router conditionally
 if settings.debug:

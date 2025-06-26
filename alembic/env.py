@@ -12,13 +12,23 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 # Import our application configuration and models
 from app.config import settings
-from app.models.base import BaseModel
+from app.models.base import UUIDBaseModel
 
 # Import all models to ensure they're registered with SQLAlchemy
 from app.models.staff import Staff
 from app.models.college import College
 from app.models.department import Department
 from app.models.session import UserSession
+from app.models.email_otp import CmsEmailOTP
+from app.models.permission import CMSStaffPermission, CMSModules, CMSRoles
+# Import new academic program models
+from app.models.term import Term
+from app.models.graduation import Graduation
+from app.models.degree import Degree
+from app.models.branch import Branch
+from app.models.subject import Subject
+from app.models.section import Section
+from app.models.section_subject import SectionSubject
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -30,11 +40,14 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# URL encode the database URL to handle special characters
+import urllib.parse
+encoded_url = settings.database_url.replace('%', '%%')  # Escape % for configparser
+config.set_main_option("sqlalchemy.url", encoded_url)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-target_metadata = BaseModel.metadata
+target_metadata = UUIDBaseModel.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
