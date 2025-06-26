@@ -218,7 +218,7 @@ jobs:
           echo "Cancelling existing refresh..."
           aws autoscaling cancel-instance-refresh \
             --auto-scaling-group-name $AUTO_SCALING_GROUP_NAME \
-            --instance-refresh-id $EXISTING_REFRESH || true
+            --instance-refresh-ids $EXISTING_REFRESH || true
           
           # Wait a bit for cancellation to process
           echo "Waiting for cancellation to complete..."
