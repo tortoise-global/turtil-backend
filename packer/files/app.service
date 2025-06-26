@@ -7,7 +7,7 @@ StartLimitIntervalSec=0
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/home/ec2-user/start.sh
+ExecStart=/bin/bash /home/ec2-user/start.sh
 ExecStop=/usr/bin/docker-compose -f /home/ec2-user/docker-compose.yml down
 WorkingDirectory=/home/ec2-user
 User=ec2-user
@@ -21,12 +21,9 @@ RestartSec=5
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-/home/ec2-user/.env
 
-# Security settings
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/home/ec2-user /var/log/turtil-backend
+# Security settings (relaxed for Docker access)
+NoNewPrivileges=false
+ReadWritePaths=/home/ec2-user /var/log/turtil-backend /var/run/docker.sock
 
 [Install]
 WantedBy=multi-user.target

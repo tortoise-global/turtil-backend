@@ -109,7 +109,7 @@ async def get_current_session(
         )
 
 
-@router.post("/signin")
+@router.post("/signin", response_model=SigninResponse)
 async def signin(
     request: SigninRequest,
     http_request: Request,
@@ -117,23 +117,24 @@ async def signin(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Sign in with email and password - Simplified and Secure Flow
-    Creates a new session with device tracking and returns only essential data
+    Sign in with email and password - Complete Authentication Flow
+    Creates a new session with device tracking and returns complete token information
     
-    **Optimal Authentication Flow:**
-    1. Use this endpoint to get `refreshToken` and `deviceInfo`
-    2. Immediately call `/refresh` endpoint to get `accessToken`
-    3. Use the `accessToken` in Authorization header for subsequent requests
+    **Authentication Flow:**
+    1. Use this endpoint to get both `accessToken` and `refreshToken`
+    2. Use the `accessToken` in Authorization header for subsequent requests
+    3. Use `/refresh` endpoint when access token expires
     
-    **Response includes only:**
-    - `refreshToken`: For getting access tokens via `/refresh` endpoint  
+    **Response includes:**
+    - `accessToken`: For immediate API access (15 minutes)
+    - `refreshToken`: For getting new access tokens (30 days)
     - `deviceInfo`: Browser, OS, and device type information
-    - `user`: Optional user profile information
+    - `staff`: Complete user profile information
     
-    **Security Benefits:**
-    - No short-lived access token in signin response
-    - Mandatory token rotation enforced via refresh endpoint
-    - Reduced token exposure in network/logs
+    **Security Features:**
+    - Multi-device session tracking
+    - Mandatory token rotation on refresh
+    - Device fingerprinting for security monitoring
     """
     try:
         email = request.email.lower().strip()
@@ -216,8 +217,11 @@ async def signin(
             # Don't fail login if notification email fails
             logger.warning(f"Failed to send login notification email to {email}: {e}")
         
-        # Return response without refresh token (it's in HttpOnly cookie)
+        # Return response with access token only (refresh token remains in HttpOnly cookie)
         return {
+            "access_token": session_data["access_token"],
+            "token_type": "bearer",
+            "expires_in": 15 * 60,  # 15 minutes
             "device_info": session_data["device_info"],
             "staff": staff.to_dict(),
             "message": "Sign in successful"

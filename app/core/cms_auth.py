@@ -57,8 +57,8 @@ class CMSAuthManager:
             "email": staff.email,
             "fullName": staff.full_name,
             "cmsRole": staff.cms_role,
-            "collegeId": staff.college_id,
-            "departmentId": staff.department_id,
+            "collegeId": str(staff.college_id) if staff.college_id else None,
+            "departmentId": str(staff.department_id) if staff.department_id else None,
             "invitationStatus": staff.invitation_status,
             "isHod": staff.is_hod,
             "requiresPasswordReset": requires_password_reset,
@@ -74,7 +74,7 @@ class CMSAuthManager:
         
         # Add session_id if provided (for multi-device sessions)
         if session_id:
-            payload["session_id"] = session_id
+            payload["session_id"] = str(session_id)  # Convert UUID to string for JSON serialization
 
         return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
 
@@ -115,7 +115,7 @@ class CMSAuthManager:
         
         # Add session_id if provided (for multi-device sessions)
         if session_id:
-            payload["session_id"] = session_id
+            payload["session_id"] = str(session_id)  # Convert UUID to string for JSON serialization
 
         return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
 
