@@ -22,9 +22,8 @@ if ! docker info >/dev/null 2>&1; then
     sleep 5
 fi
 
-# Pull latest images (if any updates)
-echo "Checking for updated Docker images..."
-docker-compose -f docker-compose.yml pull || true
+# Skip pulling for local images
+echo "Using locally built Docker images..."
 
 # Stop existing containers
 echo "Stopping existing containers..."

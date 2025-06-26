@@ -114,7 +114,7 @@ build {
 
   # Copy production configuration files
   provisioner "file" {
-    source      = "files/docker-compose.prod.yml"
+    source      = "files/docker-compose.yml"
     destination = "/home/ec2-user/docker-compose.yml"
   }
 
