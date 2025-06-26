@@ -223,11 +223,26 @@ jobs:
         
         # Wait for instance refresh to complete
         echo "Waiting for instance refresh to complete..."
-        aws autoscaling wait instance-refresh-successful \
-          --auto-scaling-group-name $AUTO_SCALING_GROUP_NAME \
-          --instance-refresh-ids $INSTANCE_REFRESH_ID
-        
-        echo "Instance refresh completed successfully!"
+        while true; do
+          STATUS=$(aws autoscaling describe-instance-refreshes \
+            --auto-scaling-group-name $AUTO_SCALING_GROUP_NAME \
+            --instance-refresh-ids $INSTANCE_REFRESH_ID \
+            --query 'InstanceRefreshes[0].Status' \
+            --output text)
+          
+          echo "Instance refresh status: $STATUS"
+          
+          if [ "$STATUS" = "Successful" ]; then
+            echo "Instance refresh completed successfully!"
+            break
+          elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ]; then
+            echo "❌ Instance refresh failed with status: $STATUS"
+            exit 1
+          fi
+          
+          echo "Still in progress... waiting 30 seconds"
+          sleep 30
+        done
 
     - name: Verify Deployment
       env:
