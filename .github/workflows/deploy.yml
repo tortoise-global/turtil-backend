@@ -123,7 +123,7 @@ jobs:
     - name: Update Launch Template
       env:
         AMI_ID: ${{ steps.packer-build.outputs.AMI_ID }}
-        LAUNCH_TEMPLATE_ID: ${{ vars.LAUNCH_TEMPLATE_ID }}
+        LAUNCH_TEMPLATE_ID: ${{ secrets.LAUNCH_TEMPLATE_ID }}
       run: |
         if [ -z "$LAUNCH_TEMPLATE_ID" ]; then
           echo "❌ LAUNCH_TEMPLATE_ID environment variable is not set"
@@ -203,7 +203,7 @@ jobs:
 
     - name: Trigger Auto Scaling Group Instance Refresh
       env:
-        AUTO_SCALING_GROUP_NAME: ${{ vars.AUTO_SCALING_GROUP_NAME }}
+        AUTO_SCALING_GROUP_NAME: ${{ secrets.AUTO_SCALING_GROUP_NAME }}
       run: |
         echo "Starting instance refresh for Auto Scaling Group: $AUTO_SCALING_GROUP_NAME"
         
@@ -231,8 +231,8 @@ jobs:
 
     - name: Verify Deployment
       env:
-        AUTO_SCALING_GROUP_NAME: ${{ vars.AUTO_SCALING_GROUP_NAME }}
-        LOAD_BALANCER_DNS: ${{ vars.LOAD_BALANCER_DNS }}
+        AUTO_SCALING_GROUP_NAME: ${{ secrets.AUTO_SCALING_GROUP_NAME }}
+        LOAD_BALANCER_DNS: ${{ secrets.LOAD_BALANCER_DNS }}
       run: |
         echo "Verifying deployment..."
         
