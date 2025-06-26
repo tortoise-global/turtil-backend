@@ -57,7 +57,7 @@ jobs:
         
         # Rate Limiting Configuration
         RATE_LIMIT_CALLS=${{ secrets.RATE_LIMIT_CALLS }}
-        RATE_LIMIT_PERIOD=${{ secrets..RATE_LIMIT_PERIOD }}
+        RATE_LIMIT_PERIOD=${{ secrets.RATE_LIMIT_PERIOD }}
         
         # OTP Configuration
         DEV_OTP=${{ secrets.DEV_OTP }}
