@@ -24,7 +24,7 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
+        aws-region: ${{ secrets.AWS_REGION }}
 
     - name: Setup Packer
       uses: hashicorp/setup-packer@main
@@ -70,7 +70,7 @@ jobs:
         # AWS Configuration
         AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION=${{ env.AWS_REGION }}
+        AWS_REGION=${{ secrets.AWS_REGION }}
         AWS_SES_FROM_EMAIL=${{ secrets.AWS_SES_FROM_EMAIL }}
         AWS_SES_REGION=${{ secrets.rs.AWS_SES_REGION }}
         
@@ -92,8 +92,8 @@ jobs:
       run: |
         cd packer
         packer validate \
-          -var "aws_region=${{ env.AWS_REGION }}" \
-          -var "environment=${{ env.ENVIRONMENT }}" \
+          -var "aws_region=${{ secrets.AWS_REGION }}" \
+          -var "environment=${{ secrets.ENVIRONMENT }}" \
           -var "instance_type=t4g.xlarge" \
           -var "source_ami=ami-0f4448044b7b1e09b" \
           amazon-linux.pkr.hcl
@@ -104,8 +104,8 @@ jobs:
         cd packer
         # Build AMI and capture the output
         packer build \
-          -var "aws_region=${{ env.AWS_REGION }}" \
-          -var "environment=${{ env.ENVIRONMENT }}" \
+          -var "aws_region=${{ secrets.AWS_REGION }}" \
+          -var "environment=${{ secrets.ENVIRONMENT }}" \
           -var "instance_type=t4g.xlarge" \
           -var "source_ami=ami-0f4448044b7b1e09b" \
           -machine-readable \
@@ -261,7 +261,7 @@ jobs:
         # Get list of ALL old AMIs for this environment (keeping only the latest one)
         aws ec2 describe-images \
           --owners self \
-          --filters "Name=name,Values=turtil-backend-${{ env.ENVIRONMENT }}-*" \
+          --filters "Name=name,Values=turtil-backend-${{ secrets.ENVIRONMENT }}-*" \
           --query 'sort_by(Images, &CreationDate)[:-1].[ImageId,Name]' \
           --output text | while read ami_id name; do
           if [ -n "$ami_id" ] && [ "$ami_id" != "None" ]; then
@@ -287,9 +287,9 @@ jobs:
       run: |
         echo "🚀 Deployment Summary"
         echo "===================="
-        echo "Environment: ${{ env.ENVIRONMENT }}"
+        echo "Environment: ${{ secrets.ENVIRONMENT }}"
         echo "New AMI ID: $AMI_ID"
-        echo "AWS Region: ${{ env.AWS_REGION }}"
+        echo "AWS Region: ${{ secrets.AWS_REGION }}"
         echo "Timestamp: $(date)"
         echo "Commit SHA: ${{ github.sha }}"
         echo "===================="
