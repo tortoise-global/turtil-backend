@@ -31,13 +31,10 @@ sudo docker images | grep turtil-backend
 sudo mkdir -p /var/log/turtil-backend
 sudo chown ec2-user:ec2-user /var/log/turtil-backend
 
-# Create environment file directory (will be populated by user data script)
-mkdir -p /home/ec2-user/.env
-
-# Copy build environment for reference (optional)
-if [ -f /tmp/build.env ]; then
-    cp /tmp/build.env /home/ec2-user/.env/build.env
-    chown ec2-user:ec2-user /home/ec2-user/.env/build.env
+# Copy environment file for application use
+if [ -f /tmp/.env ]; then
+    cp /tmp/.env /home/ec2-user/.env
+    chown ec2-user:ec2-user /home/ec2-user/.env
 fi
 
 echo "Application setup completed successfully!"

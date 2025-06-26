@@ -101,10 +101,10 @@ build {
     destination = "/tmp/turtil-backend/"
   }
 
-  # Copy build environment file
+  # Copy environment file
   provisioner "file" {
-    source      = "build.env"
-    destination = "/tmp/build.env"
+    source      = "../.env"
+    destination = "/tmp/.env"
   }
 
   # Setup application

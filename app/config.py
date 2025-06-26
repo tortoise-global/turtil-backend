@@ -1,4 +1,4 @@
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, ConfigDict
 from pydantic_settings import BaseSettings
 from typing import List, Optional
 import os
@@ -124,10 +124,12 @@ class Settings(BaseSettings):
         default="turtil-backend-dev", env="S3_BUCKET_NAME", description="S3 bucket name for all storage"
     )
 
-    class Config:
-        env_file = os.getenv("ENV_FILE", ".env")
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = ConfigDict(
+        env_file=os.getenv("ENV_FILE", ".env"),
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"  # Allow extra environment variables
+    )
 
 
 # Global settings instance
