@@ -327,10 +327,30 @@ resource "aws_lb_target_group" "main" {
   }
 }
 
-resource "aws_lb_listener" "main" {
+# HTTP Listener - Redirect to HTTPS
+resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
   port              = "80"
   protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+# HTTPS Listener
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
+  certificate_arn   = aws_acm_certificate_validation.main.certificate_arn
 
   default_action {
     type             = "forward"
@@ -338,18 +358,60 @@ resource "aws_lb_listener" "main" {
   }
 }
 
-# Route53 record for dev.api.turtil.com
+# ACM Certificate for SSL/TLS
+resource "aws_acm_certificate" "main" {
+  domain_name       = "dev.api.turtil.co"
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = {
+    Name = "${var.project_name}-cert"
+  }
+}
+
+# Route53 record for ACM certificate validation
+resource "aws_route53_record" "cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.main.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = data.aws_route53_zone.main.zone_id
+}
+
+# ACM certificate validation
+resource "aws_acm_certificate_validation" "main" {
+  certificate_arn         = aws_acm_certificate.main.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+}
+
+# Route53 record for dev.api.turtil.co
 resource "aws_route53_record" "dev_api" {
   zone_id = data.aws_route53_zone.main.zone_id
   name    = "dev.api.turtil.co"
-  type    = "CNAME"
-  ttl     = 300
-  records = [aws_lb.main.dns_name]
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.main.dns_name
+    zone_id                = aws_lb.main.zone_id
+    evaluate_target_health = true
+  }
 }
 
-# ALB listener rule for dev subdomain
-resource "aws_lb_listener_rule" "dev_api" {
-  listener_arn = aws_lb_listener.main.arn
+# ALB listener rule for dev subdomain (HTTPS)
+resource "aws_lb_listener_rule" "dev_api_https" {
+  listener_arn = aws_lb_listener.https.arn
   priority     = 100
 
   action {
@@ -537,7 +599,7 @@ output "secret_key" {
 
 output "dev_api_url" {
   description = "Dev API URL"
-  value       = "http://dev.api.turtil.co"
+  value       = "https://dev.api.turtil.co"
 }
 
 output "key_pair_name" {
