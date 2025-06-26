@@ -205,7 +205,27 @@ jobs:
       env:
         AUTO_SCALING_GROUP_NAME: ${{ secrets.AUTO_SCALING_GROUP_NAME }}
       run: |
-        echo "Starting instance refresh for Auto Scaling Group: $AUTO_SCALING_GROUP_NAME"
+        echo "Checking for existing instance refresh for Auto Scaling Group: $AUTO_SCALING_GROUP_NAME"
+        
+        # Check for existing instance refresh
+        EXISTING_REFRESH=$(aws autoscaling describe-instance-refreshes \
+          --auto-scaling-group-name $AUTO_SCALING_GROUP_NAME \
+          --query 'InstanceRefreshes[?Status==`InProgress`].InstanceRefreshId' \
+          --output text)
+        
+        if [ -n "$EXISTING_REFRESH" ] && [ "$EXISTING_REFRESH" != "None" ]; then
+          echo "Found existing instance refresh in progress: $EXISTING_REFRESH"
+          echo "Cancelling existing refresh..."
+          aws autoscaling cancel-instance-refresh \
+            --auto-scaling-group-name $AUTO_SCALING_GROUP_NAME \
+            --instance-refresh-id $EXISTING_REFRESH || true
+          
+          # Wait a bit for cancellation to process
+          echo "Waiting for cancellation to complete..."
+          sleep 30
+        fi
+        
+        echo "Starting new instance refresh for Auto Scaling Group: $AUTO_SCALING_GROUP_NAME"
         
         # Start instance refresh
         INSTANCE_REFRESH_ID=$(aws autoscaling start-instance-refresh \
