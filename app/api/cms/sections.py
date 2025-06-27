@@ -505,11 +505,11 @@ async def assign_subjects_to_section(
                           detail="Error assigning subjects")
 
 
-@router.put("/{section_id}/subjects/{section_subject_id}/assign-teacher", 
+@router.put("/{section_id}/subjects/{subject_id}/assign-teacher", 
            response_model=AssignmentActionResponse, dependencies=[Depends(security)])
 async def assign_teacher_to_subject(
     section_id: str,
-    section_subject_id: str,
+    subject_id: str,
     request: AssignTeacherRequest,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
@@ -520,7 +520,7 @@ async def assign_teacher_to_subject(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                               detail="Only Principal and College Admin can assign teachers")
 
-        # Get section-subject assignment
+        # Get section-subject assignment using section_id and subject_id
         assignment_result = await db.execute(
             select(SectionSubject, Subject.subject_name)
             .join(Subject, SectionSubject.subject_id == Subject.subject_id)
@@ -530,8 +530,8 @@ async def assign_teacher_to_subject(
             .join(Graduation, Degree.graduation_id == Graduation.graduation_id)
             .join(Term, Graduation.term_id == Term.term_id)
             .where(and_(
-                SectionSubject.section_subject_id == section_subject_id,
                 SectionSubject.section_id == section_id,
+                SectionSubject.subject_id == subject_id,
                 Term.college_id == current_staff.college_id,
             ))
         )
@@ -552,7 +552,7 @@ async def assign_teacher_to_subject(
         # Verify new teacher
         new_teacher_result = await db.execute(
             select(Staff.full_name).where(and_(
-                Staff.staff_id == request.assigned_staff_id,
+                Staff.staff_id == request.staff_id,
                 Staff.college_id == current_staff.college_id,
             ))
         )
@@ -561,16 +561,16 @@ async def assign_teacher_to_subject(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
         # Update assignment
-        assignment.assigned_staff_id = request.assigned_staff_id
+        assignment.assigned_staff_id = request.staff_id
         await db.commit()
 
         return AssignmentActionResponse(
             success=True,
             message="Teacher assigned successfully",
-            sectionSubjectId=str(section_subject_id),
-            subjectName=subject_name,
-            oldTeacher=old_teacher_name,
-            newTeacher=new_teacher_name,
+            section_subject_id=str(assignment.section_subject_id),
+            subject_name=subject_name,
+            old_teacher=old_teacher_name,
+            new_teacher=new_teacher_name,
         )
 
     except HTTPException:
@@ -582,11 +582,11 @@ async def assign_teacher_to_subject(
                           detail="Error assigning teacher")
 
 
-@router.delete("/{section_id}/subjects/{section_subject_id}", 
+@router.delete("/{section_id}/subjects/{subject_id}", 
               response_model=AssignmentActionResponse, dependencies=[Depends(security)])
 async def remove_subject_assignment(
     section_id: str,
-    section_subject_id: str,
+    subject_id: str,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ):
@@ -596,7 +596,7 @@ async def remove_subject_assignment(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                               detail="Only Principal and College Admin can remove assignments")
 
-        # Get section-subject assignment
+        # Get section-subject assignment using section_id and subject_id
         assignment_result = await db.execute(
             select(SectionSubject, Subject.subject_name)
             .join(Subject, SectionSubject.subject_id == Subject.subject_id)
@@ -606,8 +606,8 @@ async def remove_subject_assignment(
             .join(Graduation, Degree.graduation_id == Graduation.graduation_id)
             .join(Term, Graduation.term_id == Term.term_id)
             .where(and_(
-                SectionSubject.section_subject_id == section_subject_id,
                 SectionSubject.section_id == section_id,
+                SectionSubject.subject_id == subject_id,
                 Term.college_id == current_staff.college_id,
             ))
         )
@@ -624,7 +624,7 @@ async def remove_subject_assignment(
         return AssignmentActionResponse(
             success=True,
             message=f"Subject '{subject_name}' removed from section successfully",
-            subjectName=subject_name,
+            subject_name=subject_name,
         )
 
     except HTTPException:

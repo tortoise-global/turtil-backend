@@ -249,8 +249,8 @@ class BranchActionResponse(CamelCaseModel):
 # SUBJECT SCHEMAS
 # ============================================================================
 
-class CreateSubjectRequest(CamelCaseModel):
-    """Request schema for creating a new subject"""
+class SubjectData(CamelCaseModel):
+    """Individual subject data for creation"""
     
     subject_name: str = Field(..., min_length=3, max_length=255, description="Subject name")
     subject_code: str = Field(..., min_length=3, max_length=20, description="Subject code")
@@ -259,7 +259,6 @@ class CreateSubjectRequest(CamelCaseModel):
     credits: int = Field(3, ge=1, le=8, description="Credit points")
     subject_type: str = Field("theory", description="Subject type")
     sequence_order: int = Field(1, ge=1, le=999, description="Display order")
-    branch_id: str = Field(..., description="Parent branch ID")
     
     @field_validator("subject_code")
     @classmethod
@@ -275,11 +274,11 @@ class CreateSubjectRequest(CamelCaseModel):
         return v
 
 
-class CreateSubjectBulkRequest(CamelCaseModel):
-    """Request schema for bulk creating subjects"""
+class CreateSubjectRequest(CamelCaseModel):
+    """Unified request schema for creating subjects (single or bulk)"""
     
     branch_id: str = Field(..., description="Parent branch ID")
-    subjects: List[CreateSubjectRequest] = Field(..., min_items=1, max_items=50)
+    subjects: List[SubjectData] = Field(..., min_items=1, max_items=50, description="List of subjects to create")
 
 
 class UpdateSubjectRequest(CamelCaseModel):
@@ -418,7 +417,7 @@ class AssignSubjectsRequest(CamelCaseModel):
 class AssignTeacherRequest(CamelCaseModel):
     """Request schema for assigning teacher to section-subject"""
     
-    assigned_staff_id: str = Field(..., description="Staff ID to assign")
+    staff_id: str = Field(..., description="Staff ID to assign")
 
 
 class SectionSubjectResponse(CamelCaseModel):

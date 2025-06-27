@@ -6,6 +6,7 @@ asyncpg==0.30.0
 
 # HTTP & Server
 uvicorn[standard]==0.34.3
+aiohttp==3.9.1
 
 # Authentication & Security
 python-jose[cryptography]==3.3.0

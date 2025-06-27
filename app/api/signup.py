@@ -221,25 +221,16 @@ async def setup_profile(
     - Complete signup process
     """
     try:
-        temp_token = request.temp_token.strip() if hasattr(request, 'temp_token') else None
+        temp_token = request.temp_token.strip()
         password = request.password.strip()
 
         # Validate temporary token and get email
-        if temp_token:
-            email = await CMSOTPManager.validate_temp_token(temp_token)
-            if not email:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid or expired temporary token. Please verify your email again."
-                )
-        else:
-            # Fallback to email-based validation for backward compatibility
-            email = request.email.lower().strip() if hasattr(request, 'email') else None
-            if not email:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Missing authentication token. Please verify your email first."
-                )
+        email = await CMSOTPManager.validate_temp_token(temp_token)
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired temporary token. Please verify your email again."
+            )
 
         # Get client IP address
         ip_address = get_client_ip(http_request)

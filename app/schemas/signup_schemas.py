@@ -24,19 +24,9 @@ class VerifyOTPRequest(CamelCaseModel):
 class SetupProfileRequest(CamelCaseModel):
     """Request schema for profile setup after OTP verification"""
     temp_token: str = Field(..., description="Temporary token from OTP verification")
-    password: str = Field(..., min_length=8, description="Password")
-    confirm_password: str = Field(..., min_length=8, description="Password confirmation")
     full_name: str = Field(..., min_length=1, max_length=200, description="Full name")
+    password: str = Field(..., min_length=8, description="Password")
     contact_number: str = Field(..., pattern=r"^(\+91)?[6-9]\d{9}$", description="Contact number in Indian format")
-    # Keep email for backward compatibility
-    email: Optional[EmailStr] = Field(None, description="Email address (optional for backward compatibility)")
-
-    @field_validator("confirm_password")
-    @classmethod
-    def passwords_match(cls, v, info):
-        if "password" in info.data and v != info.data["password"]:
-            raise ValueError("Passwords do not match")
-        return v
 
 
 class ForgotPasswordRequest(CamelCaseModel):

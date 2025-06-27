@@ -45,8 +45,9 @@ class SessionInfo(CamelCaseModel):
 # Response Schemas
 
 class SigninResponse(CamelCaseModel):
-    """Response schema for successful sign-in with access token only"""
+    """Response schema for successful sign-in with both access and refresh tokens"""
     access_token: str = Field(..., description="JWT access token")
+    refresh_token: str = Field(..., description="JWT refresh token")
     token_type: str = Field(..., description="Token type (bearer)")
     expires_in: int = Field(..., description="Access token expiry time in seconds")
     device_info: DeviceInfo = Field(..., description="Device information")

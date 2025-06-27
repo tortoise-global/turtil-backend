@@ -13,8 +13,12 @@ class UserSession(UUIDBaseModel):
     # UUID Primary Key - descriptive and intuitive
     session_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
 
-    # Foreign key to staff using UUID
-    staff_id = Column(UUID(as_uuid=True), ForeignKey("staff.staff_id"), nullable=False, index=True)
+    # Foreign keys for both staff and student sessions
+    staff_id = Column(UUID(as_uuid=True), ForeignKey("staff.staff_id"), nullable=True, index=True)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.student_id"), nullable=True, index=True)
+    
+    # Session type to differentiate between staff and student sessions
+    session_type = Column(String(20), default="staff", nullable=False)  # "staff" or "student"
 
     # Device and browser information
     browser = Column(String(100), nullable=True)  # "Chrome", "Firefox", "Safari"
@@ -38,10 +42,12 @@ class UserSession(UUIDBaseModel):
     location = Column(String(200), nullable=True)   # City, Country (optional)
 
     # Relationships
-    staff = relationship("Staff", back_populates="sessions")
+    staff = relationship("Staff", back_populates="sessions", foreign_keys=[staff_id])
+    student = relationship("Student", back_populates="sessions", foreign_keys=[student_id])
 
     def __repr__(self):
-        return f"<UserSession(session_id={self.session_id}, staff_id={self.staff_id}, device={self.device})>"
+        user_id = self.staff_id if self.session_type == "staff" else self.student_id
+        return f"<UserSession(session_id={self.session_id}, {self.session_type}_id={user_id}, device={self.device})>"
 
     def to_dict(self, include_sensitive: bool = False) -> dict:
         """
@@ -50,7 +56,9 @@ class UserSession(UUIDBaseModel):
         base_dict = super().to_dict()
         result = {
             "sessionId": base_dict["session_id"],
+            "sessionType": base_dict["session_type"],
             "staffId": base_dict["staff_id"],
+            "studentId": base_dict["student_id"],
             "browser": base_dict["browser"],
             "os": base_dict["os"],
             "device": base_dict["device"],

@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi_pagination import add_pagination
 from contextlib import asynccontextmanager
 import logging
@@ -12,25 +12,9 @@ from app.config import settings
 from app.database import init_db, close_db
 from app.redis_client import close_redis
 
-# Import API routers
-from app.api import signup
-from app.api import session
-from app.api import registration
-from app.api.cms import (
-    departments as cms_departments,
-    staff as cms_staff,
-    files as cms_files,
-    terms as cms_terms,
-    graduations as cms_graduations,
-    degrees as cms_degrees,
-    branches as cms_branches,
-    subjects as cms_subjects,
-    sections as cms_sections,
-)
-
-# Import dev router conditionally
-if settings.debug:
-    from app.api import dev as dev_api
+# Import sub-applications
+from app.cms_app import cms_app
+from app.student_app import student_app
 
 # Import health check dependencies
 from app.api.deps import check_system_health
@@ -105,51 +89,21 @@ async def lifespan(app: FastAPI):
         logger.error(f"Error during shutdown: {e}")
 
 
-# Create FastAPI application
+# Create main FastAPI application (no docs - they're in sub-apps)
 app = FastAPI(
     title=settings.project_name,
     version=settings.version,
-    description="Production-ready FastAPI backend with SQLAlchemy, Redis, and AWS integration",
-    docs_url="/docs" if settings.debug else None,
-    redoc_url="/redoc" if settings.debug else None,
-    openapi_url="/openapi.json" if settings.debug else None,
+    description="Turtil Backend - Multi-API Platform (CMS + Student Mobile)",
+    docs_url=None,  # Disabled - use /docs-cms or /docs-student
+    redoc_url=None,
+    openapi_url=None,
     lifespan=lifespan,
 )
 
 
-# Configure OpenAPI security scheme for proper Swagger UI authentication display
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-
-    from fastapi.openapi.utils import get_openapi
-
-    openapi_schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description,
-        routes=app.routes,
-    )
-
-    # Add JWT Bearer security scheme
-    openapi_schema["components"]["securitySchemes"] = {
-        "HTTPBearer": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT",
-            "description": "JWT token for CMS authentication. Format: Bearer <token>",
-        }
-    }
-
-    # Keep schemas section visible in Swagger UI
-    # if "components" in openapi_schema and "schemas" in openapi_schema["components"]:
-    #     del openapi_schema["components"]["schemas"]
-
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-
-app.openapi = custom_openapi
+# Mount sub-applications
+app.mount("/cms", cms_app)
+app.mount("/student", student_app)
 
 # Add CORS middleware
 app.add_middleware(
@@ -206,15 +160,38 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Health check endpoints (hidden from Swagger)
+# Documentation redirect endpoints
+@app.get("/docs-cms")
+async def cms_docs_redirect():
+    """Redirect to CMS API documentation"""
+    return RedirectResponse(url="/cms/docs")
+
+@app.get("/docs-student")
+async def student_docs_redirect():
+    """Redirect to Student API documentation"""
+    return RedirectResponse(url="/student/docs")
+
+# Root endpoint (hidden from Swagger)
 @app.get("/", include_in_schema=False)
 async def root():
-    """Root endpoint"""
+    """Root endpoint with API discovery"""
     return {
         "message": f"Welcome to {settings.project_name}",
         "version": settings.version,
         "environment": settings.environment,
         "status": "healthy",
+        "apis": {
+            "cms": {
+                "description": "College Management System API",
+                "documentation": "/docs-cms",
+                "health": "/cms/health"
+            },
+            "student": {
+                "description": "Student Mobile App API", 
+                "documentation": "/docs-student",
+                "health": "/student/health"
+            }
+        },
         "timestamp": time.time(),
     }
 
@@ -247,62 +224,62 @@ async def app_info():
         "version": settings.version,
         "environment": settings.environment,
         "debug": settings.debug,
-        "features": {
-            "simplified_authentication": True,
-            "multi_device_sessions": True,
-            "file_upload": True,
+        "architecture": "Multi-API Platform",
+        "apis": {
+            "cms": {
+                "name": "Turtil CMS API",
+                "description": "College Management System",
+                "mount_path": "/cms",
+                "documentation": "/docs-cms",
+                "health": "/cms/health",
+                "info": "/cms/info",
+                "features": [
+                    "staff_management",
+                    "multi_device_sessions", 
+                    "role_based_access",
+                    "college_management",
+                    "academic_programs",
+                    "department_management",
+                    "file_upload"
+                ]
+            },
+            "student": {
+                "name": "Turtil Student Mobile API",
+                "description": "Student Mobile App",
+                "mount_path": "/student", 
+                "documentation": "/docs-student",
+                "health": "/student/health",
+                "info": "/student/info",
+                "features": [
+                    "single_device_authentication",
+                    "academic_registration",
+                    "step_by_step_onboarding",
+                    "profile_management",
+                    "college_selection",
+                    "mobile_optimized"
+                ]
+            }
+        },
+        "shared_features": {
             "aws_s3_integration": True,
             "redis_caching": True,
+            "postgresql_database": True,
+            "jwt_authentication": True,
             "camelcase_api": True,
-            "academic_programs": True,
-            "term_management": True,
-            "subject_section_assignment": True,
+            "email_notifications": True
         },
         "endpoints": {
-            "signup": "/api/auth/signup",
-            "session": "/api/auth/session", 
-            "cmsRegistration": "/api/cms/registration",
-            "cmsDepartments": "/api/cms/departments",
-            "cmsStaff": "/api/cms/staff",
-            "cmsFiles": "/api/cms/files",
-            "cmsTerms": "/api/cms/terms",
-            "cmsGraduations": "/api/cms/graduations",
-            "cmsDegrees": "/api/cms/degrees",
-            "cmsBranches": "/api/cms/branches",
-            "cmsSubjects": "/api/cms/subjects",
-            "cmsSections": "/api/cms/sections",
+            "root": "/",
             "health": "/health",
-            "healthDetailed": "/health/detailed",
-            "docs": "/docs" if settings.debug else "disabled",
-            "devApi": "/api/dev" if settings.debug else "disabled",
-        },
+            "health_detailed": "/health/detailed",
+            "cms_docs": "/docs-cms",
+            "student_docs": "/docs-student",
+            "info": "/info"
+        }
     }
 
 
-# Include API routers
-# Simplified authentication and session management
-app.include_router(signup.router, prefix="/api")
-app.include_router(session.router, prefix="/api")
-
-# CMS specific routers
-app.include_router(registration.router, prefix="/api/cms")
-app.include_router(cms_departments.router, prefix="/api")
-app.include_router(cms_staff.router, prefix="/api")
-app.include_router(cms_files.router, prefix="/api")
-
-# Academic program management routers
-app.include_router(cms_terms.router, prefix="/api")
-app.include_router(cms_graduations.router, prefix="/api")
-app.include_router(cms_degrees.router, prefix="/api")
-app.include_router(cms_branches.router, prefix="/api")
-app.include_router(cms_subjects.router, prefix="/api")
-app.include_router(cms_sections.router, prefix="/api")
-
-# Include dev router conditionally
-if settings.debug:
-    app.include_router(dev_api.router, prefix="/api")
-
-# Add pagination to the app
+# Add pagination to the main app (sub-apps have their own)
 add_pagination(app)
 
 
@@ -323,12 +300,19 @@ if settings.debug:
 async def startup_message():
     """Log startup message"""
     logger.info(f"""
-    🚀 {settings.project_name} v{settings.version} is starting...
+    🚀 {settings.project_name} v{settings.version} Multi-API Platform
     📊 Environment: {settings.environment}
     🔧 Debug mode: {settings.debug}
     🌐 CORS origins: {settings.cors_origins}
-    📡 Health checks: /health (simple), /health/detailed (comprehensive)
-    📚 API docs: {"/docs" if settings.debug else "disabled"}
+    
+    📚 API Documentation:
+    🏢 CMS API: /docs-cms
+    📱 Student API: /docs-student
+    
+    📡 Health Checks:
+    🔍 Main: /health, /health/detailed
+    🏢 CMS: /cms/health
+    📱 Student: /student/health
     """)
 
 

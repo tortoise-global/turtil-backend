@@ -15,7 +15,6 @@ from app.models.branch import Branch
 from app.models.subject import Subject
 from app.schemas.academic_program_schemas import (
     CreateSubjectRequest,
-    CreateSubjectBulkRequest,
     UpdateSubjectRequest,
     SubjectResponse,
     SubjectWithBranchResponse,
@@ -78,12 +77,12 @@ async def get_subjects(
 
 
 @router.post("", response_model=SubjectActionResponse, dependencies=[Depends(security)])
-async def create_subject(
+async def create_subjects(
     request: CreateSubjectRequest,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ):
-    """Create a new subject. Only Principal and College Admin can create subjects."""
+    """Create subjects (single or bulk). Only Principal and College Admin can create subjects."""
     try:
         if current_staff.cms_role not in ["principal", "college_admin"]:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
@@ -104,81 +103,13 @@ async def create_subject(
         if not branch:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
 
-        # Check for duplicate subject code
-        existing_subject = await db.execute(
-            select(Subject).where(and_(
-                Subject.branch_id == request.branch_id,
-                Subject.subject_code == request.subject_code,
-            ))
-        )
-        if existing_subject.scalar_one_or_none():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                              detail=f"Subject with code '{request.subject_code}' already exists")
-
-        # Create new subject
-        new_subject = Subject(
-            subject_name=request.subject_name,
-            subject_code=request.subject_code,
-            short_name=request.short_name,
-            description=request.description,
-            credits=request.credits,
-            subject_type=request.subject_type,
-            sequence_order=request.sequence_order,
-            branch_id=request.branch_id,
-        )
-
-        db.add(new_subject)
-        await db.commit()
-        await db.refresh(new_subject)
-
-        return SubjectActionResponse(
-            success=True,
-            message=f"Subject '{request.subject_name}' created successfully",
-            subjectId=str(new_subject.subject_id),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        await db.rollback()
-        print(f"Error creating subject: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error creating subject")
-
-
-@router.post("/bulk", response_model=SubjectActionResponse, dependencies=[Depends(security)])
-async def create_subjects_bulk(
-    request: CreateSubjectBulkRequest,
-    db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
-):
-    """Bulk create subjects. Only Principal and College Admin can create subjects."""
-    try:
-        if current_staff.cms_role not in ["principal", "college_admin"]:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                              detail="Only Principal and College Admin can create subjects")
-
-        # Verify branch exists and belongs to college
-        branch_result = await db.execute(
-            select(Branch)
-            .join(Degree)
-            .join(Graduation)
-            .join(Term)
-            .where(and_(
-                Branch.branch_id == request.branch_id,
-                Term.college_id == current_staff.college_id,
-            ))
-        )
-        branch = branch_result.scalar_one_or_none()
-        if not branch:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
-
-        # Check for duplicate subject codes
+        # Check for duplicate subject codes within the request
         subject_codes = [subject.subject_code for subject in request.subjects]
         if len(subject_codes) != len(set(subject_codes)):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                               detail="Duplicate subject codes found in request")
 
+        # Check for existing subject codes in database
         existing_subjects = await db.execute(
             select(Subject.subject_code).where(and_(
                 Subject.branch_id == request.branch_id,
@@ -207,24 +138,33 @@ async def create_subjects_bulk(
             created_subjects.append({
                 "subjectName": subject_data.subject_name,
                 "subjectCode": subject_data.subject_code,
+                "subjectId": str(new_subject.subject_id) if len(request.subjects) == 1 else None
             })
 
         await db.commit()
 
-        return SubjectActionResponse(
-            success=True,
-            message=f"{len(request.subjects)} subjects created successfully",
-            createdCount=len(request.subjects),
-            subjects=created_subjects,
-        )
+        # Different response based on single vs bulk creation
+        if len(request.subjects) == 1:
+            return SubjectActionResponse(
+                success=True,
+                message=f"Subject '{request.subjects[0].subject_name}' created successfully",
+                subject_id=str(new_subject.subject_id),
+            )
+        else:
+            return SubjectActionResponse(
+                success=True,
+                message=f"{len(request.subjects)} subjects created successfully",
+                created_count=len(request.subjects),
+                subjects=created_subjects,
+            )
 
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error creating subjects in bulk: {e}")
+        print(f"Error creating subjects: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error creating subjects in bulk")
+                          detail="Error creating subjects")
 
 
 @router.get("/{subject_id}", response_model=SubjectResponse, dependencies=[Depends(security)])

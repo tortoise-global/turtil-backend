@@ -176,14 +176,23 @@ async def cleanup_account_data(
                 result = await db.execute(delete_user_sessions)
                 deleted_records["user_sessions"] += result.rowcount
             
-            # 3b. Update college to remove staff reference (if this staff is contact)
+            # 3b. Update college to remove all staff references
             if college_id and college:
+                college_updates = {}
                 if college.contact_staff_id == staff_id:
+                    college_updates["contact_staff_id"] = None
                     details["operations"].append(
                         f"Removing staff reference from college contact_staff_id"
                     )
+                if college.principal_staff_id == staff_id:
+                    college_updates["principal_staff_id"] = None
+                    details["operations"].append(
+                        f"Removing staff reference from college principal_staff_id"
+                    )
+                
+                if college_updates:
                     update_college = update(College).where(College.college_id == college_id).values(
-                        contact_staff_id=None
+                        **college_updates
                     )
                     await db.execute(update_college)
             
