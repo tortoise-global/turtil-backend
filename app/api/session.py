@@ -91,14 +91,11 @@ async def get_current_session(
                 "session_info": session_info
             }
         else:
-            # Legacy token without session_id (fallback)
-            return {
-                "staff": staff,
-                "session_id": "legacy-session",
-                "device": "Web Browser",
-                "browser": "Unknown",
-                "os": "Unknown"
-            }
+            # No session_id in token - invalid token format
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token format. Please sign in again."
+            )
             
     except Exception as e:
         logger.error(f"Session validation error: {e}")
@@ -251,11 +248,11 @@ async def refresh_tokens(
             payload = jwt.decode(refresh_token, key="", options={"verify_signature": False})
             session_id = payload.get("session_id")
             
-            # Handle legacy tokens without session_id (from CMS auth system)
+            # Require session_id in token
             if not session_id:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="This token was created with the legacy authentication system. Please sign in again to use the new session management features."
+                    detail="Invalid token format. Please sign in again."
                 )
         except JWTError:
             raise HTTPException(

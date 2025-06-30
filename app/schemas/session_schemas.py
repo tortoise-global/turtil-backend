@@ -85,19 +85,3 @@ class LogoutResponse(CamelCaseModel):
     sessions_invalidated: int = Field(..., description="Number of sessions invalidated")
 
 
-# Legacy compatibility schemas (for backwards compatibility during transition)
-
-class LegacyLoginRequest(CamelCaseModel):
-    """Legacy login request schema for backwards compatibility"""
-    email: EmailStr = Field(..., description="Email address")
-    password: str = Field(..., description="Password")
-
-
-class LegacyLoginResponse(CamelCaseModel):
-    """Legacy login response schema for backwards compatibility"""
-    success: bool = Field(..., description="Login success status")
-    message: str = Field(..., description="Status message")
-    access_token: str = Field(..., description="JWT access token")
-    refresh_token: str = Field(..., description="JWT refresh token")
-    token_type: str = Field(..., description="Token type")
-    expires_in: int = Field(..., description="Token expiry time in seconds")
