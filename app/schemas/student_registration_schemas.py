@@ -27,15 +27,13 @@ class CollegeListResponse(BaseModel):
 class SelectCollegeRequest(BaseModel):
     """Select college request"""
     collegeId: str = Field(..., description="Selected college UUID")
-    rollNumber: str = Field(..., min_length=3, max_length=50, description="Student roll number")
 
 class SelectCollegeResponse(BaseModel):
     """Select college response"""
     success: bool = True
-    message: str = "College and roll number selected successfully"
+    message: str = "College selected successfully"
     nextStep: str = "term_selection"
     selectedCollege: CollegeOption
-    rollNumber: str = Field(..., description="Selected roll number")
 
 
 # ==================== TERM SELECTION SCHEMAS ====================
@@ -181,6 +179,43 @@ class SelectSectionResponse(BaseModel):
     selectedSection: SectionOption
     studentProfile: Dict[str, Any] = Field(..., description="Updated student profile")
     admissionNumber: Optional[str] = Field(None, description="Generated admission number")
+
+
+# ==================== USER DETAILS STEP SCHEMAS ====================
+
+class UserDetailsRequest(BaseModel):
+    """User details request - Final step with personal information"""
+    fullName: str = Field(..., min_length=2, max_length=200, description="Student full name")
+    gender: str = Field(..., description="Student gender")
+    rollNumber: str = Field(..., min_length=1, max_length=50, description="Student roll number")
+    email: Optional[str] = Field(None, description="Student email (optional)")
+    
+    @validator('fullName')
+    def validate_full_name(cls, v):
+        if not v.strip():
+            raise ValueError('Full name cannot be empty')
+        return ' '.join(v.strip().split())
+    
+    @validator('gender')
+    def validate_gender(cls, v):
+        allowed_genders = ['male', 'female', 'other']
+        if v.lower() not in allowed_genders:
+            raise ValueError(f'Gender must be one of: {", ".join(allowed_genders)}')
+        return v.lower()
+    
+    @validator('rollNumber')
+    def validate_roll_number(cls, v):
+        if not v.strip():
+            raise ValueError('Roll number cannot be empty')
+        return v.strip().upper()
+
+class UserDetailsResponse(BaseModel):
+    """User details response - Registration completed"""
+    success: bool = True
+    message: str = "Registration completed successfully. Waiting for college approval."
+    nextStep: str = "approval_pending"
+    studentProfile: Dict[str, Any] = Field(..., description="Complete student profile")
+    admissionNumber: str = Field(..., description="Generated admission number")
 
 
 # ==================== REGISTRATION STATUS SCHEMAS ====================

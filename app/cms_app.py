@@ -45,6 +45,7 @@ cms_app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    root_path="/api/cms",
 )
 
 
@@ -72,6 +73,14 @@ def setup_cms_openapi():
                 "description": "JWT token for CMS staff authentication. Format: Bearer <token>",
             }
         }
+
+        # Fix the server URLs to include the mount path
+        openapi_schema["servers"] = [
+            {
+                "url": "/api/cms",
+                "description": "CMS API Server"
+            }
+        ]
 
         cms_app.openapi_schema = openapi_schema
         return cms_app.openapi_schema

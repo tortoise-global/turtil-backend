@@ -28,6 +28,7 @@ student_app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    root_path="/api/student",
 )
 
 
@@ -55,6 +56,14 @@ def setup_student_openapi():
                 "description": "JWT token for student authentication (single-device). Format: Bearer <token>",
             }
         }
+
+        # Fix the server URLs to include the mount path
+        openapi_schema["servers"] = [
+            {
+                "url": "/api/student",
+                "description": "Student API Server"
+            }
+        ]
 
         student_app.openapi_schema = openapi_schema
         return student_app.openapi_schema

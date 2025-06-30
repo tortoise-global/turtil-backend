@@ -478,7 +478,10 @@ class SessionManager:
             return {
                 "staff_id": session_data["staff_id"],
                 "session_id": session_id,
-                "device_info": session_data.get("device_info", {})
+                "device_info": session_data.get("device_info", {}),
+                "created_at": session_data.get("created_at"),
+                "last_used": session_data.get("last_used"),
+                "ip_address": session_data.get("ip_address")
             }
             
         except Exception as e:

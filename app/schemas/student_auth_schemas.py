@@ -1,77 +1,48 @@
 """
-Student Authentication Schemas
-Pydantic schemas for student mobile app authentication flow
+Student Authentication Schemas - Phone-Based
+Pydantic schemas for student mobile app phone-based authentication flow
 """
 
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, Field, validator
 from typing import Optional, Dict, Any
 from datetime import datetime
 
 
-# ==================== SIGNUP FLOW SCHEMAS ====================
+# ==================== PHONE-BASED SIGNIN FLOW SCHEMAS ====================
 
-class StudentSignupRequest(BaseModel):
-    """Student signup request - Step 1: Email OTP"""
-    email: EmailStr = Field(..., description="Student email address")
+class StudentSigninRequest(BaseModel):
+    """Student signin request - Step 1: Phone number OTP"""
+    phoneNumber: str = Field(..., description="Student phone number")
+    
+    @validator('phoneNumber')
+    def validate_phone_number(cls, v):
+        if not v.strip():
+            raise ValueError('Phone number cannot be empty')
+        
+        # Remove spaces, dashes, parentheses for validation
+        cleaned = v.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+        
+        # Basic validation: 10-15 digits, optionally starting with +
+        if cleaned.startswith("+"):
+            cleaned = cleaned[1:]
+        
+        if not cleaned.isdigit() or not (10 <= len(cleaned) <= 15):
+            raise ValueError('Invalid phone number format')
+        
+        return v.strip()
 
-class StudentSignupResponse(BaseModel):
-    """Student signup response - OTP sent"""
+class StudentSigninResponse(BaseModel):
+    """Student signin response - OTP sent"""
     success: bool = True
-    message: str = "OTP sent successfully. Please check your email to continue registration."
-    attemptsRemaining: int = 3
+    message: str = "OTP sent successfully to your phone number."
+    phoneNumber: str = Field(..., description="Formatted phone number")
+    otpExpiresIn: int = 300  # 5 minutes
 
 
 class StudentVerifyOTPRequest(BaseModel):
-    """Student OTP verification - Step 2: Verify OTP"""
-    email: EmailStr = Field(..., description="Student email address")
+    """Student OTP verification - Step 2: Verify OTP and get tokens"""
+    phoneNumber: str = Field(..., description="Student phone number")
     otp: str = Field(..., min_length=6, max_length=6, description="6-digit OTP")
-
-class StudentVerifyOTPResponse(BaseModel):
-    """Student OTP verification response - Temp token for profile setup"""
-    success: bool = True
-    message: str = "Email verified successfully. Please set up your profile to continue."
-    nextStep: str = "profile_setup"
-    tempToken: str = Field(..., description="Temporary token for profile setup (5 minutes)")
-
-
-class StudentSetupProfileRequest(BaseModel):
-    """Student profile setup - Step 3: Set password and basic info"""
-    tempToken: str = Field(..., description="Temporary token from OTP verification")
-    fullName: str = Field(..., min_length=2, max_length=200, description="Student full name")
-    password: str = Field(..., min_length=8, max_length=128, description="Strong password")
-    
-    @validator('fullName')
-    def validate_full_name(cls, v):
-        if not v.strip():
-            raise ValueError('Full name cannot be empty')
-        # Remove extra spaces and ensure proper format
-        return ' '.join(v.strip().split())
-    
-    @validator('password')
-    def validate_password(cls, v):
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain at least one lowercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain at least one digit')
-        return v
-
-class StudentSetupProfileResponse(BaseModel):
-    """Student profile setup response - Account created, ready for registration"""
-    success: bool = True
-    message: str = "Account created successfully. Please complete your academic registration."
-    nextStep: str = "academic_registration"
-
-
-# ==================== SIGNIN FLOW SCHEMAS ====================
-
-class StudentSigninRequest(BaseModel):
-    """Student signin request - Single device authentication"""
-    email: EmailStr = Field(..., description="Student email address")
-    password: str = Field(..., description="Student password")
     expoPushToken: str = Field(..., description="Expo push notification token for mobile app")
 
 class StudentDeviceInfo(BaseModel):
@@ -80,15 +51,16 @@ class StudentDeviceInfo(BaseModel):
     os: str = Field(..., description="Operating system")
     device: str = Field(..., description="Device type")
 
-class StudentSigninResponse(BaseModel):
-    """Student signin response - JWT tokens and profile"""
+class StudentVerifyOTPResponse(BaseModel):
+    """Student OTP verification response - Direct authentication with tokens"""
+    success: bool = True
+    message: str = "Authentication successful"
     accessToken: str = Field(..., description="JWT access token for API requests")
     refreshToken: str = Field(..., description="JWT refresh token")
     tokenType: str = "bearer"
     expiresIn: int = Field(..., description="Access token expiration in seconds")
     deviceInfo: StudentDeviceInfo
     student: Dict[str, Any] = Field(..., description="Student profile information")
-    message: str = "Sign in successful"
     registrationRequired: bool = Field(..., description="True if student needs to complete academic registration")
 
 
@@ -142,10 +114,12 @@ class StudentRegistrationStatusResponse(BaseModel):
 class StudentProfileResponse(BaseModel):
     """Student profile response"""
     studentId: str = Field(..., description="Student UUID")
-    email: EmailStr = Field(..., description="Student email")
-    fullName: str = Field(..., description="Student full name")
+    phoneNumber: str = Field(..., description="Student phone number")
+    email: Optional[str] = Field(None, description="Student email (optional)")
+    fullName: Optional[str] = Field(None, description="Student full name")
+    gender: Optional[str] = Field(None, description="Student gender")
     isActive: bool = Field(..., description="Account active status")
-    isVerified: bool = Field(..., description="Email verification status")
+    isVerified: bool = Field(..., description="Phone verification status")
     registrationCompleted: bool = Field(..., description="Academic registration status")
     collegeId: Optional[str] = Field(None, description="Assigned college ID")
     sectionId: Optional[str] = Field(None, description="Assigned section ID")
@@ -158,6 +132,7 @@ class StudentProfileResponse(BaseModel):
 class StudentUpdateProfileRequest(BaseModel):
     """Student profile update request"""
     fullName: Optional[str] = Field(None, min_length=2, max_length=200, description="Updated full name")
+    email: Optional[str] = Field(None, description="Updated email address")
     
     @validator('fullName')
     def validate_full_name(cls, v):
@@ -179,37 +154,45 @@ class StudentAuthErrorResponse(BaseModel):
     attemptsRemaining: Optional[int] = Field(None, description="Remaining OTP attempts")
 
 
-# ==================== PASSWORD RESET SCHEMAS ====================
+# ==================== USER DETAILS STEP SCHEMAS ====================
 
-class StudentForgotPasswordRequest(BaseModel):
-    """Student forgot password request"""
-    email: EmailStr = Field(..., description="Student email address")
-
-class StudentForgotPasswordResponse(BaseModel):
-    """Student forgot password response"""
-    success: bool = True
-    message: str = "Password reset OTP sent successfully. Please check your email."
-    attemptsRemaining: int = 3
-    studentExists: bool = True
-
-class StudentResetPasswordRequest(BaseModel):
-    """Student password reset request"""
-    tempToken: str = Field(..., description="Temporary token from OTP verification")
-    newPassword: str = Field(..., min_length=8, max_length=128, description="New password")
+class StudentUserDetailsRequest(BaseModel):
+    """Student user details request - Final registration step"""
+    fullName: str = Field(..., min_length=2, max_length=200, description="Student full name")
+    gender: str = Field(..., description="Student gender")
+    rollNumber: str = Field(..., min_length=1, max_length=50, description="Student roll number")
+    email: Optional[str] = Field(None, description="Student email (optional)")
     
-    @validator('newPassword')
-    def validate_password(cls, v):
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain at least one lowercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain at least one digit')
-        return v
+    @validator('fullName')
+    def validate_full_name(cls, v):
+        if not v.strip():
+            raise ValueError('Full name cannot be empty')
+        return ' '.join(v.strip().split())
+    
+    @validator('gender')
+    def validate_gender(cls, v):
+        allowed_genders = ['male', 'female', 'other']
+        if v.lower() not in allowed_genders:
+            raise ValueError(f'Gender must be one of: {", ".join(allowed_genders)}')
+        return v.lower()
+    
+    @validator('rollNumber')
+    def validate_roll_number(cls, v):
+        if not v.strip():
+            raise ValueError('Roll number cannot be empty')
+        return v.strip().upper()
 
-class StudentResetPasswordResponse(BaseModel):
-    """Student password reset response"""
+class StudentUserDetailsResponse(BaseModel):
+    """Student user details response - Registration completed"""
     success: bool = True
-    message: str = "Password reset successful. Please sign in with your new password."
+    message: str = "Registration completed successfully. Waiting for college approval."
+    studentProfile: Dict[str, Any] = Field(..., description="Complete student profile")
+    admissionNumber: str = Field(..., description="Generated admission number")
+    nextStep: str = "approval_pending"
+
+
+# ==================== BACKWARD COMPATIBILITY (TO BE REMOVED) ====================
+# Keep some old schemas temporarily to avoid breaking existing code
+
+StudentSignupRequest = StudentSigninRequest  # Alias for backward compatibility
+StudentSignupResponse = StudentSigninResponse  # Alias for backward compatibility

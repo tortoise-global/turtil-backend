@@ -1,6 +1,6 @@
 """
-Student Authentication API
-Mobile app authentication endpoints with single-device session management
+Student Authentication API - Phone-Based
+Mobile app authentication endpoints with phone-based single-device session management
 """
 
 from fastapi import APIRouter, HTTPException, status, Depends, Request
@@ -12,20 +12,14 @@ from app.database import get_db
 from app.models.student import Student
 from app.core.student_auth import student_auth
 from app.core.student_session_manager import student_session_manager
-from app.core.cms_otp import CMSOTPManager
-from app.core.aws import EmailService
+from app.core.mock_sms import PhoneOTPManager, MockSMSService
 from app.config import settings
 from app.api.student.deps import get_current_student_session, get_client_ip
 from app.schemas.student_auth_schemas import (
-    StudentSignupRequest, StudentSignupResponse,
-    StudentVerifyOTPRequest, StudentVerifyOTPResponse,
-    StudentSetupProfileRequest, StudentSetupProfileResponse,
     StudentSigninRequest, StudentSigninResponse,
+    StudentVerifyOTPRequest, StudentVerifyOTPResponse,
     StudentRefreshTokenRequest, StudentRefreshTokenResponse,
-    StudentCurrentSessionResponse, StudentLogoutResponse,
-    StudentForgotPasswordRequest, StudentForgotPasswordResponse,
-    StudentResetPasswordRequest, StudentResetPasswordResponse,
-    StudentProfileResponse, StudentUpdateProfileRequest
+    StudentCurrentSessionResponse, StudentLogoutResponse
 )
 import logging
 
@@ -33,69 +27,64 @@ router = APIRouter(prefix="/auth", tags=["Student Authentication"])
 logger = logging.getLogger(__name__)
 
 
-@router.post("/signup", response_model=StudentSignupResponse)
-async def send_student_signup_otp(
-    request: StudentSignupRequest,
+@router.post("/signin", response_model=StudentSigninResponse)
+async def student_signin_send_otp(
+    request: StudentSigninRequest,
     http_request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Step 1: Send OTP for student account creation
-    - Check if student already exists
-    - Generate and send OTP via email
+    Step 1: Send OTP to phone number for authentication
+    - Format and validate phone number
+    - Send OTP via mock SMS service
+    - Create or update student record if needed
     """
     try:
-        email = request.email.lower().strip()
-
-        # Check if student already exists and is verified
-        result = await db.execute(select(Student).where(Student.email == email))
+        phone_number = request.phoneNumber.strip()
+        
+        # Format phone number to consistent format
+        formatted_phone = MockSMSService.format_phone_number(phone_number)
+        
+        # Send OTP via mock SMS service
+        otp_result = await PhoneOTPManager.send_phone_otp(formatted_phone, purpose="signin")
+        
+        if not otp_result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to send OTP: {otp_result.get('error', 'Unknown error')}"
+            )
+        
+        # Check if student exists, create if not
+        result = await db.execute(select(Student).where(Student.phone_number == formatted_phone))
         existing_student = result.scalar_one_or_none()
         
-        if existing_student and existing_student.is_verified and existing_student.hashed_password:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Account already exists. Please use sign in instead."
+        if not existing_student:
+            # Create new student record with minimal data
+            student = Student(
+                phone_number=formatted_phone,
+                is_verified=False,  # Will be verified after OTP
+                registration_details={"current_step": "college_selection"}
             )
+            db.add(student)
+            await db.commit()
+            logger.info(f"New student record created for phone: {formatted_phone}")
+        else:
+            logger.info(f"Existing student found for phone: {formatted_phone}")
 
-        # Generate OTP
-        otp = CMSOTPManager.generate_otp()
+        # Development mode: Include OTP in response for easier testing
+        response_data = {
+            "phoneNumber": formatted_phone,
+        }
         
-        # Get client IP address
-        ip_address = get_client_ip(http_request)
-        
-        # Store OTP in Redis with purpose and IP tracking
-        otp_stored = await CMSOTPManager.store_otp(email, otp, purpose="student_signup", ip_address=ip_address)
-        
-        if not otp_stored:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to generate OTP. Please try again."
-            )
+        if settings.debug and otp_result.get("otp"):
+            logger.info(f"🔑 [DEV MODE] Phone OTP for {formatted_phone}: {otp_result['otp']}")
 
-        # Send OTP via email
-        email_result = await EmailService.send_otp_email(email, otp)
-        email_sent = email_result.get("success", False)
-        
-        if not email_sent:
-            # Clear OTP if email failed
-            await CMSOTPManager.clear_otp(email)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to send OTP email. Please try again."
-            )
-
-        # Development mode: Log OTP for easier testing
-        if settings.debug:
-            logger.info(f"🔑 [DEV MODE] Student Signup OTP for {email}: {otp}")
-
-        logger.info(f"Student signup OTP sent to {email}")
-        
-        return StudentSignupResponse()
+        return StudentSigninResponse(**response_data)
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Student signup error for {request.email}: {e}")
+        logger.error(f"Student signin OTP error for {request.phoneNumber}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred. Please try again."
@@ -103,209 +92,47 @@ async def send_student_signup_otp(
 
 
 @router.post("/verify-otp", response_model=StudentVerifyOTPResponse)
-async def verify_student_signup_otp(
+async def student_verify_otp_and_authenticate(
     request: StudentVerifyOTPRequest,
     http_request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Step 2: Verify OTP and create temporary student record
-    - Verify OTP with attempt tracking
-    - Create or update student record
-    - Return temporary token for profile setup
+    Step 2: Verify OTP and authenticate student
+    - Verify OTP with mock service
+    - Create session with device tracking
+    - Return JWT tokens for authenticated access
     """
     try:
-        email = request.email.lower().strip()
+        phone_number = request.phoneNumber.strip()
         otp = request.otp.strip()
-
-        # Get client IP address
-        ip_address = get_client_ip(http_request)
+        expo_push_token = request.expoPushToken.strip()
         
-        # Verify OTP with purpose and IP validation
-        verification_result = await CMSOTPManager.verify_otp(email, otp, purpose="student_signup", ip_address=ip_address)
+        # Format phone number
+        formatted_phone = MockSMSService.format_phone_number(phone_number)
         
-        if verification_result["expired"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="OTP has expired. Please request a new one."
-            )
-        
-        if verification_result["purpose_mismatch"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid verification flow. Please request a new OTP for signup."
-            )
-        
-        if verification_result["exceeded"]:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Maximum OTP attempts exceeded. Please request a new OTP."
-            )
+        # Verify OTP with mock service
+        verification_result = PhoneOTPManager.verify_phone_otp(formatted_phone, otp)
         
         if not verification_result["valid"]:
-            attempts_remaining = 3 - verification_result["attempts"]
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid OTP. {attempts_remaining} attempts remaining."
+                detail=verification_result.get("message", "Invalid OTP")
             )
-
-        # Check if student already exists
-        result = await db.execute(select(Student).where(Student.email == email))
-        existing_student = result.scalar_one_or_none()
         
-        if existing_student and existing_student.is_verified and existing_student.hashed_password:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Account already exists. Please use sign in instead."
-            )
-
-        # Create new student record if doesn't exist
-        if not existing_student:
-            student = Student(
-                email=email,
-                full_name="",  # Will be filled in next step
-                hashed_password="",  # Will be filled in next step
-                is_verified=True,  # Email is verified via OTP
-                registration_details={"current_step": "profile_setup"}
-            )
-            db.add(student)
-            await db.commit()
-            await db.refresh(student)
-        else:
-            # Update existing unverified student
-            student = existing_student
-            student.is_verified = True
-            student.email_verified_at = datetime.now(timezone.utc)
-            await db.commit()
-
-        # Mark OTP as verified in Redis
-        await CMSOTPManager.mark_otp_verified(email)
-
-        # Generate secure temporary token for profile setup
-        temp_token = CMSOTPManager.generate_secure_temp_token()
-        await CMSOTPManager.store_temp_token(temp_token, email, ttl=300)  # 5 minutes
-
-        logger.info(f"Student OTP verified for {email}, student record created/updated")
-
-        return StudentVerifyOTPResponse(tempToken=temp_token)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Student OTP verification error for {request.email}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again."
-        )
-
-
-@router.post("/setup-profile", response_model=StudentSetupProfileResponse)
-async def setup_student_profile(
-    request: StudentSetupProfileRequest,
-    http_request: Request,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Step 3: Complete profile setup with password and personal details
-    - Verify temporary token
-    - Set password and full name
-    - Complete basic account setup
-    """
-    try:
-        temp_token = request.tempToken.strip()
-        password = request.password.strip()
-        full_name = request.fullName.strip()
-
-        # Validate temporary token and get email
-        email = await CMSOTPManager.validate_temp_token(temp_token)
-        if not email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired temporary token. Please verify your email again."
-            )
-
-        # Get client IP address
-        ip_address = get_client_ip(http_request)
-
-        # Get student from database
-        result = await db.execute(select(Student).where(Student.email == email))
+        # Get student record
+        result = await db.execute(select(Student).where(Student.phone_number == formatted_phone))
         student = result.scalar_one_or_none()
         
         if not student:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Account not found. Please complete email verification first."
-            )
-
-        # Validate OTP for action
-        otp_validation = await CMSOTPManager.validate_otp_for_action(email, "student_signup", ip_address)
-        if not otp_validation["valid"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=otp_validation["reason"]
-            )
-
-        # Hash password
-        hashed_password = student_auth.get_password_hash(password)
-
-        # Update student with password and profile
-        student.hashed_password = hashed_password
-        student.full_name = full_name
-        student.update_registration_step("college_selection", {"profile_completed": True})
-        
-        await db.commit()
-
-        # Consume OTP after successful profile setup
-        await CMSOTPManager.consume_otp(email, "student_signup")
-        
-        # Clear temporary token
-        await CMSOTPManager.clear_temp_token(temp_token)
-
-        logger.info(f"Student profile setup completed for {email}")
-
-        return StudentSetupProfileResponse()
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Student profile setup error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again."
-        )
-
-
-@router.post("/signin", response_model=StudentSigninResponse)
-async def student_signin(
-    request: StudentSigninRequest,
-    http_request: Request,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Student sign in with single-device enforcement
-    - Validates email and password
-    - Automatically logs out from all other devices
-    - Creates new session with device tracking
-    """
-    try:
-        email = request.email.lower().strip()
-        
-        # Find student by email
-        result = await db.execute(select(Student).where(Student.email == email))
-        student = result.scalar_one_or_none()
-        
-        if not student:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password"
+                detail="Student account not found. Please try signing in again."
             )
         
-        # Authenticate student
-        if not student_auth.authenticate_student(email, request.password, student):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password"
-            )
+        # Mark phone as verified
+        if not student.is_verified:
+            student.verify_phone()
         
         # Get device information
         user_agent = http_request.headers.get("User-Agent", "")
@@ -321,25 +148,12 @@ async def student_signin(
         
         # Update login tracking and expo push token
         student.record_login()
-        student.update_expo_push_token(request.expoPushToken)
+        student.update_expo_push_token(expo_push_token)
         await db.commit()
         
-        logger.info(f"Student signin successful for {email} from {ip_address}")
+        logger.info(f"Student authentication successful for {formatted_phone} from {ip_address}")
         
-        # Send login notification email (non-blocking)
-        try:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
-            await EmailService.send_login_notification_email(
-                email=email,
-                full_name=student.full_name,
-                device_info=session_data["device_info"],
-                ip_address=ip_address,
-                timestamp=timestamp
-            )
-        except Exception as e:
-            logger.warning(f"Failed to send login notification email to {email}: {e}")
-        
-        return StudentSigninResponse(
+        return StudentVerifyOTPResponse(
             accessToken=session_data["access_token"],
             refreshToken=session_data["refresh_token"],
             expiresIn=session_data["expires_in"],
@@ -351,10 +165,10 @@ async def student_signin(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Student signin error for {request.email}: {e}")
+        logger.error(f"Student OTP verification error for {request.phoneNumber}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to sign in"
+            detail="Authentication failed. Please try again."
         )
 
 
@@ -462,7 +276,7 @@ async def student_signout(
                 detail="Failed to sign out"
             )
         
-        logger.info(f"Student {student.email} signed out from session {session_id}")
+        logger.info(f"Student {student.phone_number} signed out from session {session_id}")
         
         return StudentLogoutResponse()
         
@@ -474,5 +288,3 @@ async def student_signout(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to sign out"
         )
-
-

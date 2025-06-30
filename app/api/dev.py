@@ -440,7 +440,7 @@ async def dev_info():
         "available_endpoints": {
             "cleanup_account": {
                 "method": "DELETE",
-                "path": "/api/dev/cleanup-account", 
+                "path": "/api/cms/dev/cleanup-account", 
                 "description": "Delete all data associated with an email account (staff or student)",
                 "parameters": {
                     "email": "Email address of account to delete",

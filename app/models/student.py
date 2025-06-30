@@ -15,16 +15,18 @@ class Student(UUIDBaseModel):
     student_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
 
     # Basic student information
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    full_name = Column(String(200), nullable=False)
+    phone_number = Column(String(20), unique=True, index=True, nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=True)
+    full_name = Column(String(200), nullable=True)
+    gender = Column(String(10), nullable=True)
 
     # Authentication
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
 
-    # Email verification
-    email_verified_at = Column(DateTime(timezone=True), nullable=True)
+    # Phone verification
+    phone_verified_at = Column(DateTime(timezone=True), nullable=True)
 
     # Last login tracking
     last_login_at = Column(DateTime(timezone=True), nullable=True)
@@ -65,12 +67,12 @@ class Student(UUIDBaseModel):
     )
 
     def __repr__(self):
-        return f"<Student(student_id={self.student_id}, email={self.email})>"
+        return f"<Student(student_id={self.student_id}, phone_number={self.phone_number})>"
 
-    def verify_email(self):
-        """Mark email as verified"""
+    def verify_phone(self):
+        """Mark phone as verified"""
         self.is_verified = True
-        self.email_verified_at = datetime.now(timezone.utc)
+        self.phone_verified_at = datetime.now(timezone.utc)
 
     def record_login(self):
         """Record a successful login"""
@@ -124,7 +126,7 @@ class Student(UUIDBaseModel):
         
         # Define step progression for progress calculation
         steps = ["college_selection", "term_selection", "graduation_selection", 
-                "degree_selection", "branch_selection", "section_selection", "completed"]
+                "degree_selection", "branch_selection", "section_selection", "user_details", "completed"]
         
         current_step = self.registration_details.get("current_step", "college_selection")
         
@@ -166,11 +168,13 @@ class Student(UUIDBaseModel):
         base_dict = super().to_dict()
         result = {
             "studentId": base_dict["student_id"],
+            "phoneNumber": base_dict["phone_number"],
             "email": base_dict["email"],
             "fullName": base_dict["full_name"],
+            "gender": base_dict["gender"],
             "isActive": base_dict["is_active"],
             "isVerified": base_dict["is_verified"],
-            "emailVerifiedAt": base_dict["email_verified_at"],
+            "phoneVerifiedAt": base_dict["phone_verified_at"],
             "lastLoginAt": base_dict["last_login_at"],
             "loginCount": base_dict["login_count"],
             "expoPushToken": base_dict["expo_push_token"],
@@ -197,6 +201,7 @@ class Student(UUIDBaseModel):
         """Create JWT token payload for student authentication"""
         return {
             "sub": str(self.student_id),
+            "phoneNumber": self.phone_number,
             "email": self.email,
             "collegeId": str(self.college_id) if self.college_id else None,
             "sectionId": str(self.section_id) if self.section_id else None,

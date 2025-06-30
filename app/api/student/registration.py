@@ -32,6 +32,7 @@ from app.schemas.student_registration_schemas import (
     SelectBranchRequest, SelectBranchResponse,
     SectionListResponse, SectionOption, SectionStatusOption,
     SelectSectionRequest, SelectSectionResponse,
+    UserDetailsRequest, UserDetailsResponse,
     RegistrationStatusResponse, RegistrationStepDetails,
     ResetRegistrationRequest, ResetRegistrationResponse
 )
@@ -86,11 +87,10 @@ async def select_college(
     current_session: dict = Depends(check_registration_in_progress),
     db: AsyncSession = Depends(get_db)
 ):
-    """Select college and roll number, then move to term selection"""
+    """Select college, then move to term selection"""
     try:
         student = current_session["student"]
         college_id = request.collegeId
-        roll_number = request.rollNumber.strip()
         
         # Validate college exists
         result = await db.execute(
@@ -110,24 +110,10 @@ async def select_college(
                 detail="College is not available for self-registration"
             )
         
-        # Check if roll number is already taken in this college
-        existing_student = await db.execute(
-            select(Student).where(
-                Student.college_id == college_id,
-                Student.roll_number == roll_number
-            )
-        )
-        if existing_student.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Roll number '{roll_number}' is already taken in this college"
-            )
-        
         # Update student registration details (with approval reset)
         student.update_registration_step("term_selection", {
             "college_id": college_id,
-            "college_name": college.name,
-            "roll_number": roll_number
+            "college_name": college.name
         }, reset_approval=True)
         await db.commit()
         
@@ -140,11 +126,10 @@ async def select_college(
             logoUrl=college.logo_url
         )
         
-        logger.info(f"Student {student.student_id} selected college {college.name} with roll number {roll_number}")
+        logger.info(f"Student {student.student_id} selected college {college.name}")
         
         return SelectCollegeResponse(
-            selectedCollege=selected_college,
-            rollNumber=roll_number
+            selectedCollege=selected_college
         )
         
     except HTTPException:
@@ -664,7 +649,7 @@ async def select_section(
     current_session: dict = Depends(check_registration_in_progress),
     db: AsyncSession = Depends(get_db)
 ):
-    """Select section and complete registration"""
+    """Select section and move to user details step"""
     try:
         student = current_session["student"]
         section_id = request.sectionId
@@ -697,25 +682,12 @@ async def select_section(
                 detail="Selected section is full. Please choose another section."
             )
         
-        # Generate admission number (simple format: COLLEGE_YEAR_SEQUENCE)
-        import datetime
-        current_year = datetime.datetime.now().year
-        admission_number = f"STU{current_year}{section.current_strength + 1:04d}"
-        
-        # Get roll number from registration details
-        roll_number = student.registration_details.get("roll_number")
-        
-        # Complete registration
-        student.complete_registration(
-            college_id=uuid.UUID(college_id),
-            section_id=uuid.UUID(section_id),
-            admission_number=admission_number,
-            roll_number=roll_number
-        )
-        
-        # Update section strength
-        section.current_strength += 1
-        
+        # Update student registration details to move to user_details step
+        student.update_registration_step("user_details", {
+            **student.registration_details,
+            "section_id": section_id,
+            "section_name": section.section_name
+        }, reset_approval=True)
         await db.commit()
         
         selected_section = SectionOption(
@@ -728,10 +700,99 @@ async def select_section(
             classTeacher=None
         )
         
-        logger.info(f"Student {student.student_id} completed registration with section {section.section_name}")
+        logger.info(f"Student {student.student_id} selected section {section.section_name}, moving to user details")
         
         return SelectSectionResponse(
             selectedSection=selected_section,
+            studentProfile=student.to_dict()
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Select section error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to complete registration"
+        )
+
+
+@router.put("/user-details", response_model=UserDetailsResponse)
+async def submit_user_details(
+    request: UserDetailsRequest,
+    current_session: dict = Depends(check_registration_in_progress),
+    db: AsyncSession = Depends(get_db)
+):
+    """Submit user details and complete registration"""
+    try:
+        student = current_session["student"]
+        
+        # Check if section is selected (prerequisite for user details)
+        section_id = student.registration_details.get("section_id")
+        college_id = student.registration_details.get("college_id")
+        
+        if not section_id or not college_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Please complete section selection first"
+            )
+        
+        # Check if roll number is already taken in this college
+        existing_student = await db.execute(
+            select(Student).where(
+                Student.college_id == college_id,
+                Student.roll_number == request.rollNumber,
+                Student.student_id != student.student_id  # Exclude current student
+            )
+        )
+        if existing_student.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Roll number '{request.rollNumber}' is already taken in this college"
+            )
+        
+        # Update student personal details
+        student.full_name = request.fullName
+        student.gender = request.gender
+        student.email = request.email
+        
+        # Get section to update strength
+        result = await db.execute(select(Section).where(Section.section_id == section_id))
+        section = result.scalar_one_or_none()
+        
+        if not section:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Selected section not found"
+            )
+        
+        # Check section capacity one more time
+        if section.current_strength >= section.student_capacity:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Selected section is now full. Please select a different section."
+            )
+        
+        # Generate admission number
+        current_year = datetime.datetime.now().year
+        admission_number = f"STU{current_year}{section.current_strength + 1:04d}"
+        
+        # Complete registration
+        student.complete_registration(
+            college_id=uuid.UUID(college_id),
+            section_id=uuid.UUID(section_id),
+            admission_number=admission_number,
+            roll_number=request.rollNumber
+        )
+        
+        # Update section strength
+        section.current_strength += 1
+        
+        await db.commit()
+        
+        logger.info(f"Student {student.student_id} completed registration with user details")
+        
+        return UserDetailsResponse(
             studentProfile=student.to_dict(),
             admissionNumber=admission_number
         )
@@ -739,7 +800,7 @@ async def select_section(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Select section error: {e}")
+        logger.error(f"Submit user details error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to complete registration"
@@ -845,12 +906,13 @@ async def get_registration_status(
                 next_action = "Registration completed! You can now access the app"
         else:
             next_actions = {
-                "college_selection": "Select your college and enter your roll number",
+                "college_selection": "Select your college",
                 "term_selection": "Choose the current academic term",
                 "graduation_selection": "Select your graduation level (UG/PG/PhD)",
                 "degree_selection": "Choose your degree program",
                 "branch_selection": "Select your academic specialization",
                 "section_selection": "Choose your class section",
+                "user_details": "Enter your personal details to complete registration",
             }
             next_action = next_actions.get(progress["current_step"], "Continue registration")
         
