@@ -3,7 +3,7 @@ Student FastAPI Application
 Separate application for Student Mobile App with single-device authentication
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -90,7 +90,23 @@ async def add_process_time_header(request, call_next):
     return response
 
 
-# Global exception handler
+# Global exception handlers
+@student_app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    """Global HTTP exception handler for Student app - converts detail to message"""
+    logger.warning(f"Student API - HTTP {exc.status_code}: {exc.detail}")
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "statusCode": exc.status_code,
+            "message": exc.detail,
+            "success": False,
+            "timestamp": time.time(),
+            "api": "student"
+        },
+    )
+
 @student_app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
     """Global exception handler for Student app"""
@@ -166,9 +182,9 @@ async def student_app_info():
 
 
 # Include Student API routers
-student_app.include_router(student_auth.router, prefix="/api/student")
-student_app.include_router(student_registration.router, prefix="/api/student")
-student_app.include_router(student_profile.router, prefix="/api/student")
+student_app.include_router(student_auth.router)
+student_app.include_router(student_registration.router)
+student_app.include_router(student_profile.router)
 
 # Add pagination
 add_pagination(student_app)

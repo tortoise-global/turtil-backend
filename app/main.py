@@ -102,8 +102,8 @@ app = FastAPI(
 
 
 # Mount sub-applications
-app.mount("/cms", cms_app)
-app.mount("/student", student_app)
+app.mount("/api/cms", cms_app)
+app.mount("/api/student", student_app)
 
 # Add CORS middleware
 app.add_middleware(
@@ -164,12 +164,12 @@ async def general_exception_handler(request: Request, exc: Exception):
 @app.get("/docs-cms")
 async def cms_docs_redirect():
     """Redirect to CMS API documentation"""
-    return RedirectResponse(url="/cms/docs")
+    return RedirectResponse(url="/api/cms/docs")
 
 @app.get("/docs-student")
 async def student_docs_redirect():
     """Redirect to Student API documentation"""
-    return RedirectResponse(url="/student/docs")
+    return RedirectResponse(url="/api/student/docs")
 
 # Root endpoint (hidden from Swagger)
 @app.get("/", include_in_schema=False)

@@ -68,7 +68,7 @@ class SecurityManager:
             expire = datetime.now(timezone.utc) + expires_delta
         else:
             expire = datetime.now(timezone.utc) + timedelta(
-                minutes=settings.access_token_expire_minutes
+                minutes=settings.cms_access_token_expire_minutes
             )
 
         to_encode.update(
@@ -230,7 +230,7 @@ async def blacklist_token(token: str, ttl: Optional[int] = None) -> bool:
     """Add token to blacklist"""
     from app.redis_client import CacheManager
 
-    ttl = ttl or settings.access_token_expire_minutes * 60
+    ttl = ttl or settings.cms_access_token_expire_minutes * 60
     return await CacheManager.blacklist_token(token, ttl)
 
 

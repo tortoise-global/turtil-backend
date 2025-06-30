@@ -100,9 +100,8 @@ async def get_branches(
         )
 
     except Exception as e:
-        print(f"Error getting branches: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error fetching branches")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get branches", {"staff_id": str(current_staff.staff_id), "college_id": str(current_staff.college_id), "degree_id": degree_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("", response_model=BranchActionResponse, dependencies=[Depends(security)])
@@ -178,9 +177,8 @@ async def create_branch(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error creating branch: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error creating branch")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Create branch", {"staff_id": str(current_staff.staff_id), "degree_id": str(request.degree_id), "branch_name": request.branch_name, "branch_code": request.branch_code}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.get("/{branch_id}", response_model=BranchResponse, dependencies=[Depends(security)])
@@ -210,9 +208,8 @@ async def get_branch(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting branch: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error fetching branch")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get branch by ID", {"staff_id": str(current_staff.staff_id), "branch_id": branch_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.get("/{branch_id}/complete", response_model=CompleteBranchResponse, dependencies=[Depends(security)])
@@ -307,9 +304,8 @@ async def get_branch_complete(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting complete branch: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error fetching complete branch")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get complete branch", {"staff_id": str(current_staff.staff_id), "branch_id": branch_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.put("/{branch_id}", response_model=BranchActionResponse, dependencies=[Depends(security)])
@@ -375,9 +371,8 @@ async def update_branch(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error updating branch: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error updating branch")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Update branch", {"staff_id": str(current_staff.staff_id), "branch_id": branch_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.delete("/{branch_id}", response_model=BranchActionResponse, dependencies=[Depends(security)])
@@ -436,6 +431,5 @@ async def delete_branch(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error deleting branch: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error deleting branch")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Delete branch", {"staff_id": str(current_staff.staff_id), "branch_id": branch_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)

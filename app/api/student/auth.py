@@ -25,7 +25,6 @@ from app.schemas.student_auth_schemas import (
     StudentCurrentSessionResponse, StudentLogoutResponse,
     StudentForgotPasswordRequest, StudentForgotPasswordResponse,
     StudentResetPasswordRequest, StudentResetPasswordResponse,
-    StudentRegistrationStatusResponse, StudentRegistrationProgress,
     StudentProfileResponse, StudentUpdateProfileRequest
 )
 import logging
@@ -477,28 +476,3 @@ async def student_signout(
         )
 
 
-@router.get("/registration-status", response_model=StudentRegistrationStatusResponse)
-async def get_student_registration_status(
-    current_session: dict = Depends(get_current_student_session)
-):
-    """Get student's current academic registration status"""
-    try:
-        student = current_session["student"]
-        progress = student.get_registration_progress()
-        
-        return StudentRegistrationStatusResponse(
-            registrationCompleted=student.registration_completed,
-            progress=StudentRegistrationProgress(
-                currentStep=progress["current_step"],
-                progressPercentage=progress["progress_percentage"],
-                details=progress["details"],
-                canAccessApp=student.can_access_app()
-            )
-        )
-        
-    except Exception as e:
-        logger.error(f"Get student registration status error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get registration status"
-        )

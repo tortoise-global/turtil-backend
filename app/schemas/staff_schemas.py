@@ -81,7 +81,7 @@ class UpdateUsernameRequest(CamelCaseModel):
 class UpdateContactRequest(CamelCaseModel):
     """Request schema for updating college contact information"""
     contact_number: str = Field(..., pattern=r"^(\+91)?[6-9]\d{9}$", description="Contact number in Indian format")
-    contact_staff_id: int = Field(..., description="Staff ID who will be the primary contact")
+    contact_staff_id: str = Field(..., description="Staff ID (UUID) who will be the primary contact")
 
 
 class UpdateContactResponse(CamelCaseModel):
@@ -89,13 +89,13 @@ class UpdateContactResponse(CamelCaseModel):
     success: bool = Field(..., description="Update success status")
     message: str = Field(..., description="Update status message")
     contact_number: str = Field(..., description="Updated contact number")
-    contact_staff_id: int = Field(..., description="Updated contact staff ID")
+    contact_staff_id: str = Field(..., description="Updated contact staff ID (UUID)")
 
 
 class ContactInfoResponse(CamelCaseModel):
     """Response schema for getting current contact information"""
     contact_number: Optional[str] = Field(None, description="Current contact number")
-    contact_staff_id: Optional[int] = Field(None, description="Current contact staff ID")
+    contact_staff_id: Optional[str] = Field(None, description="Current contact staff ID (UUID)")
     contact_staff_name: Optional[str] = Field(None, description="Contact staff full name")
     contact_staff_email: Optional[str] = Field(None, description="Contact staff email")
 
@@ -104,7 +104,7 @@ class ContactInfoResponse(CamelCaseModel):
 
 class StaffResponse(CamelCaseModel):
     """Response schema for staff information (used in paginated lists)"""
-    staff_id: int = Field(..., description="Staff ID")
+    staff_id: str = Field(..., description="Staff ID (UUID)")
     uuid: str = Field(..., description="Staff UUID")
     email: EmailStr = Field(..., description="Staff email")
     full_name: str = Field(..., description="Full name")
@@ -112,12 +112,12 @@ class StaffResponse(CamelCaseModel):
     is_active: bool = Field(..., description="Account active status")
     is_verified: bool = Field(..., description="Email verification status")
     cms_role: str = Field(..., description="CMS role (principal, college_admin, hod, staff)")
-    college_id: Optional[int] = Field(None, description="College ID")
-    department_id: Optional[int] = Field(None, description="Department ID")
+    college_id: Optional[str] = Field(None, description="College ID (UUID)")
+    department_id: Optional[str] = Field(None, description="Department ID (UUID)")
     invitation_status: str = Field(..., description="Invitation status (pending, accepted, active)")
     temporary_password: bool = Field(..., description="Has temporary password")
     must_reset_password: bool = Field(..., description="Must reset password on next login")
-    invited_by_staff_id: Optional[int] = Field(None, description="ID of staff member who sent invitation")
+    invited_by_staff_id: Optional[str] = Field(None, description="ID of staff member who sent invitation (UUID)")
     is_hod: bool = Field(..., description="Head of Department status")
     last_login_at: Optional[datetime] = Field(None, description="Last login timestamp")
     created_at: datetime = Field(..., description="Account creation timestamp")
@@ -126,7 +126,7 @@ class StaffResponse(CamelCaseModel):
 
 class StaffDetailsResponse(CamelCaseModel):
     """Detailed staff information response schema"""
-    staff_id: int = Field(..., description="Staff ID")
+    staff_id: str = Field(..., description="Staff ID (UUID)")
     uuid: str = Field(..., description="Staff UUID")
     email: EmailStr = Field(..., description="Staff email")
     full_name: str = Field(..., description="Full name")
@@ -140,13 +140,13 @@ class StaffDetailsResponse(CamelCaseModel):
     marketing_consent: bool = Field(..., description="Marketing consent")
     terms_accepted: bool = Field(..., description="Terms accepted")
     cms_role: str = Field(..., description="CMS role")
-    college_id: Optional[int] = Field(None, description="College ID")
-    department_id: Optional[int] = Field(None, description="Department ID")
+    college_id: Optional[str] = Field(None, description="College ID (UUID)")
+    department_id: Optional[str] = Field(None, description="Department ID (UUID)")
     invitation_status: str = Field(..., description="Invitation status")
     temporary_password: bool = Field(..., description="Has temporary password")
     must_reset_password: bool = Field(..., description="Must reset password")
     can_assign_department: bool = Field(..., description="Can assign departments")
-    invited_by_staff_id: Optional[int] = Field(None, description="Invited by staff ID")
+    invited_by_staff_id: Optional[str] = Field(None, description="Invited by staff ID (UUID)")
     is_hod: bool = Field(..., description="Head of Department status")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Update timestamp")

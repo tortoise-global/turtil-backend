@@ -3,7 +3,7 @@ CMS FastAPI Application
 Separate application for CMS (College Management System) with existing staff functionality
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -107,7 +107,23 @@ async def add_process_time_header(request, call_next):
     return response
 
 
-# Global exception handler
+# Global exception handlers
+@cms_app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    """Global HTTP exception handler for CMS app - converts detail to message"""
+    logger.warning(f"CMS API - HTTP {exc.status_code}: {exc.detail}")
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "statusCode": exc.status_code,
+            "message": exc.detail,
+            "success": False,
+            "timestamp": time.time(),
+            "api": "cms"
+        },
+    )
+
 @cms_app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
     """Global exception handler for CMS app"""
@@ -179,32 +195,32 @@ async def cms_app_info():
 
 # Include CMS API routers
 # Authentication and session management
-cms_app.include_router(signup.router, prefix="/api")
-cms_app.include_router(session.router, prefix="/api")
+cms_app.include_router(signup.router)
+cms_app.include_router(session.router)
 
 # CMS specific routers
-cms_app.include_router(registration.router, prefix="/api/cms")
-cms_app.include_router(cms_departments.router, prefix="/api")
-cms_app.include_router(cms_staff.router, prefix="/api")
-cms_app.include_router(cms_files.router, prefix="/api")
+cms_app.include_router(registration.router)
+cms_app.include_router(cms_departments.router)
+cms_app.include_router(cms_staff.router)
+cms_app.include_router(cms_files.router)
 
 # Academic program management routers
-cms_app.include_router(cms_terms.router, prefix="/api")
-cms_app.include_router(cms_graduations.router, prefix="/api")
-cms_app.include_router(cms_degrees.router, prefix="/api")
-cms_app.include_router(cms_branches.router, prefix="/api")
-cms_app.include_router(cms_subjects.router, prefix="/api")
-cms_app.include_router(cms_sections.router, prefix="/api")
+cms_app.include_router(cms_terms.router)
+cms_app.include_router(cms_graduations.router)
+cms_app.include_router(cms_degrees.router)
+cms_app.include_router(cms_branches.router)
+cms_app.include_router(cms_subjects.router)
+cms_app.include_router(cms_sections.router)
 
 # Student management router
-cms_app.include_router(cms_students.router, prefix="/api")
+cms_app.include_router(cms_students.router)
 
 # Notification management router
-cms_app.include_router(cms_notifications.router, prefix="/api")
+cms_app.include_router(cms_notifications.router)
 
 # Include dev router conditionally
 if settings.debug:
-    cms_app.include_router(dev_api.router, prefix="/api")
+    cms_app.include_router(dev_api.router)
 
 # Add pagination
 add_pagination(cms_app)

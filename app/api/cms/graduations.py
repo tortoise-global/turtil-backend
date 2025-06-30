@@ -125,11 +125,8 @@ async def get_graduations(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting graduations: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while fetching graduations",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get graduations", {"staff_id": str(current_staff.staff_id), "college_id": str(current_staff.college_id), "term_id": term_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("", response_model=GraduationActionResponse, dependencies=[Depends(security)])
@@ -210,11 +207,8 @@ async def create_graduation(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error creating graduation: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while creating graduation",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Create graduation", {"staff_id": str(current_staff.staff_id), "term_id": str(request.term_id), "graduation_name": request.graduation_name, "graduation_code": request.graduation_code}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.get(
@@ -253,11 +247,8 @@ async def get_graduation(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting graduation: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while fetching graduation",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get graduation by ID", {"staff_id": str(current_staff.staff_id), "graduation_id": graduation_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.put(
@@ -320,11 +311,8 @@ async def update_graduation(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error updating graduation: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while updating graduation",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Update graduation", {"staff_id": str(current_staff.staff_id), "graduation_id": graduation_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.delete(
@@ -419,8 +407,5 @@ async def delete_graduation(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error deleting graduation: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while deleting graduation",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Delete graduation", {"staff_id": str(current_staff.staff_id), "graduation_id": graduation_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)

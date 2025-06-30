@@ -71,9 +71,8 @@ async def get_subjects(
         )
 
     except Exception as e:
-        print(f"Error getting subjects: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error fetching subjects")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get subjects", {"staff_id": str(current_staff.staff_id), "college_id": str(current_staff.college_id), "branch_id": branch_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("", response_model=SubjectActionResponse, dependencies=[Depends(security)])
@@ -162,9 +161,8 @@ async def create_subjects(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error creating subjects: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error creating subjects")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Create subject", {"staff_id": str(current_staff.staff_id), "branch_id": str(request.branch_id), "subject_name": request.subject_name, "subject_code": request.subject_code}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.get("/{subject_id}", response_model=SubjectResponse, dependencies=[Depends(security)])
@@ -195,9 +193,8 @@ async def get_subject(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting subject: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error fetching subject")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get subject by ID", {"staff_id": str(current_staff.staff_id), "subject_id": subject_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.put("/{subject_id}", response_model=SubjectActionResponse, dependencies=[Depends(security)])
@@ -255,9 +252,8 @@ async def update_subject(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error updating subject: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error updating subject")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Update subject", {"staff_id": str(current_staff.staff_id), "subject_id": subject_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.delete("/{subject_id}", response_model=SubjectActionResponse, dependencies=[Depends(security)])
@@ -313,6 +309,5 @@ async def delete_subject(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error deleting subject: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error deleting subject")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Delete subject", {"staff_id": str(current_staff.staff_id), "subject_id": subject_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)

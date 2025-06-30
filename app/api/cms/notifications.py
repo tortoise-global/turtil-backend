@@ -116,14 +116,11 @@ async def send_notification(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error sending notification: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send notification"
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Send notification", {"staff_id": str(current_staff.staff_id), "student_count": len(request.studentIds), "title": request.title}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@router.get("/history", response_model=NotificationHistoryResponse, dependencies=[Depends(security)])
+@router.get("/history", response_model=Page[NotificationHistoryItem], dependencies=[Depends(security)])
 async def get_notification_history(
     status_filter: Optional[str] = Query(None, description="Filter by status"),
     date_from: Optional[str] = Query(None, description="Filter from date (ISO format)"),
@@ -193,31 +190,20 @@ async def get_notification_history(
                 retryCount=notification.retry_count
             ))
         
-        # Build applied filters
-        applied_filters = NotificationHistoryFilters(
-            status=status_filter,
-            dateFrom=datetime.fromisoformat(date_from.replace('Z', '+00:00')) if date_from else None,
-            dateTo=datetime.fromisoformat(date_to.replace('Z', '+00:00')) if date_to else None,
-            sentByStaff=sent_by_staff
-        )
-        
-        return NotificationHistoryResponse(
-            notifications=history_items,
+        # Return standard Page response
+        return Page(
+            items=history_items,
             total=paginated_result.total,
             page=paginated_result.page,
             size=paginated_result.size,
-            pages=paginated_result.pages,
-            appliedFilters=applied_filters
+            pages=paginated_result.pages
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting notification history: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get notification history"
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get notification history", {"staff_id": str(current_staff.staff_id), "status_filter": status_filter, "date_from": date_from}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.get("/{notification_id}", response_model=NotificationDetailResponse, dependencies=[Depends(security)])
@@ -281,11 +267,8 @@ async def get_notification_details(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting notification details: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get notification details"
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get notification details", {"staff_id": str(current_staff.staff_id), "notification_id": notification_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("/{notification_id}/retry", response_model=RetryNotificationResponse, dependencies=[Depends(security)])
@@ -365,11 +348,8 @@ async def retry_notification(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrying notification: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retry notification"
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Retry notification", {"staff_id": str(current_staff.staff_id), "notification_id": notification_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.get("/stats/overview", response_model=NotificationStatisticsResponse, dependencies=[Depends(security)])
@@ -498,8 +478,5 @@ async def get_notification_statistics(
         )
         
     except Exception as e:
-        logger.error(f"Error getting notification statistics: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get notification statistics"
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get notification statistics", {"staff_id": str(current_staff.staff_id), "college_id": str(current_staff.college_id)}, status.HTTP_500_INTERNAL_SERVER_ERROR)

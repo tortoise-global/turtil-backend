@@ -98,11 +98,8 @@ async def send_signup_otp(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Signup error for {request.email}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again."
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Signup", {"user_email": request.email}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("/verify-otp", response_model=VerifySignupResponse)
@@ -200,10 +197,16 @@ async def verify_signup_otp(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"OTP verification error for {request.email}: {e}")
+        logger.error(f"OTP verification error for {request.email}: {e}", extra={
+            "user_email": request.email,
+            "operation": "verify_otp",
+            "error_type": type(e).__name__
+        })
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again."
+            detail=f"OTP verification failed due to {type(e).__name__}: {str(e)}"
         )
 
 
@@ -328,11 +331,8 @@ async def setup_profile(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Profile setup error for {request.email}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again."
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Profile setup", {"user_email": request.email}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
@@ -402,11 +402,8 @@ async def send_forgot_password_otp(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Forgot password error for {request.email}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again."
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Forgot password", {"user_email": request.email}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("/verify-forgot-password", response_model=VerifySignupResponse)
@@ -484,11 +481,8 @@ async def verify_password_reset_otp(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Password reset OTP verification error for {request.email}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again."
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Password reset OTP verification", {"user_email": request.email}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("/reset-password", response_model=SignupResponse)
@@ -504,36 +498,16 @@ async def reset_password(
     - Invalidate all user sessions for security
     """
     try:
-        temp_token = request.temp_token.strip() if request.temp_token else None
-        new_password = request.new_password.strip()
+        temp_token = request.temp_token.strip()
+        new_password = request.password.strip()
 
         # Validate temporary token and get email
-        if temp_token:
-            email = await CMSOTPManager.validate_temp_token(temp_token)
-            if not email:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid or expired temporary token. Please verify your OTP again."
-                )
-        else:
-            # Fallback to legacy approach for backward compatibility
-            email = request.email.lower().strip() if request.email else None
-            otp = request.otp.strip() if request.otp else None
-            
-            if not email or not otp:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Missing authentication token. Please verify your OTP first."
-                )
-            
-            # Legacy OTP verification (deprecated)
-            verification_result = await CMSOTPManager.verify_otp(email, otp, purpose="password_reset")
-            
-            if not verification_result["valid"]:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid or expired OTP. Please request a new one."
-                )
+        email = await CMSOTPManager.validate_temp_token(temp_token)
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired temporary token. Please verify your OTP again."
+            )
 
         # Get client IP address
         ip_address = get_client_ip(http_request)
@@ -548,14 +522,13 @@ async def reset_password(
                 detail="Account not found"
             )
 
-        # For new approach: Comprehensive OTP validation for consumption
-        if temp_token:
-            otp_validation = await CMSOTPManager.validate_otp_for_action(email, "password_reset", ip_address)
-            if not otp_validation["valid"]:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=otp_validation["reason"]
-                )
+        # Comprehensive OTP validation for consumption
+        otp_validation = await CMSOTPManager.validate_otp_for_action(email, "password_reset", ip_address)
+        if not otp_validation["valid"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=otp_validation["reason"]
+            )
 
         # Hash new password
         hashed_password = cms_auth.get_password_hash(new_password)
@@ -574,8 +547,7 @@ async def reset_password(
         await CMSOTPManager.consume_otp(email, "password_reset")
         
         # Clear temporary token
-        if temp_token:
-            await CMSOTPManager.clear_temp_token(temp_token)
+        await CMSOTPManager.clear_temp_token(temp_token)
 
         logger.info(f"Password reset completed for {email}, all sessions invalidated")
 
@@ -602,8 +574,5 @@ async def reset_password(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Password reset error for {request.email}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again."
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Password reset", {"user_email": getattr(request, 'email', 'unknown')}, status.HTTP_500_INTERNAL_SERVER_ERROR)

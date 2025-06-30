@@ -16,7 +16,7 @@ from app.schemas.registration_schemas import (
 )
 from app.api.cms.deps import get_current_staff_from_temp_token
 
-router = APIRouter(prefix="/cms/registration", tags=["CMS Registration Details"])
+router = APIRouter(prefix="/registration", tags=["CMS Registration Details"])
 
 
 @router.post(
@@ -91,11 +91,8 @@ async def college_logo(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error saving college logo: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again.",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "College logo upload", {"staff_id": str(current_staff.staff_id), "logo_url": getattr(request, 'logoUrl', None), "skip_logo": getattr(request, 'skipLogo', False)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post(
@@ -170,11 +167,8 @@ async def college_details(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error saving college details: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again.",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "College details setup", {"staff_id": str(current_staff.staff_id), "college_name": request.name, "college_reference_id": request.collegeReferenceId}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post(
@@ -242,8 +236,5 @@ async def college_address(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error completing registration: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again.",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Complete college registration", {"staff_id": str(current_staff.staff_id), "college_id": str(current_staff.college_id) if current_staff.college_id else None}, status.HTTP_500_INTERNAL_SERVER_ERROR)

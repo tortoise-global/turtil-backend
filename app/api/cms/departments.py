@@ -44,12 +44,13 @@ async def get_departments(
         )
         query = query.order_by(Department.name)
 
-        # Get paginated departments
-        paginated_result = await sqlalchemy_paginate(db, query)
+        # Execute query to get all departments
+        result = await db.execute(query)
+        departments = result.scalars().all()
 
-        # Add staff statistics for each department
+        # Transform departments to response objects with stats
         department_responses = []
-        for department in paginated_result.items:
+        for department in departments:
             # Count total staff in department
             total_staff_result = await db.execute(
                 select(func.count(Staff.staff_id)).where(Staff.department_id == department.department_id)
@@ -66,40 +67,40 @@ async def get_departments(
 
             # Get HOD information
             hod_name = None
-            if department.hod_cms_staff_id:
+            if department.head_staff_id:
                 hod_result = await db.execute(
-                    select(Staff).where(Staff.staff_id == department.hod_cms_staff_id)
+                    select(Staff).where(Staff.staff_id == department.head_staff_id)
                 )
                 hod_staff = hod_result.scalar_one_or_none()
                 if hod_staff:
                     hod_name = hod_staff.full_name
 
-            dept_dict = department.to_dict()
             department_responses.append(
                 DepartmentWithStatsResponse(
-                    **dept_dict,
+                    id=str(department.department_id),
+                    uuid=str(department.department_id),
+                    name=department.name,
+                    code=department.code,
+                    description=department.description,
+                    collegeId=str(department.college_id),
+                    hodCmsStaffId=str(department.head_staff_id) if department.head_staff_id else None,
+                    hodName=hod_name,
                     totalStaffs=total_staff,
                     activeStaffs=active_staff,
-                    hodName=hod_name,
+                    createdAt=department.created_at,
+                    updatedAt=department.updated_at,
                 )
             )
 
-        return Page(
-            items=department_responses,
-            total=paginated_result.total,
-            page=paginated_result.page,
-            size=paginated_result.size,
-            pages=paginated_result.pages,
-        )
+        # Use fastapi-pagination to paginate the transformed data
+        from fastapi_pagination import paginate
+        return paginate(department_responses)
 
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting departments: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while fetching departments",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get departments", {"staff_id": str(current_staff.staff_id), "college_id": str(current_staff.college_id)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post(
@@ -160,11 +161,8 @@ async def create_department(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error creating department: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while creating department",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Create department", {"staff_id": str(current_staff.staff_id), "department_name": request.name, "department_code": request.code}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.put(
@@ -244,11 +242,8 @@ async def update_department(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error updating department: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while updating department",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Update department", {"staff_id": str(current_staff.staff_id), "department_id": departmentId}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.put(
@@ -311,7 +306,7 @@ async def assign_hod_to_department(
         # Check if staff is already HOD of another department
         if staff.is_hod:
             existing_hod_dept_result = await db.execute(
-                select(Department).where(Department.hod_cms_staff_id == staff.staff_id)
+                select(Department).where(Department.head_staff_id == staff.staff_id)
             )
             existing_dept = existing_hod_dept_result.scalar_one_or_none()
             if existing_dept and str(existing_dept.department_id) != departmentId:
@@ -321,16 +316,16 @@ async def assign_hod_to_department(
                 )
 
         # Remove current HOD if exists
-        if department.hod_cms_staff_id:
+        if department.head_staff_id:
             current_hod_result = await db.execute(
-                select(Staff).where(Staff.staff_id == department.hod_cms_staff_id)
+                select(Staff).where(Staff.staff_id == department.head_staff_id)
             )
             current_hod = current_hod_result.scalar_one_or_none()
             if current_hod:
                 current_hod.is_hod = False
 
         # Assign new HOD
-        department.hod_cms_staff_id = staff.staff_id
+        department.head_staff_id = staff.staff_id
         staff.is_hod = True
         staff.department_id = departmentId  # Ensure HOD is assigned to the department
 
@@ -348,11 +343,8 @@ async def assign_hod_to_department(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error assigning HOD: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while assigning HOD",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Assign HOD", {"staff_id": str(current_staff.staff_id), "department_id": departmentId, "hod_staff_id": str(request.staffId)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.put(
@@ -393,7 +385,7 @@ async def remove_hod_from_department(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Department not found"
             )
 
-        if not department.hod_cms_staff_id:
+        if not department.head_staff_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Department does not have an assigned HOD",
@@ -401,14 +393,14 @@ async def remove_hod_from_department(
 
         # Get current HOD
         hod_result = await db.execute(
-            select(Staff).where(Staff.staff_id == department.hod_cms_staff_id)
+            select(Staff).where(Staff.staff_id == department.head_staff_id)
         )
         hod_staff = hod_result.scalar_one_or_none()
 
         # Remove HOD assignment
         if hod_staff:
             hod_staff.is_hod = False
-        department.hod_cms_staff_id = None
+        department.head_staff_id = None
 
         await db.commit()
 
@@ -424,11 +416,8 @@ async def remove_hod_from_department(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error removing HOD: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while removing HOD",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Remove HOD", {"staff_id": str(current_staff.staff_id), "department_id": departmentId}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.delete(
@@ -482,9 +471,9 @@ async def delete_department(
             )
 
         # Remove HOD assignment if exists
-        if department.hod_cms_staff_id:
+        if department.head_staff_id:
             hod_result = await db.execute(
-                select(Staff).where(Staff.staff_id == department.hod_cms_staff_id)
+                select(Staff).where(Staff.staff_id == department.head_staff_id)
             )
             hod_staff = hod_result.scalar_one_or_none()
             if hod_staff:
@@ -505,8 +494,5 @@ async def delete_department(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error deleting department: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while deleting department",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Delete department", {"staff_id": str(current_staff.staff_id), "department_id": departmentId}, status.HTTP_500_INTERNAL_SERVER_ERROR)

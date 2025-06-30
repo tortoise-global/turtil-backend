@@ -127,6 +127,42 @@ def convert_response_to_camel(func: Callable) -> Callable:
     return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
 
 
+def handle_api_exception(e: Exception, operation: str, context: dict = None, status_code: int = 500) -> None:
+    """
+    Standardized exception handling for API endpoints with detailed error information.
+    
+    Args:
+        e: The caught exception
+        operation: Description of the operation that failed
+        context: Additional context for debugging (user_id, request_data, etc.)
+        status_code: HTTP status code to return
+    """
+    import logging
+    import traceback
+    from fastapi import HTTPException
+    
+    logger = logging.getLogger(__name__)
+    
+    # Prepare logging context
+    log_context = {
+        "operation": operation,
+        "error_type": type(e).__name__,
+        "error_message": str(e)
+    }
+    if context:
+        log_context.update(context)
+    
+    # Log the error with full context
+    logger.error(f"API Error in {operation}: {e}", extra=log_context)
+    traceback.print_exc()
+    
+    # Raise HTTP exception with detailed error info
+    raise HTTPException(
+        status_code=status_code,
+        detail=f"{operation} failed due to {type(e).__name__}: {str(e)}"
+    )
+
+
 def generate_temporary_password(length: int = 10) -> str:
     """
     Generate a secure temporary password.

@@ -218,11 +218,8 @@ async def signin(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Signin error for {request.email}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to sign in"
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Signin", {"user_email": request.email, "ip_address": get_client_ip(http_request)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("/refresh", response_model=RefreshTokenResponse)
@@ -291,11 +288,8 @@ async def refresh_tokens(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Token refresh error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to refresh tokens"
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Token refresh", {"refresh_token_provided": bool(request.refresh_token)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.get("/list", response_model=SessionListResponse)
@@ -346,11 +340,8 @@ async def list_sessions(
         )
         
     except Exception as e:
-        logger.error(f"List sessions error for staff {current_session['staff'].staff_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list sessions"
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "List sessions", {"staff_id": str(current_session['staff'].staff_id)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.get("/current", response_model=CurrentSessionResponse)
@@ -372,11 +363,8 @@ async def get_current_session_info(
         )
         
     except Exception as e:
-        logger.error(f"Get current session error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get session info"
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get current session", {"session_id": current_session.get("session_id", "unknown")}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("/signout", response_model=LogoutResponse)
@@ -417,11 +405,8 @@ async def signout(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Signout error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to sign out"
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Signout", {"staff_id": str(current_session['staff'].staff_id), "session_id": current_session.get("session_id")}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.delete("/all", response_model=LogoutResponse)
@@ -464,11 +449,8 @@ async def signout_all_sessions(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Signout all sessions error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to sign out all sessions"
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Signout all sessions", {"staff_id": str(current_session['staff'].staff_id)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.delete("/{sessionId}", response_model=LogoutResponse)
@@ -520,8 +502,5 @@ async def signout_specific_session(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Signout specific session error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to sign out session"
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Signout specific session", {"staff_id": str(current_session['staff'].staff_id), "target_session_id": sessionId}, status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -100,9 +100,8 @@ async def get_sections(
         )
 
     except Exception as e:
-        print(f"Error getting sections: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error fetching sections")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get sections", {"staff_id": str(current_staff.staff_id), "college_id": str(current_staff.college_id)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("", response_model=SectionActionResponse, dependencies=[Depends(security)])
@@ -179,9 +178,8 @@ async def create_section(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error creating section: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error creating section")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Create section", {"staff_id": str(current_staff.staff_id), "section_name": request.section_name, "branch_id": str(request.branch_id)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.get("/{section_id}", response_model=SectionResponse, dependencies=[Depends(security)])
@@ -212,9 +210,8 @@ async def get_section(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting section: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error fetching section")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get section by ID", {"staff_id": str(current_staff.staff_id), "section_id": section_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.put("/{section_id}", response_model=SectionActionResponse, dependencies=[Depends(security)])
@@ -281,9 +278,8 @@ async def update_section(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error updating section: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error updating section")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Update section", {"staff_id": str(current_staff.staff_id), "section_id": section_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.delete("/{section_id}", response_model=SectionActionResponse, dependencies=[Depends(security)])
@@ -328,9 +324,8 @@ async def delete_section(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error deleting section: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error deleting section")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Delete section", {"staff_id": str(current_staff.staff_id), "section_id": section_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ============================================================================
@@ -397,9 +392,8 @@ async def get_section_subjects(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting section subjects: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error fetching section subjects")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get section subjects", {"staff_id": str(current_staff.staff_id), "section_id": section_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("/{section_id}/assign-subjects", response_model=AssignmentActionResponse, dependencies=[Depends(security)])
@@ -500,9 +494,8 @@ async def assign_subjects_to_section(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error assigning subjects: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error assigning subjects")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Assign subjects to section", {"staff_id": str(current_staff.staff_id), "section_id": section_id, "subject_count": len(request.subject_ids)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.put("/{section_id}/subjects/{subject_id}/assign-teacher", 
@@ -577,9 +570,8 @@ async def assign_teacher_to_subject(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error assigning teacher: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error assigning teacher")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Assign teacher to section", {"staff_id": str(current_staff.staff_id), "section_id": section_id, "teacher_staff_id": str(request.teacher_staff_id)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.delete("/{section_id}/subjects/{subject_id}", 
@@ -631,6 +623,5 @@ async def remove_subject_assignment(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error removing assignment: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error removing assignment")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Remove section assignment", {"staff_id": str(current_staff.staff_id), "section_subject_id": section_subject_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)

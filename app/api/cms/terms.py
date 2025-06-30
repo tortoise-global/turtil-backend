@@ -125,11 +125,8 @@ async def get_terms(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting terms: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while fetching terms",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get terms", {"staff_id": str(current_staff.staff_id), "college_id": str(current_staff.college_id)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("", response_model=TermActionResponse, dependencies=[Depends(security)])
@@ -195,11 +192,8 @@ async def create_term(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error creating term: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while creating term",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Create term", {"staff_id": str(current_staff.staff_id), "batch_year": request.batch_year, "current_year": request.current_year, "current_semester": request.current_semester}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.get(
@@ -236,11 +230,8 @@ async def get_term(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting term: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while fetching term",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get term by ID", {"staff_id": str(current_staff.staff_id), "term_id": term_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.put(
@@ -301,11 +292,8 @@ async def update_term(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error updating term: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while updating term",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Update term", {"staff_id": str(current_staff.staff_id), "term_id": term_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.delete(
@@ -417,8 +405,5 @@ async def delete_term(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error deleting term: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while deleting term",
-        )
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Delete term", {"staff_id": str(current_staff.staff_id), "term_id": term_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)

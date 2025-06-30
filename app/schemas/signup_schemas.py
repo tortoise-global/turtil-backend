@@ -41,20 +41,9 @@ class VerifyPasswordResetOTPRequest(CamelCaseModel):
 
 
 class ResetPasswordRequest(CamelCaseModel):
-    """Request schema for password reset with verified token (step 2)"""
+    """Request schema for password reset with verified token"""
     temp_token: str = Field(..., description="Temporary token from OTP verification")
-    new_password: str = Field(..., min_length=8, description="New password")
-    confirm_password: str = Field(..., min_length=8, description="Password confirmation")
-    # Keep email for backward compatibility
-    email: Optional[EmailStr] = Field(None, description="Email address (optional for backward compatibility)")
-    otp: Optional[str] = Field(None, description="OTP (optional for backward compatibility)")
-
-    @field_validator("confirm_password")
-    @classmethod
-    def passwords_match(cls, v, info):
-        if "new_password" in info.data and v != info.data["new_password"]:
-            raise ValueError("Passwords do not match")
-        return v
+    password: str = Field(..., min_length=8, description="New password")
 
 
 class ChangePasswordRequest(CamelCaseModel):

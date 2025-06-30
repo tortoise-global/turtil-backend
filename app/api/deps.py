@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.core.auth import auth
+from app.core.session_manager import SessionManager
 from app.models.staff import Staff
 from app.redis_client import get_redis, UpstashRedisClient
 import logging
@@ -20,7 +20,7 @@ async def get_current_staff_from_token(
     db: AsyncSession = Depends(get_db),
 ) -> Optional[Staff]:
     """
-    Get current staff from JWT token using custom auth system.
+    Get current staff from JWT token using session-based auth system.
     Returns None if no valid token is provided.
     """
     if not credentials:
@@ -29,11 +29,28 @@ async def get_current_staff_from_token(
     token = credentials.credentials
 
     try:
-        # Use custom auth manager to get staff from token
-        staff = await auth.get_staff_by_token(db, token)
+        # Use the security manager to verify token first
+        from app.core.security import SecurityManager
+        payload = SecurityManager.verify_token(token, "access")
+        
+        if not payload:
+            logger.warning("Invalid or expired token")
+            return None
+        
+        staff_id = payload.get("sub")
+        if not staff_id:
+            logger.warning("Token missing staff ID")
+            return None
+        
+        # Get staff from database
+        from sqlalchemy import select
+        result = await db.execute(
+            select(Staff).where(Staff.staff_id == staff_id, Staff.is_active == True)
+        )
+        staff = result.scalar_one_or_none()
 
         if not staff:
-            logger.warning("Invalid token or staff not found")
+            logger.warning("Staff not found or inactive")
             return None
 
         return staff

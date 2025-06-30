@@ -102,9 +102,8 @@ async def get_degrees(
         )
 
     except Exception as e:
-        print(f"Error getting degrees: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error fetching degrees")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get degrees", {"staff_id": str(current_staff.staff_id), "college_id": str(current_staff.college_id), "graduation_id": graduation_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.post("", response_model=DegreeActionResponse, dependencies=[Depends(security)])
@@ -167,9 +166,8 @@ async def create_degree(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error creating degree: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error creating degree")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Create degree", {"staff_id": str(current_staff.staff_id), "graduation_id": str(request.graduation_id), "degree_name": request.degree_name, "degree_code": request.degree_code}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.get("/{degree_id}", response_model=DegreeResponse, dependencies=[Depends(security)])
@@ -198,9 +196,8 @@ async def get_degree(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting degree: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error fetching degree")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Get degree by ID", {"staff_id": str(current_staff.staff_id), "degree_id": degree_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.put("/{degree_id}", response_model=DegreeActionResponse, dependencies=[Depends(security)])
@@ -252,9 +249,8 @@ async def update_degree(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error updating degree: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error updating degree")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Update degree", {"staff_id": str(current_staff.staff_id), "degree_id": degree_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @router.delete("/{degree_id}", response_model=DegreeActionResponse, dependencies=[Depends(security)])
@@ -324,6 +320,5 @@ async def delete_degree(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error deleting degree: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                          detail="Error deleting degree")
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Delete degree", {"staff_id": str(current_staff.staff_id), "degree_id": degree_id}, status.HTTP_500_INTERNAL_SERVER_ERROR)

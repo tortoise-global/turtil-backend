@@ -33,7 +33,7 @@ class UpdateDepartmentRequest(CamelCaseModel):
     description: Optional[str] = Field(
         None, max_length=1000, description="Department description"
     )
-    hod_cms_staff_id: Optional[int] = Field(None, description="Head of Department staff ID")
+    hod_cms_staff_id: Optional[str] = Field(None, description="Head of Department staff ID (UUID)")
 
     @field_validator("code")
     @classmethod
@@ -46,13 +46,13 @@ class UpdateDepartmentRequest(CamelCaseModel):
 class DepartmentResponse(CamelCaseModel):
     """Response schema for department information"""
 
-    id: int = Field(..., description="Department ID")
+    id: str = Field(..., description="Department ID (UUID)")
     uuid: str = Field(..., description="Department UUID")
     name: str = Field(..., description="Department name")
     code: str = Field(..., description="Department code")
     description: Optional[str] = Field(None, description="Department description")
-    college_id: int = Field(..., description="College ID")
-    hod_cms_staff_id: Optional[int] = Field(None, description="Head of Department staff ID")
+    college_id: str = Field(..., description="College ID (UUID)")
+    hod_cms_staff_id: Optional[str] = Field(None, description="Head of Department staff ID (UUID)")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Update timestamp")
 
@@ -60,13 +60,13 @@ class DepartmentResponse(CamelCaseModel):
 class DepartmentWithStatsResponse(CamelCaseModel):
     """Department response with staff statistics"""
 
-    id: int = Field(..., description="Department ID")
+    id: str = Field(..., description="Department ID (UUID)")
     uuid: str = Field(..., description="Department UUID")
     name: str = Field(..., description="Department name")
     code: str = Field(..., description="Department code")
     description: Optional[str] = Field(None, description="Department description")
-    college_id: int = Field(..., description="College ID")
-    hod_cms_staff_id: Optional[int] = Field(None, description="Head of Department staff ID")
+    college_id: str = Field(..., description="College ID (UUID)")
+    hod_cms_staff_id: Optional[str] = Field(None, description="Head of Department staff ID (UUID)")
     hod_name: Optional[str] = Field(None, description="Head of Department name")
     total_staffs: int = Field(..., description="Total staff in department")
     active_staffs: int = Field(..., description="Active staff in department")
@@ -79,13 +79,13 @@ class DepartmentActionResponse(CamelCaseModel):
 
     success: bool = Field(..., description="Action success status")
     message: str = Field(..., description="Action result message")
-    department_id: Optional[int] = Field(None, description="Affected department ID")
+    department_id: Optional[str] = Field(None, description="Affected department ID (UUID)")
 
 
 class AssignHODRequest(CamelCaseModel):
     """Request schema for assigning HOD to department"""
 
-    staff_id: int = Field(..., description="Staff ID to assign as HOD")
+    staff_id: str = Field(..., description="Staff ID to assign as HOD (UUID)")
 
 
 class HODActionResponse(CamelCaseModel):
@@ -93,6 +93,6 @@ class HODActionResponse(CamelCaseModel):
 
     success: bool = Field(..., description="Action success status")
     message: str = Field(..., description="Action result message")
-    department_id: int = Field(..., description="Department ID")
-    staff_id: Optional[int] = Field(None, description="HOD staff ID")
+    department_id: str = Field(..., description="Department ID (UUID)")
+    staff_id: Optional[str] = Field(None, description="HOD staff ID (UUID)")
     hod_name: Optional[str] = Field(None, description="HOD name")

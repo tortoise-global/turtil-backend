@@ -32,21 +32,5 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
-  # MinIO - Local S3 Compatible Storage
-  minio:
-    image: quay.io/minio/minio:latest
-    container_name: turtil_minio
-    ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Web Console
-    environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: admin123
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
-    restart: unless-stopped
-
 volumes:
   postgres_data:
-  minio_data:

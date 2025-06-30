@@ -55,7 +55,7 @@ class CMSDeleteFileRequest(CamelCaseModel):
         if not v or not v.startswith('https://'):
             raise ValueError("Invalid S3 URL format")
         
-        if 'my-cms-file-upload' not in v:
+        if 'turtil-backend-dev' not in v:
             raise ValueError("URL must be from the CMS file upload bucket")
         
         return v
