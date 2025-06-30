@@ -28,7 +28,7 @@ from app.schemas.signup_schemas import (
 )
 import logging
 
-router = APIRouter(prefix="/auth/signup", tags=["Signup"])
+router = APIRouter(prefix="/auth/signup", tags=["CMS Authentication - Signup"])
 logger = logging.getLogger(__name__)
 
 

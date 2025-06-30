@@ -26,7 +26,7 @@ from app.schemas.session_schemas import (
 )
 import logging
 
-router = APIRouter(prefix="/auth/session", tags=["Session Management"])
+router = APIRouter(prefix="/auth/session", tags=["CMS Authentication - Session Management"])
 logger = logging.getLogger(__name__)
 
 # Security scheme for JWT tokens
