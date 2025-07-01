@@ -26,7 +26,7 @@ class SetupProfileRequest(CamelCaseModel):
     temp_token: str = Field(..., description="Temporary token from OTP verification")
     full_name: str = Field(..., min_length=1, max_length=200, description="Full name")
     password: str = Field(..., min_length=8, description="Password")
-    contact_number: str = Field(..., pattern=r"^(\+91)?[6-9]\d{9}$", description="Contact number in Indian format")
+    contact_number: str = Field(..., pattern=r"^(\+[1-9]\d{0,3})?[1-9]\d{6,14}$", description="Contact number in international format")
 
 
 class ForgotPasswordRequest(CamelCaseModel):

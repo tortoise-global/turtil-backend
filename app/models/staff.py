@@ -16,10 +16,11 @@ class Staff(UUIDBaseModel):
 
     # Basic staff information
     email = Column(String(255), unique=True, index=True, nullable=False)
-    full_name = Column(String(200), nullable=False)
+    full_name = Column(String(200), nullable=True)  # Collected during profile setup
+    contact_number = Column(String(20), nullable=True)  # Staff contact number (collected during profile setup)
 
     # Authentication
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)  # Set during profile setup
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
     is_superstaff = Column(Boolean, default=False, nullable=False)
@@ -33,8 +34,9 @@ class Staff(UUIDBaseModel):
 
     # CMS-specific fields with UUID foreign keys
     college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.college_id"), nullable=True)
+    division_id = Column(UUID(as_uuid=True), ForeignKey("divisions.division_id"), nullable=True)  # Division assignment
     department_id = Column(UUID(as_uuid=True), ForeignKey("departments.department_id"), nullable=True)
-    cms_role = Column(String(50), default="staff", nullable=False)  # 'principal', 'college_admin', 'hod', 'staff'
+    cms_role = Column(String(50), default="staff", nullable=False)  # 'principal', 'admin', 'hod', 'staff'
 
     # Invitation & Onboarding System
     invitation_status = Column(String(50), default="pending", nullable=False)  # 'pending', 'accepted', 'active'
@@ -46,6 +48,7 @@ class Staff(UUIDBaseModel):
 
     # Relationships
     college = relationship("College", back_populates="staff_members", foreign_keys=[college_id])
+    division = relationship("Division", back_populates="staff_members", foreign_keys=[division_id])
     department = relationship("Department", back_populates="staff_members", foreign_keys=[department_id])
     invited_by = relationship("Staff", remote_side=[staff_id])
     sessions = relationship("UserSession", back_populates="staff")
@@ -73,6 +76,7 @@ class Staff(UUIDBaseModel):
             "staffId": base_dict["staff_id"],
             "email": base_dict["email"],
             "fullName": base_dict["full_name"],
+            "contactNumber": base_dict["contact_number"],
             "isActive": base_dict["is_active"],
             "isVerified": base_dict["is_verified"],
             "isSuperstaff": base_dict["is_superstaff"],
@@ -81,6 +85,7 @@ class Staff(UUIDBaseModel):
             "loginCount": base_dict["login_count"],
             # CMS-specific fields
             "collegeId": base_dict["college_id"],
+            "divisionId": base_dict["division_id"],
             "departmentId": base_dict["department_id"],
             "cmsRole": base_dict["cms_role"],
             "invitationStatus": base_dict["invitation_status"],
@@ -122,6 +127,7 @@ class Staff(UUIDBaseModel):
             # CMS-specific token data
             "cmsRole": self.cms_role,
             "collegeId": str(self.college_id) if self.college_id else None,
+            "divisionId": str(self.division_id) if self.division_id else None,
             "departmentId": str(self.department_id) if self.department_id else None,
             "invitationStatus": self.invitation_status,
             "requiresPasswordReset": requires_password_reset,

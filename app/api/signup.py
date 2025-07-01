@@ -262,6 +262,7 @@ async def setup_profile(
         # Update staff with password and profile
         staff.hashed_password = hashed_password
         staff.full_name = request.full_name
+        staff.contact_number = request.contact_number
         staff.temporary_password = False
         staff.must_reset_password = False
         

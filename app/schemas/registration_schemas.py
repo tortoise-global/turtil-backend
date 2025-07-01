@@ -21,7 +21,7 @@ class CollegeDetailsRequest(CamelCaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="College/University full name")
     short_name: str = Field(..., min_length=1, max_length=50, description="Short name/code")
     college_reference_id: str = Field(..., min_length=1, max_length=100, description="College reference ID")
-    phone_number: str = Field(..., pattern=r"^\+91[6-9]\d{9}$", description="College phone number in +91 format")
+    # phone_number removed - automatically uses initial staff's contact number
 
 
 class AddressDetailsRequest(CamelCaseModel):

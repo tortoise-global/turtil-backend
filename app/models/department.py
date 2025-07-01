@@ -19,10 +19,12 @@ class Department(UUIDBaseModel):
     description = Column(Text, nullable=True)
 
     # Foreign Keys using UUIDs
+    division_id = Column(UUID(as_uuid=True), ForeignKey("divisions.division_id"), nullable=False)  # Parent division
     college_id = Column(UUID(as_uuid=True), ForeignKey("colleges.college_id"), nullable=False)
     head_staff_id = Column(UUID(as_uuid=True), ForeignKey("staff.staff_id"), nullable=True)  # Head of Department
 
     # Relationships
+    division = relationship("Division", back_populates="departments")
     college = relationship("College", back_populates="departments")
     head = relationship("Staff", foreign_keys=[head_staff_id], post_update=True)
     staff_members = relationship("Staff", back_populates="department", foreign_keys="Staff.department_id")
@@ -40,6 +42,7 @@ class Department(UUIDBaseModel):
             "name": base_dict["name"],
             "code": base_dict["code"],
             "description": base_dict["description"],
+            "divisionId": base_dict["division_id"],
             "collegeId": base_dict["college_id"],
             "headStaffId": base_dict["head_staff_id"],
             "createdAt": base_dict["created_at"],

@@ -151,7 +151,11 @@ async def college_details(
         college.name = request.name
         college.short_name = request.shortName
         college.college_reference_id = request.collegeReferenceId
-        college.phone_number = request.phoneNumber
+        
+        # Automatically assign staff as college contact and use their contact number
+        college.contact_staff_id = current_staff.staff_id
+        college.contact_number = current_staff.contact_number  # Use staff's contact number
+        
         await db.commit()
 
         # Generate new temp token for next step

@@ -13,8 +13,6 @@ from app.schemas.department_schemas import (
     UpdateDepartmentRequest,
     DepartmentWithStatsResponse,
     DepartmentActionResponse,
-    AssignHODRequest,
-    HODActionResponse,
 )
 from .deps import get_current_staff
 
@@ -112,14 +110,14 @@ async def create_department(
     current_staff: Staff = Depends(get_current_staff),
 ):
     """
-    Create a new department. Only Principal and College Admin can create departments.
+    Create a new department. Only Principal and Admin can create departments.
     """
     try:
         # Check permissions
-        if current_staff.cms_role not in ["principal", "college_admin"]:
+        if current_staff.cms_role not in ["principal", "admin"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Principal and College Admin can create departments",
+                detail="Only Principal and Admin can create departments",
             )
 
         # Check if department with same code already exists in college
@@ -177,14 +175,14 @@ async def update_department(
     current_staff: Staff = Depends(get_current_staff),
 ):
     """
-    Update a department. Only Principal and College Admin can update departments.
+    Update a department. Only Principal and Admin can update departments.
     """
     try:
         # Check permissions
-        if current_staff.cms_role not in ["principal", "college_admin"]:
+        if current_staff.cms_role not in ["principal", "admin"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Principal and College Admin can update departments",
+                detail="Only Principal and Admin can update departments",
             )
 
         # Get department
@@ -246,178 +244,7 @@ async def update_department(
         handle_api_exception(e, "Update department", {"staff_id": str(current_staff.staff_id), "department_id": departmentId}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@router.put(
-    "/{departmentId}/assign-hod",
-    response_model=HODActionResponse,
-    dependencies=[Depends(security)],
-)
-async def assign_hod_to_department(
-    departmentId: str,
-    request: AssignHODRequest,
-    db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
-):
-    """
-    Assign a Head of Department (HOD) to a department.
-    Only Principal and College Admin can assign HODs.
-    """
-    try:
-        # Check permissions
-        if current_staff.cms_role not in ["principal", "college_admin"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Principal and College Admin can assign HODs",
-            )
-
-        # Get department
-        dept_result = await db.execute(
-            select(Department).where(
-                and_(
-                    Department.department_id == departmentId,
-                    Department.college_id == current_staff.college_id,
-                )
-            )
-        )
-        department = dept_result.scalar_one_or_none()
-
-        if not department:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Department not found"
-            )
-
-        # Get staff to be assigned as HOD
-        staff_result = await db.execute(
-            select(Staff).where(
-                and_(
-                    Staff.staff_id == request.staffId,
-                    Staff.college_id == current_staff.college_id,
-                    Staff.is_active,
-                )
-            )
-        )
-        staff = staff_result.scalar_one_or_none()
-
-        if not staff:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Staff not found or inactive",
-            )
-
-        # Check if staff is already HOD of another department
-        if staff.is_hod:
-            existing_hod_dept_result = await db.execute(
-                select(Department).where(Department.head_staff_id == staff.staff_id)
-            )
-            existing_dept = existing_hod_dept_result.scalar_one_or_none()
-            if existing_dept and str(existing_dept.department_id) != departmentId:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Staff is already HOD of {existing_dept.name} department",
-                )
-
-        # Remove current HOD if exists
-        if department.head_staff_id:
-            current_hod_result = await db.execute(
-                select(Staff).where(Staff.staff_id == department.head_staff_id)
-            )
-            current_hod = current_hod_result.scalar_one_or_none()
-            if current_hod:
-                current_hod.is_hod = False
-
-        # Assign new HOD
-        department.head_staff_id = staff.staff_id
-        staff.is_hod = True
-        staff.department_id = departmentId  # Ensure HOD is assigned to the department
-
-        await db.commit()
-
-        return HODActionResponse(
-            success=True,
-            message=f"{staff.full_name} assigned as HOD of {department.name} department",
-            departmentId=str(departmentId),
-            staffId=str(staff.staff_id),
-            hodName=staff.full_name,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        await db.rollback()
-        from app.core.utils import handle_api_exception
-        handle_api_exception(e, "Assign HOD", {"staff_id": str(current_staff.staff_id), "department_id": departmentId, "hod_staff_id": str(request.staffId)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@router.put(
-    "/{departmentId}/remove-hod",
-    response_model=HODActionResponse,
-    dependencies=[Depends(security)],
-)
-async def remove_hod_from_department(
-    departmentId: str,
-    db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
-):
-    """
-    Remove the Head of Department (HOD) from a department.
-    Only Principal and College Admin can remove HODs.
-    """
-    try:
-        # Check permissions
-        if current_staff.cms_role not in ["principal", "college_admin"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Principal and College Admin can remove HODs",
-            )
-
-        # Get department
-        dept_result = await db.execute(
-            select(Department).where(
-                and_(
-                    Department.department_id == departmentId,
-                    Department.college_id == current_staff.college_id,
-                )
-            )
-        )
-        department = dept_result.scalar_one_or_none()
-
-        if not department:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Department not found"
-            )
-
-        if not department.head_staff_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Department does not have an assigned HOD",
-            )
-
-        # Get current HOD
-        hod_result = await db.execute(
-            select(Staff).where(Staff.staff_id == department.head_staff_id)
-        )
-        hod_staff = hod_result.scalar_one_or_none()
-
-        # Remove HOD assignment
-        if hod_staff:
-            hod_staff.is_hod = False
-        department.head_staff_id = None
-
-        await db.commit()
-
-        return HODActionResponse(
-            success=True,
-            message=f"HOD removed from {department.name} department",
-            departmentId=str(departmentId),
-            staffId=str(hod_staff.staff_id) if hod_staff else None,
-            hodName=None,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        await db.rollback()
-        from app.core.utils import handle_api_exception
-        handle_api_exception(e, "Remove HOD", {"staff_id": str(current_staff.staff_id), "department_id": departmentId}, status.HTTP_500_INTERNAL_SERVER_ERROR)
+# HOD assignment/removal endpoints removed - now handled through staff role system in staff update-details endpoint
 
 
 @router.delete(
@@ -431,15 +258,15 @@ async def delete_department(
     current_staff: Staff = Depends(get_current_staff),
 ):
     """
-    Delete a department. Only Principal and College Admin can delete departments.
+    Delete a department. Only Principal and Admin can delete departments.
     Cannot delete department if it has assigned staff.
     """
     try:
         # Check permissions
-        if current_staff.cms_role not in ["principal", "college_admin"]:
+        if current_staff.cms_role not in ["principal", "admin"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Principal and College Admin can delete departments",
+                detail="Only Principal and Admin can delete departments",
             )
 
         # Get department

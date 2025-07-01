@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models.staff import Staff
 from app.models.college import College
 from app.models.department import Department
+from app.models.division import Division
 from app.core.cms_auth import cms_auth
 from app.core.aws import EmailService
 from app.core.utils import generate_temporary_password
@@ -17,13 +18,9 @@ from app.schemas.staff_schemas import (
     InviteStaffRequest,
     InviteStaffResponse,
     StaffResponse,
-    AssignDepartmentRequest,
     StaffActionResponse,
-    UpdateUsernameRequest,
-    UpdateUsernameResponse,
-    UpdateContactRequest,
-    UpdateContactResponse,
-    ContactInfoResponse,
+    UpdateStaffDetailsRequest,
+    UpdateStaffDetailsResponse,
 )
 from app.schemas.staff_schemas import StaffDetailsResponse
 from .deps import get_current_staff
@@ -51,11 +48,11 @@ async def invite_staff(
     - Automatically invalidates staff sessions when deleted
     """
     try:
-        # Check permissions - only Principal and College Admin can invite CMS staffs
-        if current_staff.cms_role not in ["principal", "college_admin"]:
+        # Check permissions - only Principal and Admin can invite CMS staffs
+        if current_staff.cms_role not in ["principal", "admin"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Principal and College Admin can invite CMS staffs",
+                detail="Only Principal and Admin can invite CMS staffs",
             )
 
         # Check if CMS staff already exists
@@ -72,15 +69,50 @@ async def invite_staff(
         temporary_password = generate_temporary_password(12)
         hashed_password = cms_auth.get_password_hash(temporary_password)
 
+        # Validate department if provided and auto-assign division
+        division_id = None
+        department_id = None
+        is_hod = False
+        
+        if request.department_id:
+            # Validate department exists and belongs to college
+            department_result = await db.execute(
+                select(Department).where(
+                    and_(
+                        Department.department_id == request.department_id,
+                        Department.college_id == current_staff.college_id
+                    )
+                )
+            )
+            department = department_result.scalar_one_or_none()
+            if not department:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Department not found or does not belong to your college"
+                )
+            department_id = request.department_id
+            
+            # Auto-assign division from department
+            if department.division_id:
+                division_id = department.division_id
+        
+        # Set HOD status based on role and department assignment
+        if request.cms_role == "hod" and department_id:
+            is_hod = True
+
         # Create new CMS staff with invitation fields
         new_staff = Staff(
             email=request.email,
-            full_name="",  # Will be filled during onboarding
+            full_name=request.full_name,  # Set name immediately
+            contact_number=request.contact_number,  # Set contact number (mandatory)
             hashed_password=hashed_password,
             is_active=True,
             is_verified=False,  # Will be verified during first login
             college_id=current_staff.college_id,
-            cms_role="staff",  # Default role, can be changed later
+            cms_role=request.cms_role,  # Use provided role
+            division_id=division_id,    # Set division if provided
+            department_id=department_id, # Set department if provided
+            is_hod=is_hod,              # Set HOD status based on role
             invitation_status="pending",
             temporary_password=True,
             must_reset_password=True,
@@ -163,7 +195,7 @@ async def get_staff(
     """
     try:
         # Check permissions
-        if current_staff.cms_role not in ["principal", "college_admin", "hod"]:
+        if current_staff.cms_role not in ["principal", "admin", "hod"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Insufficient permissions to view CMS staffs",
@@ -212,7 +244,7 @@ async def get_staff(
                 uuid=str(staff.staff_id),
                 email=staff.email,
                 fullName=staff.full_name,
-                phoneNumber=None,  # Staff model doesn't have phone_number
+                contactNumber=staff.contact_number,
                 isActive=staff.is_active,
                 isVerified=staff.is_verified,
                 cmsRole=staff.cms_role,
@@ -240,125 +272,7 @@ async def get_staff(
         handle_api_exception(e, "Get CMS staffs", {"staff_id": str(current_staff.staff_id), "role": current_staff.cms_role, "filters": {"status": status, "department_assigned": department_assigned, "role": role}}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@router.get(
-    "/contact-info", response_model=ContactInfoResponse, dependencies=[Depends(security)]
-)
-async def get_contact_info(
-    db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
-):
-    """
-    Get current college contact information. Only staff members of the college can view this.
-    """
-    try:
-        # Get the college
-        college_result = await db.execute(
-            select(College).where(College.college_id == current_staff.college_id)
-        )
-        college = college_result.scalar_one_or_none()
-
-        if not college:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="College not found",
-            )
-
-        # Get contact staff details if contact_staff_id is set
-        contact_staff_name = None
-        contact_staff_email = None
-        
-        if college.contact_staff_id:
-            contact_staff_result = await db.execute(
-                select(Staff).where(Staff.staff_id == college.contact_staff_id)
-            )
-            contact_staff = contact_staff_result.scalar_one_or_none()
-            
-            if contact_staff:
-                contact_staff_name = contact_staff.full_name
-                contact_staff_email = contact_staff.email
-
-        return ContactInfoResponse(
-            contactNumber=college.contact_number,
-            contactStaffId=str(college.contact_staff_id) if college.contact_staff_id else None,
-            contactStaffName=contact_staff_name,
-            contactStaffEmail=contact_staff_email,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        from app.core.utils import handle_api_exception
-        handle_api_exception(e, "Get contact info", {"staff_id": str(current_staff.staff_id), "college_id": str(current_staff.college_id)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@router.put(
-    "/contact-info", response_model=UpdateContactResponse, dependencies=[Depends(security)]
-)
-async def update_contact_info(
-    request: UpdateContactRequest,
-    db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
-):
-    """
-    Update college contact information. Only Principal and College Admin can update contact info.
-    Validates that the contact staff exists and belongs to the same college.
-    """
-    try:
-        # Check permissions
-        if current_staff.cms_role not in ["principal", "college_admin"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Principal and College Admin can update contact information",
-            )
-
-        # Validate that the contact staff exists and belongs to the same college
-        contact_staff_result = await db.execute(
-            select(Staff).where(
-                and_(
-                    Staff.staff_id == request.contactStaffId,
-                    Staff.college_id == current_staff.college_id,
-                    Staff.is_active == True
-                )
-            )
-        )
-        contact_staff = contact_staff_result.scalar_one_or_none()
-
-        if not contact_staff:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Contact staff not found or not active in this college",
-            )
-
-        # Get the college
-        college_result = await db.execute(
-            select(College).where(College.college_id == current_staff.college_id)
-        )
-        college = college_result.scalar_one_or_none()
-
-        if not college:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="College not found",
-            )
-
-        # Update contact information
-        college.contact_number = request.contactNumber
-        college.contact_staff_id = request.contactStaffId
-        await db.commit()
-
-        return UpdateContactResponse(
-            success=True,
-            message=f"Contact information updated successfully. {contact_staff.full_name} is now the primary contact.",
-            contactNumber=request.contactNumber,
-            contactStaffId=request.contactStaffId,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        await db.rollback()
-        from app.core.utils import handle_api_exception
-        handle_api_exception(e, "Update contact info", {"staff_id": str(current_staff.staff_id), "contact_number": request.contact_number, "contact_staff_id": str(request.contactStaffId)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
+# Contact info endpoints removed - phone number now handled in staff invite/update endpoints
 
 
 @router.get(
@@ -381,7 +295,7 @@ async def get_staff_by_id(
     """
     try:
         # Build query based on role permissions
-        if current_staff.cms_role in ["principal", "college_admin"]:
+        if current_staff.cms_role in ["principal", "admin"]:
             # Can view any staff in college
             query = select(Staff).where(
                 and_(Staff.staff_id == staffId, Staff.college_id == current_staff.college_id)
@@ -412,18 +326,27 @@ async def get_staff_by_id(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found"
             )
 
+        # Determine if password reset is required (consolidated logic)
+        requires_password_reset = (
+            staff.must_reset_password or 
+            staff.temporary_password or
+            staff.invitation_status == "pending"
+        )
+
         return StaffDetailsResponse(
             staffId=str(staff.staff_id),
             uuid=str(staff.staff_id),
             email=staff.email,
             fullName=staff.full_name,
+            contactNumber=staff.contact_number,
             cmsRole=staff.cms_role,
-            collegeId=staff.college_id,
-            departmentId=staff.department_id,
-            invitationStatus=staff.invitation_status,
-            mustResetPassword=staff.must_reset_password,
+            collegeId=str(staff.college_id) if staff.college_id else None,
+            departmentId=str(staff.department_id) if staff.department_id else None,
             isHod=staff.is_hod,
+            requiresPasswordReset=requires_password_reset,
+            invitedByStaffId=str(staff.invited_by_staff_id) if staff.invited_by_staff_id else None,
             createdAt=staff.created_at,
+            updatedAt=staff.updated_at,
         )
 
     except HTTPException:
@@ -433,197 +356,13 @@ async def get_staff_by_id(
         handle_api_exception(e, "Get staff by ID", {"requester_staff_id": str(current_staff.staff_id), "target_staff_id": staffId}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@router.put(
-    "/{staffId}/assign-department",
-    response_model=StaffActionResponse,
-    dependencies=[Depends(security)],
-)
-async def assign_staff_to_department(
-    staffId: str,
-    request: AssignDepartmentRequest,
-    db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
-):
-    """
-    Assign a staff to a department. Only Principal and College Admin can assign departments.
-    """
-    try:
-        # Check permissions
-        if current_staff.cms_role not in ["principal", "college_admin"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Principal and College Admin can assign departments",
-            )
-
-        # Get staff
-        result = await db.execute(
-            select(Staff).where(
-                and_(Staff.staff_id == staffId, Staff.college_id == current_staff.college_id)
-            )
-        )
-        staff = result.scalar_one_or_none()
-
-        if not staff:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found"
-            )
-
-        # Validate department exists and belongs to same college
-        dept_result = await db.execute(
-            select(Department).where(
-                and_(
-                    Department.department_id == request.departmentId,
-                    Department.college_id == current_staff.college_id,
-                )
-            )
-        )
-        department = dept_result.scalar_one_or_none()
-
-        if not department:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Department not found"
-            )
-
-        # Update staff's department
-        staff.department_id = request.departmentId
-        await db.commit()
-
-        return StaffActionResponse(
-            success=True,
-            message=f"Staff assigned to {department.name} department successfully",
-            staffId=str(staffId),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        await db.rollback()
-        from app.core.utils import handle_api_exception
-        handle_api_exception(e, "Assign staff to department", {"staff_id": str(current_staff.staff_id), "target_staff_id": staffId, "department_id": str(request.departmentId)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
+# Assign department endpoint removed - now handled by staff update-details endpoint
 
 
-@router.put(
-    "/{staffId}/remove-department",
-    response_model=StaffActionResponse,
-    dependencies=[Depends(security)],
-)
-async def remove_staff_from_department(
-    staffId: str,
-    db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
-):
-    """
-    Remove a staff from their current department. Only Principal and College Admin can do this.
-    """
-    try:
-        # Check permissions
-        if current_staff.cms_role not in ["principal", "college_admin"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Principal and College Admin can remove department assignments",
-            )
-
-        # Get staff
-        result = await db.execute(
-            select(Staff).where(
-                and_(Staff.staff_id == staffId, Staff.college_id == current_staff.college_id)
-            )
-        )
-        staff = result.scalar_one_or_none()
-
-        if not staff:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found"
-            )
-
-        # Remove department assignment and HOD status
-        staff.department_id = None
-        staff.is_hod = False  # Remove HOD status when removing from department
-        await db.commit()
-
-        return StaffActionResponse(
-            success=True,
-            message="Staff removed from department successfully",
-            staffId=str(staffId),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        await db.rollback()
-        from app.core.utils import handle_api_exception
-        handle_api_exception(e, "Remove staff from department", {"staff_id": str(current_staff.staff_id), "target_staff_id": staffId}, status.HTTP_500_INTERNAL_SERVER_ERROR)
+# Remove department endpoint removed - now handled by staff update-details endpoint
 
 
-@router.put(
-    "/{staffId}/update-username",
-    response_model=UpdateUsernameResponse,
-    dependencies=[Depends(security)],
-)
-async def update_staff_username(
-    staffId: str,
-    request: UpdateUsernameRequest,
-    db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
-):
-    """
-    Update staff username (full_name). 
-    
-    Permissions:
-    - Principal/College Admin: Can update any staff in their college
-    - HOD: Can update staff in their department
-    - Staff: Can update their own username only
-    """
-    try:
-        # Build query based on role permissions
-        if current_staff.cms_role in ["principal", "college_admin"]:
-            # Can update any staff in college
-            query = select(Staff).where(
-                and_(Staff.staff_id == staffId, Staff.college_id == current_staff.college_id)
-            )
-        elif current_staff.cms_role == "hod":
-            # Can only update staffs in same department
-            query = select(Staff).where(
-                and_(
-                    Staff.staff_id == staffId,
-                    Staff.college_id == current_staff.college_id,
-                    Staff.department_id == current_staff.department_id,
-                )
-            )
-        else:  # staff
-            # Can only update their own username
-            if staffId != str(current_staff.staff_id):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Insufficient permissions to update this staff's username",
-                )
-            query = select(Staff).where(Staff.staff_id == staffId)
-
-        result = await db.execute(query)
-        staff = result.scalar_one_or_none()
-
-        if not staff:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found"
-            )
-
-        # Update staff's full name (username)
-        staff.full_name = request.fullName
-        await db.commit()
-
-        return UpdateUsernameResponse(
-            success=True,
-            message="Staff username updated successfully",
-            staffId=str(staffId),
-            fullName=request.fullName,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        await db.rollback()
-        from app.core.utils import handle_api_exception
-        handle_api_exception(e, "Update staff username", {"staff_id": str(current_staff.staff_id), "target_staff_id": staffId, "new_full_name": request.fullName}, status.HTTP_500_INTERNAL_SERVER_ERROR)
+# Update username endpoint removed - now handled by staff update-details endpoint
 
 
 @router.delete(
@@ -641,10 +380,10 @@ async def delete_staff(
     """
     try:
         # Check permissions
-        if current_staff.cms_role not in ["principal", "college_admin"]:
+        if current_staff.cms_role not in ["principal", "admin"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Principal and College Admin can delete staffs",
+                detail="Only Principal and Admin can delete staffs",
             )
 
         # Prevent self-deletion
@@ -715,5 +454,154 @@ async def delete_staff(
         await db.rollback()
         from app.core.utils import handle_api_exception
         handle_api_exception(e, "Delete staff", {"staff_id": str(current_staff.staff_id), "target_staff_id": staffId}, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@router.put(
+    "/{staffId}/update-details", 
+    response_model=UpdateStaffDetailsResponse, 
+    dependencies=[Depends(security)]
+)
+async def update_staff_details(
+    staffId: str,
+    request: UpdateStaffDetailsRequest,
+    db: AsyncSession = Depends(get_db),
+    current_staff: Staff = Depends(get_current_staff),
+):
+    """
+    Update comprehensive staff details including name, email, role, and assignments.
+    Only Principal and College Admin can update staff details.
+    Automatically handles division assignment through department assignment.
+    """
+    try:
+        # Check permissions - only Principal and Admin can update staff details
+        if current_staff.cms_role not in ["principal", "admin"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only Principal and Admin can update staff details",
+            )
+
+        # Get staff to update
+        result = await db.execute(
+            select(Staff).where(
+                and_(Staff.staff_id == staffId, Staff.college_id == current_staff.college_id)
+            )
+        )
+        staff = result.scalar_one_or_none()
+
+        if not staff:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Staff not found"
+            )
+
+        # Prevent updating principal role unless current user is principal
+        if staff.cms_role == "principal" and current_staff.cms_role != "principal":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only Principal can update another Principal's details",
+            )
+
+        updated_fields = []
+        
+        # Update basic details
+        if request.full_name is not None:
+            staff.full_name = request.full_name
+            updated_fields.append("full_name")
+            
+        if request.email is not None:
+            # Check if email is already taken
+            existing_staff_result = await db.execute(
+                select(Staff).where(
+                    and_(
+                        Staff.email == request.email,
+                        Staff.staff_id != staffId
+                    )
+                )
+            )
+            existing_staff = existing_staff_result.scalar_one_or_none()
+            if existing_staff:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email address is already in use by another staff member"
+                )
+            staff.email = request.email
+            updated_fields.append("email")
+
+        if request.contact_number is not None:
+            staff.contact_number = request.contact_number
+            updated_fields.append("contact_number")
+
+        if request.cms_role is not None:
+            old_role = staff.cms_role
+            staff.cms_role = request.cms_role
+            updated_fields.append("cms_role")
+            
+            # Handle HOD status based on role change
+            if old_role == "hod" and request.cms_role != "hod":
+                # Removing HOD role
+                staff.is_hod = False
+                updated_fields.append("is_hod (removed due to role change)")
+            elif request.cms_role == "hod" and staff.department_id:
+                # Assigning HOD role and staff has department
+                staff.is_hod = True
+                updated_fields.append("is_hod (assigned due to role change)")
+
+        # Handle department assignment and auto-assign division
+        if request.department_id is not None:
+            if request.department_id == "":
+                # Empty string means remove department assignment
+                staff.department_id = None
+                staff.division_id = None  # Also remove division
+                # Also remove HOD status if removing department
+                if staff.is_hod:
+                    staff.is_hod = False
+                    updated_fields.append("is_hod (removed due to department removal)")
+                updated_fields.extend(["department_id", "division_id"])
+            else:
+                # Validate department exists and belongs to college
+                department_result = await db.execute(
+                    select(Department).where(
+                        and_(
+                            Department.department_id == request.department_id,
+                            Department.college_id == current_staff.college_id
+                        )
+                    )
+                )
+                department = department_result.scalar_one_or_none()
+                if not department:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Department not found or does not belong to your college"
+                    )
+                
+                # Update department and auto-assign division
+                staff.department_id = request.department_id
+                updated_fields.append("department_id")
+                
+                if department.division_id:
+                    staff.division_id = department.division_id
+                    updated_fields.append("division_id (auto-assigned)")
+                
+                # Handle HOD assignment based on role
+                if staff.cms_role == "hod":
+                    staff.is_hod = True
+                    updated_fields.append("is_hod (assigned due to HOD role + department)")
+
+        await db.commit()
+        await db.refresh(staff)
+
+        return UpdateStaffDetailsResponse(
+            success=True,
+            message=f"Staff details updated successfully",
+            staffId=str(staffId),
+            updatedFields=updated_fields,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        from app.core.utils import handle_api_exception
+        handle_api_exception(e, "Update staff details", {"staff_id": str(current_staff.staff_id), "target_staff_id": staffId}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
 from app.core.utils import CamelCaseModel
+from uuid import UUID
 
 
 class CreateDepartmentRequest(CamelCaseModel):
@@ -14,6 +15,7 @@ class CreateDepartmentRequest(CamelCaseModel):
     description: Optional[str] = Field(
         None, max_length=1000, description="Department description"
     )
+    division_id: UUID = Field(..., description="Division ID that this department belongs to")
 
     @field_validator("code")
     @classmethod
@@ -33,6 +35,7 @@ class UpdateDepartmentRequest(CamelCaseModel):
     description: Optional[str] = Field(
         None, max_length=1000, description="Department description"
     )
+    division_id: Optional[UUID] = Field(None, description="Division ID that this department belongs to")
     hod_cms_staff_id: Optional[str] = Field(None, description="Head of Department staff ID (UUID)")
 
     @field_validator("code")
@@ -51,6 +54,8 @@ class DepartmentResponse(CamelCaseModel):
     name: str = Field(..., description="Department name")
     code: str = Field(..., description="Department code")
     description: Optional[str] = Field(None, description="Department description")
+    division_id: str = Field(..., description="Division ID (UUID)")
+    division_name: Optional[str] = Field(None, description="Division name")
     college_id: str = Field(..., description="College ID (UUID)")
     hod_cms_staff_id: Optional[str] = Field(None, description="Head of Department staff ID (UUID)")
     created_at: datetime = Field(..., description="Creation timestamp")
@@ -65,6 +70,8 @@ class DepartmentWithStatsResponse(CamelCaseModel):
     name: str = Field(..., description="Department name")
     code: str = Field(..., description="Department code")
     description: Optional[str] = Field(None, description="Department description")
+    division_id: str = Field(..., description="Division ID (UUID)")
+    division_name: Optional[str] = Field(None, description="Division name")
     college_id: str = Field(..., description="College ID (UUID)")
     hod_cms_staff_id: Optional[str] = Field(None, description="Head of Department staff ID (UUID)")
     hod_name: Optional[str] = Field(None, description="Head of Department name")

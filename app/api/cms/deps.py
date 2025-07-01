@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.staff import Staff
 from app.core.cms_auth import cms_auth
 from app.core.session_manager import SessionManager
+from uuid import UUID
 
 
 # Security scheme for JWT tokens
@@ -122,5 +123,42 @@ async def get_current_staff_from_temp_token(
     except Exception as e:
         from app.core.utils import handle_api_exception
         handle_api_exception(e, "Get current staff from temp token", {"has_credentials": bool(credentials)}, status.HTTP_401_UNAUTHORIZED)
+
+
+async def require_principal_or_admin(current_staff: Staff = Depends(get_current_staff)) -> Staff:
+    """
+    Require Principal or Admin role.
+    Only these roles can manage divisions, departments, and staff.
+    """
+    if current_staff.cms_role not in ["principal", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions. Principal or Admin role required."
+        )
+    return current_staff
+
+
+async def require_hod_or_above(current_staff: Staff = Depends(get_current_staff)) -> Staff:
+    """
+    Require HOD or higher role (HOD, Admin, Principal).
+    """
+    if current_staff.cms_role not in ["principal", "admin", "hod"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions. HOD or higher role required."
+        )
+    return current_staff
+
+
+async def check_college_access(current_staff: Staff, resource_college_id: UUID):
+    """
+    Check if current staff has access to resources from the specified college.
+    Ensures multi-tenant data isolation.
+    """
+    if current_staff.college_id != resource_college_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. You can only access resources from your college."
+        )
 
 

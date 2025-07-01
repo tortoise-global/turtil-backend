@@ -18,6 +18,7 @@ from app.api import signup
 from app.api import session
 from app.api import registration
 from app.api.cms import (
+    divisions as cms_divisions,
     departments as cms_departments,
     staff as cms_staff,
     files as cms_files,
@@ -29,6 +30,7 @@ from app.api.cms import (
     sections as cms_sections,
     students as cms_students,
     notifications as cms_notifications,
+    college_contact as cms_college_contact,
 )
 
 # Import dev router conditionally
@@ -188,6 +190,7 @@ async def cms_app_info():
             "role_based_access": True,
             "college_management": True,
             "academic_programs": True,
+            "division_management": True,
             "department_management": True,
             "file_upload": True,
             "aws_s3_integration": True,
@@ -209,6 +212,7 @@ cms_app.include_router(session.router)
 
 # CMS specific routers
 cms_app.include_router(registration.router)
+cms_app.include_router(cms_divisions.router, prefix="/divisions", tags=["Divisions"])
 cms_app.include_router(cms_departments.router)
 cms_app.include_router(cms_staff.router)
 cms_app.include_router(cms_files.router)
@@ -226,6 +230,9 @@ cms_app.include_router(cms_students.router)
 
 # Notification management router
 cms_app.include_router(cms_notifications.router)
+
+# College contact management router
+cms_app.include_router(cms_college_contact.router)
 
 # Include dev router conditionally
 if settings.debug:

@@ -89,14 +89,14 @@ class CMSRoles:
     """CMS Role constants"""
 
     PRINCIPAL = "principal"
-    COLLEGE_ADMIN = "college_admin"
+    ADMIN = "admin"
     HOD = "hod"
     STAFF = "staff"
 
-    ALL_ROLES = [PRINCIPAL, COLLEGE_ADMIN, HOD, STAFF]
+    ALL_ROLES = [PRINCIPAL, ADMIN, HOD, STAFF]
 
     # Roles that can manage staff
-    STAFF_MANAGEMENT_ROLES = [PRINCIPAL, COLLEGE_ADMIN]
+    STAFF_MANAGEMENT_ROLES = [PRINCIPAL, ADMIN]
 
     # Roles that have full access
-    FULL_ACCESS_ROLES = [PRINCIPAL, COLLEGE_ADMIN]
+    FULL_ACCESS_ROLES = [PRINCIPAL, ADMIN]

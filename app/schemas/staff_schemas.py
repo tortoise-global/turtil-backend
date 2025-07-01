@@ -42,6 +42,18 @@ class AdminStaffUpdateRequest(CamelCaseModel):
 class InviteStaffRequest(CamelCaseModel):
     """Request schema for inviting a new staff member"""
     email: EmailStr = Field(..., description="Staff member's college/university email address")
+    full_name: str = Field(..., min_length=1, max_length=200, description="Staff member's full name")
+    contact_number: str = Field(..., pattern=r"^(\+[1-9]\d{0,3})?[1-9]\d{6,14}$", description="Staff member's contact number in international format")
+    cms_role: str = Field(default="staff", description="CMS role (principal, admin, hod, staff)")
+    department_id: Optional[str] = Field(None, description="Department ID (UUID) to assign staff member to")
+
+    @field_validator("cms_role")
+    @classmethod
+    def validate_cms_role(cls, v):
+        allowed_roles = ["principal", "admin", "hod", "staff"]
+        if v not in allowed_roles:
+            raise ValueError(f"Role must be one of: {', '.join(allowed_roles)}")
+        return v
 
 
 class InviteStaffResponse(CamelCaseModel):
@@ -53,51 +65,28 @@ class InviteStaffResponse(CamelCaseModel):
     temporary_password: str = Field(..., description="Generated temporary password")
 
 
-class AssignDepartmentRequest(CamelCaseModel):
-    """Request schema for assigning staff member to department"""
-    department_id: int = Field(..., description="Department ID to assign staff member to")
+# Assignment and role update schemas removed - now handled by comprehensive update-details endpoint
 
 
-class UpdateStaffRoleRequest(CamelCaseModel):
-    """Request schema for updating staff role"""
-    role: str = Field(..., description="New CMS role")
+class UpdateStaffDetailsRequest(CamelCaseModel):
+    """Request schema for updating comprehensive staff details (Principal/Admin only)"""
+    full_name: Optional[str] = Field(None, min_length=1, max_length=200, description="Staff full name")
+    email: Optional[EmailStr] = Field(None, description="Staff email address")
+    contact_number: Optional[str] = Field(None, pattern=r"^(\+[1-9]\d{0,3})?[1-9]\d{6,14}$", description="Staff contact number in international format")
+    cms_role: Optional[str] = Field(None, description="CMS role (principal, admin, hod, staff)")
+    department_id: Optional[str] = Field(None, description="Department ID (UUID) to assign staff member to")
 
-    @field_validator("role")
+    @field_validator("cms_role")
     @classmethod
-    def validate_role(cls, v):
-        allowed_roles = ["principal", "college_admin", "hod", "staff"]
-        if v not in allowed_roles:
-            raise ValueError(f"Role must be one of: {', '.join(allowed_roles)}")
+    def validate_cms_role(cls, v):
+        if v is not None:
+            allowed_roles = ["principal", "admin", "hod", "staff"]
+            if v not in allowed_roles:
+                raise ValueError(f"Role must be one of: {', '.join(allowed_roles)}")
         return v
 
 
-class UpdateUsernameRequest(CamelCaseModel):
-    """Request schema for updating staff username (full_name)"""
-    full_name: str = Field(..., min_length=1, max_length=200, description="Full name (username)")
-
-
-# Contact management schemas
-
-class UpdateContactRequest(CamelCaseModel):
-    """Request schema for updating college contact information"""
-    contact_number: str = Field(..., pattern=r"^(\+91)?[6-9]\d{9}$", description="Contact number in Indian format")
-    contact_staff_id: str = Field(..., description="Staff ID (UUID) who will be the primary contact")
-
-
-class UpdateContactResponse(CamelCaseModel):
-    """Response schema for contact information update"""
-    success: bool = Field(..., description="Update success status")
-    message: str = Field(..., description="Update status message")
-    contact_number: str = Field(..., description="Updated contact number")
-    contact_staff_id: str = Field(..., description="Updated contact staff ID (UUID)")
-
-
-class ContactInfoResponse(CamelCaseModel):
-    """Response schema for getting current contact information"""
-    contact_number: Optional[str] = Field(None, description="Current contact number")
-    contact_staff_id: Optional[str] = Field(None, description="Current contact staff ID (UUID)")
-    contact_staff_name: Optional[str] = Field(None, description="Contact staff full name")
-    contact_staff_email: Optional[str] = Field(None, description="Contact staff email")
+# Username update and contact management schemas removed - now handled by comprehensive update-details endpoint
 
 
 # Staff response schemas
@@ -108,12 +97,15 @@ class StaffResponse(CamelCaseModel):
     uuid: str = Field(..., description="Staff UUID")
     email: EmailStr = Field(..., description="Staff email")
     full_name: str = Field(..., description="Full name")
-    phone_number: Optional[str] = Field(None, description="Phone number")
+    contact_number: str = Field(..., description="Contact number")
     is_active: bool = Field(..., description="Account active status")
     is_verified: bool = Field(..., description="Email verification status")
-    cms_role: str = Field(..., description="CMS role (principal, college_admin, hod, staff)")
+    cms_role: str = Field(..., description="CMS role (principal, admin, hod, staff)")
     college_id: Optional[str] = Field(None, description="College ID (UUID)")
+    division_id: Optional[str] = Field(None, description="Division ID (UUID)")
+    division_name: Optional[str] = Field(None, description="Division name")
     department_id: Optional[str] = Field(None, description="Department ID (UUID)")
+    department_name: Optional[str] = Field(None, description="Department name")
     invitation_status: str = Field(..., description="Invitation status (pending, accepted, active)")
     temporary_password: bool = Field(..., description="Has temporary password")
     must_reset_password: bool = Field(..., description="Must reset password on next login")
@@ -125,29 +117,25 @@ class StaffResponse(CamelCaseModel):
 
 
 class StaffDetailsResponse(CamelCaseModel):
-    """Detailed staff information response schema"""
+    """Detailed staff information response schema - CMS focused"""
+    # Identity
     staff_id: str = Field(..., description="Staff ID (UUID)")
     uuid: str = Field(..., description="Staff UUID")
     email: EmailStr = Field(..., description="Staff email")
     full_name: str = Field(..., description="Full name")
-    phone_number: Optional[str] = Field(None, description="Phone number")
-    is_active: bool = Field(..., description="Account active status")
-    is_verified: bool = Field(..., description="Email verification status")
-    is_superstaff: bool = Field(..., description="Superstaff status")
-    email_verified_at: Optional[datetime] = Field(None, description="Email verification timestamp")
-    last_login_at: Optional[datetime] = Field(None, description="Last login timestamp")
-    login_count: int = Field(..., description="Login count")
-    marketing_consent: bool = Field(..., description="Marketing consent")
-    terms_accepted: bool = Field(..., description="Terms accepted")
-    cms_role: str = Field(..., description="CMS role")
+    contact_number: str = Field(..., description="Contact number")
+    
+    # CMS Role & Assignment
+    cms_role: str = Field(..., description="CMS role (principal, admin, hod, staff)")
     college_id: Optional[str] = Field(None, description="College ID (UUID)")
     department_id: Optional[str] = Field(None, description="Department ID (UUID)")
-    invitation_status: str = Field(..., description="Invitation status")
-    temporary_password: bool = Field(..., description="Has temporary password")
-    must_reset_password: bool = Field(..., description="Must reset password")
-    can_assign_department: bool = Field(..., description="Can assign departments")
-    invited_by_staff_id: Optional[str] = Field(None, description="Invited by staff ID (UUID)")
     is_hod: bool = Field(..., description="Head of Department status")
+    
+    # Password Management (simplified)
+    requires_password_reset: bool = Field(..., description="Whether staff needs to reset password on next login")
+    
+    # Audit
+    invited_by_staff_id: Optional[str] = Field(None, description="Invited by staff ID (UUID)")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Update timestamp")
 
@@ -159,12 +147,15 @@ class StaffActionResponse(CamelCaseModel):
     staff_id: int = Field(..., description="Affected staff ID")
 
 
-class UpdateUsernameResponse(CamelCaseModel):
-    """Response schema for username update"""
+class UpdateStaffDetailsResponse(CamelCaseModel):
+    """Response schema for staff details update"""
     success: bool = Field(..., description="Update success status")
     message: str = Field(..., description="Update result message")
-    staff_id: int = Field(..., description="Updated staff ID")
-    full_name: str = Field(..., description="Updated full name")
+    staff_id: str = Field(..., description="Updated staff ID (UUID)")
+    updated_fields: List[str] = Field(..., description="List of fields that were updated")
+
+
+# Old username update response removed - now handled by comprehensive update-details response
 
 
 # List and query schemas

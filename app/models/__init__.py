@@ -1,6 +1,7 @@
 from .staff import Staff
 from .student import Student
 from .college import College
+from .division import Division
 from .department import Department
 from .email_otp import CmsEmailOTP
 from .permission import CMSStaffPermission, CMSModules, CMSRoles
@@ -17,7 +18,8 @@ from .notification import Notification
 __all__ = [
     "Staff",
     "Student",
-    "College", 
+    "College",
+    "Division",
     "Department",
     "CmsEmailOTP",
     "CMSStaffPermission",
