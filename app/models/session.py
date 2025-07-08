@@ -1,0 +1,101 @@
+from sqlalchemy import Column, String, Text, Boolean, BigInteger, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from app.models.base import UUIDBaseModel
+import uuid
+
+
+class UserSession(UUIDBaseModel):
+    """User Session model with UUID primary key for multi-device authentication tracking"""
+
+    __tablename__ = "user_sessions"
+
+    # UUID Primary Key - descriptive and intuitive
+    session_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+
+    # Foreign keys for both staff and student sessions
+    staff_id = Column(UUID(as_uuid=True), ForeignKey("staff.staff_id"), nullable=True, index=True)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.student_id"), nullable=True, index=True)
+    
+    # Session type to differentiate between staff and student sessions
+    session_type = Column(String(20), default="staff", nullable=False)  # "staff" or "student"
+
+    # Device and browser information
+    browser = Column(String(100), nullable=True)  # "Chrome", "Firefox", "Safari"
+    os = Column(String(100), nullable=True)       # "macOS", "Windows", "Linux"
+    device = Column(String(100), nullable=True)   # "Desktop", "Mobile", "Tablet"
+    user_agent = Column(Text, nullable=True)      # Full user agent string
+
+    # Session security
+    refresh_token_hash = Column(String(255), nullable=False)  # Hashed refresh token
+    
+    # Session tracking
+    created_at_timestamp = Column(BigInteger, nullable=False)  # Unix timestamp
+    last_used_timestamp = Column(BigInteger, nullable=False)   # Unix timestamp
+    expires_at_timestamp = Column(BigInteger, nullable=False)  # Unix timestamp
+    
+    # Session status
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    # IP tracking (optional)
+    ip_address = Column(String(45), nullable=True)  # IPv4/IPv6 support
+    location = Column(String(200), nullable=True)   # City, Country (optional)
+
+    # Relationships
+    staff = relationship("Staff", back_populates="sessions", foreign_keys=[staff_id])
+    student = relationship("Student", back_populates="sessions", foreign_keys=[student_id])
+
+    def __repr__(self):
+        user_id = self.staff_id if self.session_type == "staff" else self.student_id
+        return f"<UserSession(session_id={self.session_id}, {self.session_type}_id={user_id}, device={self.device})>"
+
+    def to_dict(self, include_sensitive: bool = False) -> dict:
+        """
+        Convert to dictionary with camelCase for API responses.
+        """
+        base_dict = super().to_dict()
+        result = {
+            "sessionId": base_dict["session_id"],
+            "sessionType": base_dict["session_type"],
+            "staffId": base_dict["staff_id"],
+            "studentId": base_dict["student_id"],
+            "browser": base_dict["browser"],
+            "os": base_dict["os"],
+            "device": base_dict["device"],
+            "createdAt": base_dict["created_at_timestamp"],
+            "lastUsed": base_dict["last_used_timestamp"],
+            "expiresAt": base_dict["expires_at_timestamp"],
+            "isActive": base_dict["is_active"],
+            "ipAddress": base_dict["ip_address"] if include_sensitive else None,
+            "location": base_dict["location"],
+        }
+
+        # Only include user agent if sensitive data is requested
+        if include_sensitive:
+            result["userAgent"] = base_dict["user_agent"]
+
+        return result
+
+    @property
+    def device_display_name(self) -> str:
+        """Get human-readable device name for display"""
+        parts = []
+        if self.browser:
+            parts.append(self.browser)
+        if self.os:
+            parts.append(f"on {self.os}")
+        if self.device and self.device.lower() != "desktop":
+            parts.append(f"({self.device})")
+        
+        return " ".join(parts) if parts else "Unknown Device"
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if session is expired based on timestamp"""
+        import time
+        return time.time() > self.expires_at_timestamp
+
+    def update_last_used(self):
+        """Update last used timestamp to current time"""
+        import time
+        self.last_used_timestamp = int(time.time())

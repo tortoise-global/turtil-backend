@@ -1,0 +1,29 @@
+[Unit]
+Description=Turtil Backend Application
+Requires=docker.service
+After=docker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /home/ec2-user/start.sh
+ExecStop=/usr/bin/docker-compose -f /home/ec2-user/docker-compose.yml down
+WorkingDirectory=/home/ec2-user
+User=ec2-user
+Group=ec2-user
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+
+# Environment
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/home/ec2-user/.env
+
+# Security settings (relaxed for Docker access)
+NoNewPrivileges=false
+ReadWritePaths=/home/ec2-user /var/log/turtil-backend /var/run/docker.sock
+
+[Install]
+WantedBy=multi-user.target

@@ -86,6 +86,10 @@ celerybeat-schedule
 
 # Environments
 .env
+.env.local
+.env.dev
+.env.test
+.env.prod
 .venv
 env/
 venv/
@@ -132,8 +136,6 @@ Thumbs.db
 
 # Local development
 docker-compose.override.yml
-.env.local
-.env.production
 
 # Logs
 logs/
@@ -175,3 +177,5 @@ htmlcov/
 # Local testing
 test_*.py
 *_test.py
+
+*/env_config.json

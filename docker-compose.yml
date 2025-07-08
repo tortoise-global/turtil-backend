@@ -1,119 +1,16 @@
-version: "3.8"
-
 services:
   app:
     build: .
     ports:
       - "8000:8000"
-    environment:
-      # Database Configuration
-      - DATABASE_URL=postgresql://user:password@postgres:5432/turtil_db
-      
-      # Redis Configuration (Upstash HTTP)
-      - UPSTASH_REDIS_URL=http://serverless-redis-http:80
-      - UPSTASH_REDIS_TOKEN=example_token
-      - REDIS_USER_CACHE_TTL=300
-      - REDIS_BLACKLIST_TTL=86400
-      
-      # Security Configuration
-      - SECRET_KEY=your-local-secret-key-change-in-production
-      - ALGORITHM=HS256
-      - ACCESS_TOKEN_EXPIRE_MINUTES=30
-      - JWT_SECRET_KEY=your-local-secret-key-change-in-production
-      - JWT_ALGORITHM=HS256
-      - JWT_EXPIRE_MINUTES=30
-      
-      # Application Configuration
-      - PROJECT_NAME=Turtil Backend
-      - VERSION=1.0.0
-      - ENVIRONMENT=development
-      - DEBUG=true
-      - LOG_LEVEL=INFO
-      
-      # CORS and Host Configuration
-      - CORS_ORIGINS='["*", "http://localhost:3000", "http://localhost:8080"]'
-      - ALLOWED_HOSTS='["*", "localhost", "127.0.0.1", "0.0.0.0"]'
-      
-      # Rate Limiting
-      - RATE_LIMIT_CALLS=100
-      - RATE_LIMIT_PERIOD=60
-      
-      # OTP Configuration
-      - OTP_SECRET=123456
-      - OTP_EXPIRY_MINUTES=5
-      
-      # AWS Configuration
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-your-aws-access-key}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-your-aws-secret-key}
-      - AWS_REGION=ap-south-1
-      - AWS_DEFAULT_REGION=ap-south-1
-      
-      # S3 Configuration
-      - S3_BUCKET_NAME=my-cms-image-upload
-      
-      # Email Configuration (AWS SES)
-      - AWS_SES_FROM_EMAIL=support@turtil.co
-      - AWS_SES_REGION=ap-south-1
-    depends_on:
-      postgres:
-        condition: service_healthy
-      serverless-redis-http:
-        condition: service_started
+    env_file:
+      - .env
     volumes:
       - .:/app
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/simple"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
     restart: unless-stopped
-
-  postgres:
-    image: postgres:15
-    container_name: turtil_postgres
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: turtil_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d turtil_db"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    restart: unless-stopped
-
-  serverless-redis-http:
-    image: hiett/serverless-redis-http:latest
-    ports:
-      - "8079:80"
-    environment:
-      SRH_MODE: env
-      SRH_TOKEN: example_token
-      SRH_CONNECTION_STRING: "redis://redis:6379"
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
-  redis_data:
