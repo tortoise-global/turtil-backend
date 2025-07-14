@@ -82,7 +82,7 @@ jobs:
 
       - name: Tag Docker Image
         run: |
-          docker tag "$TF_ENV"-cms-app-repo:latest 033464272864.dkr.ecr.ap-south-1.amazonaws.com/"$TF_ENV"-cms-api-repo:latest
+          docker tag "$TF_ENV"-cms-app-repo:latest 033464272864.dkr.ecr.ap-south-1.amazonaws.com/"$TF_ENV"-cms-app-repo:latest
 
       - name: Push Docker Image to ECR
         run: |
