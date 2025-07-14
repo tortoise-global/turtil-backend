@@ -78,7 +78,7 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build --platform linux/arm64 -t "$TF_ENV"-cms-api-repo .
+          docker build --platform linux/arm64 -t "$TF_ENV"-cms-app-repo .
 
       - name: Tag Docker Image
         run: |
