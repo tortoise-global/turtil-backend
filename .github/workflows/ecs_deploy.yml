@@ -78,7 +78,6 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          cd app
           docker build --platform linux/arm64 -t "$TF_ENV"-cms-api-repo .
 
       - name: Tag Docker Image
