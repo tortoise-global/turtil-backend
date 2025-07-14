@@ -70,8 +70,9 @@ jobs:
         if: github.event_name != 'pull_request'
         working-directory: ./terraform_ecs
         run: |   
+            
             terraform apply -auto-approve tfplan
-       #terraform apply -auto-approve tfplan
+        #terraform apply -auto-approve tfplan
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 033464272864.dkr.ecr.$AWS_REGION.amazonaws.com
