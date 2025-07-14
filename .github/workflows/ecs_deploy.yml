@@ -1,0 +1,108 @@
+name: CI/CD Pipeline with Docker Deployment
+
+on:
+  push:
+    branches: [dev, test, prod]
+  pull_request:
+    branches: [dev, test, prod]
+  workflow_dispatch:
+    inputs:
+      tf_env:
+        description: "Target environment (dev | test | prod)"
+        required: true
+        default: dev
+        type: choice
+        options: [dev, test, prod]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      TF_ENV: ${{ github.event.inputs.tf_env || github.ref_name }}
+      AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION:            ${{ secrets.AWS_REGION }}
+      AWS_DEFAULT_REGION:    ${{ secrets.AWS_REGION }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Debug - Print Environment
+        run: echo "Environment is set to $TF_ENV"
+
+      - name: Terraform Init
+        working-directory: ./terraform_ecs
+        run: terraform init -reconfigure
+
+      - name: Terraform Validate
+        working-directory: ./terraform_ecs
+        run: terraform validate
+
+      - name: Select or Create Terraform Workspace
+        working-directory: ./terraform_ecs
+        run: terraform workspace select "$TF_ENV" || terraform workspace new "$TF_ENV"
+
+      - name: Terraform Plan
+        working-directory: ./terraform_ecs
+        run: |
+          terraform plan \
+            -var="environment=$TF_ENV" \
+            -out=tfplan
+
+      - name: Terraform Apply
+        if: github.event_name != 'pull_request'
+        working-directory: ./terraform_ecs
+        run: |   
+            terraform apply -auto-approve tfplan
+       #terraform apply -auto-approve tfplan
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 033464272864.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      - name: Build Docker Image
+        run: |
+          cd app
+          docker build --platform linux/arm64 -t "$TF_ENV"-cms-api-repo .
+
+      - name: Tag Docker Image
+        run: |
+          docker tag "$TF_ENV"-cms-app-repo:latest 033464272864.dkr.ecr.ap-south-1.amazonaws.com/"$TF_ENV"-cms-api-repo:latest
+
+      - name: Push Docker Image to ECR
+        run: |
+          docker push 033464272864.dkr.ecr.$AWS_REGION.amazonaws.com/"$TF_ENV"-cms-app-repo:latest
+
+      # ── 5. ECS Service Restart (Optional: Uncomment to enable) ──
+      - name: Restart ECS service
+        if: github.event_name != 'pull_request'
+        run: |
+          CLUSTER="cms-app-${TF_ENV}"
+          SERVICE="cms-app-${TF_ENV}-service"
+          TASKDEF=$(aws ecs list-task-definitions \
+                      --family-prefix cms-app-${TF_ENV}-task \
+                      --sort DESC \
+                      --query 'taskDefinitionArns[0]' \
+                      --output text)
+          aws ecs update-service \
+            --cluster "$CLUSTER" \
+            --service "$SERVICE" \
+            --task-definition "$TASKDEF" \
+            --force-new-deployment \
+            --region "$AWS_REGION"
